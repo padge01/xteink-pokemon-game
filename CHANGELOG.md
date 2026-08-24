@@ -1,3 +1,9 @@
+## [Unreleased]
+
+### Fixed
+
+- KOReader Sync now accepts successful responses from compatible servers such as BookLore and Grimmory, including an empty `204` progress response.
+
 ## [v1.5.0] - 2026-08-08
 
 ### Added

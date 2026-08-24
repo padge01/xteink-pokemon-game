@@ -22,6 +22,7 @@
 #include <string>
 
 #include "KOReaderCredentialStore.h"
+#include "KOReaderSyncHttpStatus.h"
 
 #ifndef SIMULATOR
 // wolfSSL is built with DEBUG_WOLFSSL, whose Arduino backend expects the app to
@@ -197,6 +198,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::authenticate() {
 
   http.end();
 
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) return OK;
   if (httpCode == 401) return AUTH_FAILED;
   if (httpCode < 0) return NETWORK_ERROR;
   return SERVER_ERROR;
@@ -224,6 +226,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::authenticate() {
     return result;
   }
   http.end();
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) return OK;
   if (httpCode == 401) return AUTH_FAILED;
   return SERVER_ERROR;
 #endif
@@ -261,7 +264,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::createUser() {
   LOG_DBG("KOSync", "Create user response: %d", httpCode);
 
   if (httpCode <= 0) return NETWORK_ERROR;
-  if (httpCode == 200 || httpCode == 201) return OK;
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) return OK;
   if (httpCode == 402) return USER_EXISTS;
   return SERVER_ERROR;
 }
@@ -297,7 +300,12 @@ KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string& doc
   lastHttpCode = httpCode;
   lastTransportError = (httpCode < 0) ? httpCode : 0;
 
-  if (httpCode == 200) {
+  if (koreader_sync::isNoContentProgressCode(httpCode)) {
+    http.end();
+    return NOT_FOUND;
+  }
+
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) {
     String responseBody = http.getString();
     http.end();
 
@@ -346,7 +354,12 @@ KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string& doc
     return NETWORK_ERROR;
   }
 
-  if (httpCode == 200) {
+  if (koreader_sync::isNoContentProgressCode(httpCode)) {
+    http.end();
+    return NOT_FOUND;
+  }
+
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) {
     const std::string& body = http.getString();
     JsonDocument doc;
     const DeserializationError error = deserializeJson(doc, body);
@@ -384,6 +397,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::getProgress(const std::string& doc
     }
 
     LOG_DBG("KOSync", "Got progress: %.2f%% at %s", outProgress.percentage * 100, outProgress.progress.c_str());
+    http.end();
     return OK;
   }
 
@@ -457,7 +471,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgr
 
   LOG_DBG("KOSync", "Update progress response: %d", httpCode);
 
-  if (httpCode == 200 || httpCode == 202) return OK;
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) return OK;
   if (httpCode == 401) return AUTH_FAILED;
   if (httpCode < 0) return NETWORK_ERROR;
   return SERVER_ERROR;
@@ -478,7 +492,7 @@ KOReaderSyncClient::Error KOReaderSyncClient::updateProgress(const KOReaderProgr
   LOG_DBG("KOSync", "Update progress response: %d", httpCode);
 
   if (httpCode <= 0) return NETWORK_ERROR;
-  if (httpCode == 200 || httpCode == 202) return OK;
+  if (koreader_sync::isSuccessfulHttpCode(httpCode)) return OK;
   if (httpCode == 401) return AUTH_FAILED;
   return SERVER_ERROR;
 #endif

@@ -1,0 +1,9 @@
+add_executable(KOReaderSyncHttpStatusTest
+  KOReaderSyncHttpStatusTest.cpp
+)
+
+target_link_libraries(KOReaderSyncHttpStatusTest PRIVATE
+  crosspoint_test_common
+)
+
+add_test(NAME KOReaderSyncHttpStatusTest COMMAND KOReaderSyncHttpStatusTest)
