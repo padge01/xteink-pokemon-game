@@ -3,6 +3,7 @@
 ### Fixed
 
 - KOReader Sync now accepts successful responses from compatible servers such as BookLore and Grimmory, including an empty `204` progress response.
+- The web EPUB optimizer now removes XML comments without damaging CDATA, processing instructions, DOCTYPE declarations, or malformed input.
 
 ## [v1.5.0] - 2026-08-08
 

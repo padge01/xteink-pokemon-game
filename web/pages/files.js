@@ -4087,7 +4087,15 @@ async function convertEpubFile(file, progressCallback) {
   // Second pass: update XHTML using DOMParser
   for (const [xhtmlPath, content] of Object.entries(xhtmlFiles)) {
     if (operationCancelled) throw new Error("Cancelled by user");
-    let t = scrubEpubTextResource(xhtmlPath, content);
+    let t = content;
+
+    const stripped = stripComments(t);
+    if (stripped.count) {
+      t = stripped.text;
+      logFix(`Comments (${stripped.count}, ${formatBytes(stripped.bytes)})`, xhtmlPath.split("/").pop());
+    }
+
+    t = scrubEpubTextResource(xhtmlPath, t);
     const r = fixSvgCover(t);
     if (r.fixed) {
       t = r.c;
