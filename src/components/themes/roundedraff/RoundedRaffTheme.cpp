@@ -455,27 +455,30 @@ void RoundedRaffTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, 
   renderer.fillRect(rightGroupX, outlineY, groupWidth, hintHeight, false);
 
   renderer.drawRoundedRect(leftGroupX, outlineY, groupWidth, hintHeight, 2, kBottomRadius, true);
-  const int selectWidth = renderer.getTextWidth(kGuideFontId, selectText.c_str(), EpdFontFamily::REGULAR);
-  const int downWidth = renderer.getTextWidth(kGuideFontId, downText.c_str(), EpdFontFamily::REGULAR);
   constexpr int innerEdgePadding = 16;
-
-  const int backX = leftGroupX + innerEdgePadding;
-  const int selectX = leftGroupX + groupWidth - innerEdgePadding - selectWidth;
-  const int upX = rightGroupX + innerEdgePadding;
-  const int downX = rightGroupX + groupWidth - innerEdgePadding - downWidth;
 
   renderer.drawRoundedRect(rightGroupX, outlineY, groupWidth, hintHeight, 2, kBottomRadius, true);
 
   renderer.setOrientation(invertText ? GfxRenderer::Orientation::PortraitInverted : GfxRenderer::Orientation::Portrait);
-  const int textY = (invertText ? bottomMargin : outlineY) + (hintHeight - renderer.getLineHeight(kGuideFontId)) / 2;
+  const int labelTop = invertText ? bottomMargin : outlineY;
+  const int textYOffset = (hintHeight - renderer.getLineHeight(kGuideFontId)) / 2;
+  const int leftHalfWidth = groupWidth / 2;
+  const int rightHalfWidth = groupWidth - leftHalfWidth;
+  const Rect leftOuterRect{leftGroupX, labelTop, leftHalfWidth, hintHeight};
+  const Rect leftInnerRect{leftGroupX + leftHalfWidth, labelTop, rightHalfWidth, hintHeight};
+  const Rect rightInnerRect{rightGroupX, labelTop, leftHalfWidth, hintHeight};
+  const Rect rightOuterRect{rightGroupX + leftHalfWidth, labelTop, rightHalfWidth, hintHeight};
 
   if (!backDisabled) {
-    renderer.drawText(kGuideFontId, backX, textY, backLabel.c_str(), true, EpdFontFamily::REGULAR);
+    drawHintLabel(renderer, kGuideFontId, EpdFontFamily::REGULAR, backLabel.c_str(), leftOuterRect, textYOffset,
+                  ButtonHintLayout::Alignment::Left, innerEdgePadding);
   }
-  renderer.drawText(kGuideFontId, selectX, textY, selectText.c_str(), true, EpdFontFamily::REGULAR);
-
-  renderer.drawText(kGuideFontId, upX, textY, upText.c_str(), true, EpdFontFamily::REGULAR);
-  renderer.drawText(kGuideFontId, downX, textY, downText.c_str(), true, EpdFontFamily::REGULAR);
+  drawHintLabel(renderer, kGuideFontId, EpdFontFamily::REGULAR, selectText.c_str(), leftInnerRect, textYOffset,
+                ButtonHintLayout::Alignment::Right, innerEdgePadding);
+  drawHintLabel(renderer, kGuideFontId, EpdFontFamily::REGULAR, upText.c_str(), rightInnerRect, textYOffset,
+                ButtonHintLayout::Alignment::Left, innerEdgePadding);
+  drawHintLabel(renderer, kGuideFontId, EpdFontFamily::REGULAR, downText.c_str(), rightOuterRect, textYOffset,
+                ButtonHintLayout::Alignment::Right, innerEdgePadding);
 
   renderer.setOrientation(origOrientation);
 }

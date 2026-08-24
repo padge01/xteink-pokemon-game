@@ -159,6 +159,51 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
   renderer.drawCenteredText(UI_10_FONT_ID, rect.y + rect.height + 15, percentText.c_str());
 }
 
+void BaseTheme::drawHintLabel(const GfxRenderer& renderer, const int fontId,
+                              const EpdFontFamily::Style fontStyle, const char* label, const Rect contentRect,
+                              const int singleLineYOffset, const ButtonHintLayout::Alignment alignment,
+                              const int horizontalPadding, const bool black) {
+  if (label == nullptr || label[0] == '\0') return;
+
+  const int maxTextWidth = ButtonHintLayout::maxTextWidth(contentRect.width, horizontalPadding);
+  const int textWidth = renderer.getTextWidth(fontId, label, fontStyle);
+  if (textWidth <= maxTextWidth) {
+    const int textX = ButtonHintLayout::textX(contentRect.x, contentRect.width, textWidth, alignment, horizontalPadding);
+    renderer.drawText(fontId, textX, contentRect.y + singleLineYOffset, label, black, fontStyle);
+    return;
+  }
+
+  constexpr int lineGap = 2;
+  const int overflowMaxWidth =
+      ButtonHintLayout::overflowMaxTextWidth(contentRect.width, horizontalPadding, alignment);
+  const int pixelHeight = renderer.getTextPixelHeight(fontId, label, fontStyle);
+  const int maxLines = ButtonHintLayout::maxVisibleLines(contentRect.height, pixelHeight, 2, lineGap);
+  if (maxLines == 1) {
+    // Current front-button guides cannot contain two complete rows of their
+    // built-in font. Allocate one temporary string only on overflow and keep
+    // the ellipsized label at the legacy single-line Y position.
+    const std::string visibleLabel = renderer.truncatedText(fontId, label, overflowMaxWidth, fontStyle);
+    const int visibleWidth = renderer.getTextWidth(fontId, visibleLabel.c_str(), fontStyle);
+    const int visibleX =
+        ButtonHintLayout::textX(contentRect.x, contentRect.width, visibleWidth, alignment, horizontalPadding);
+    renderer.drawText(fontId, visibleX, contentRect.y + singleLineYOffset, visibleLabel.c_str(), black, fontStyle);
+    return;
+  }
+
+  // Larger future guides may wrap. The transient vector and strings exist
+  // only on the overflow path and are released before this helper returns.
+  const auto lines = renderer.wrappedText(fontId, label, overflowMaxWidth, maxLines, fontStyle);
+  int lineY = ButtonHintLayout::wrappedTextTop(contentRect.y, contentRect.height, pixelHeight,
+                                               static_cast<int>(lines.size()), lineGap);
+  for (const auto& line : lines) {
+    const int lineWidth = renderer.getTextWidth(fontId, line.c_str(), fontStyle);
+    const int lineX =
+        ButtonHintLayout::textX(contentRect.x, contentRect.width, lineWidth, alignment, horizontalPadding);
+    renderer.drawText(fontId, lineX, lineY, line.c_str(), black, fontStyle);
+    lineY += pixelHeight + lineGap;
+  }
+}
+
 void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,
                                 const char* btn4, const bool allowInvertedText) const {
   if (gpio.hasTouch()) return;
@@ -194,14 +239,13 @@ void BaseTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   }
 
   renderer.setOrientation(invertText ? GfxRenderer::Orientation::PortraitInverted : GfxRenderer::Orientation::Portrait);
-  const int textY = invertText ? textYOffset : pageHeight - buttonY + textYOffset;
+  const int labelTop = invertText ? 0 : pageHeight - buttonY;
 
   for (int i = 0; i < 4; i++) {
     if (labels[i] != nullptr && labels[i][0] != '\0') {
       const int x = buttonPositions[invertText ? 3 - i : i];
-      const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, labels[i]);
-      const int textX = x + (buttonWidth - 1 - textWidth) / 2;
-      renderer.drawText(UI_10_FONT_ID, textX, textY, labels[i]);
+      drawHintLabel(renderer, UI_10_FONT_ID, EpdFontFamily::REGULAR, labels[i],
+                    Rect{x, labelTop, buttonWidth, buttonHeight}, textYOffset, ButtonHintLayout::Alignment::Center, 4);
     }
   }
 

@@ -291,6 +291,10 @@ class GfxRenderer {
   /// truncated with an ellipsis (U+2026).
   std::vector<std::string> wrappedText(int fontId, const char* text, int maxWidth, int maxLines,
                                        EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  /// Returns the full ascender-to-descender pixel bounds for the font that
+  /// drawText() resolves for this text, including a registered CJK fallback.
+  int getTextPixelHeight(int fontId, const char* text,
+                         EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
 
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,

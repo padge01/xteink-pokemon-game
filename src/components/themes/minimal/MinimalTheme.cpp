@@ -674,14 +674,13 @@ void MinimalTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, cons
   }
 
   renderer.setOrientation(invertText ? GfxRenderer::Orientation::PortraitInverted : GfxRenderer::Orientation::Portrait);
-  const int textY = invertText ? textYOffset : pageHeight - buttonY + textYOffset;
+  const int labelTop = invertText ? 0 : pageHeight - buttonY;
 
   for (int i = 0; i < 4; i++) {
     if (labels[i] != nullptr && labels[i][0] != '\0') {
       const int x = buttonPositions[invertText ? 3 - i : i];
-      const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, labels[i]);
-      const int textX = x + (buttonWidth - 1 - textWidth) / 2;
-      renderer.drawText(SMALL_FONT_ID, textX, textY, labels[i]);
+      drawHintLabel(renderer, SMALL_FONT_ID, EpdFontFamily::REGULAR, labels[i],
+                    Rect{x, labelTop, buttonWidth, buttonHeight}, textYOffset, ButtonHintLayout::Alignment::Center, 4);
     }
   }
 

@@ -6,6 +6,10 @@
 #include <string>
 #include <vector>
 
+#include <EpdFontFamily.h>
+
+#include "ButtonHintLayout.h"
+
 class GfxRenderer;
 struct RecentBook;
 struct BookReadingStats;
@@ -292,6 +296,9 @@ class BaseTheme {
   static constexpr int homeHeaderTopInset = 2;
   static int homeHeaderClockTextYOffset(const GfxRenderer& renderer);
   static Rect buttonMenuTouchTarget(Rect rowRect, Rect menuRect, bool isLastItem, int rowSpacing);
+  static void drawHintLabel(const GfxRenderer& renderer, int fontId, EpdFontFamily::Style fontStyle, const char* label,
+                            Rect contentRect, int singleLineYOffset, ButtonHintLayout::Alignment alignment,
+                            int horizontalPadding, bool black = true);
   static void drawBatteryOutline(const GfxRenderer& renderer, int x, int y, int battWidth, int rectHeight,
                                  bool foregroundBlack = true);
   static void drawBatteryLightningBolt(const GfxRenderer& renderer, int boltX, int boltY, bool foregroundBlack = false);
