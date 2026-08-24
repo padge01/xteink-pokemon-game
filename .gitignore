@@ -14,6 +14,7 @@ build
 /.cache
 .history/
 /.venv
+/.worktrees/
 *.local*
 fs_/
 /site/node_modules/
