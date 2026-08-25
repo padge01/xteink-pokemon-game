@@ -96,22 +96,6 @@ class SimulatorSmokeTest {
     return std::max(0, std::atoi(raw));
   }
 
-  static void applyRequestedTheme() {
-    const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_THEME");
-    if (raw == nullptr || raw[0] == '\0') {
-      return;
-    }
-
-    const int theme = std::atoi(raw);
-    if (theme < 0 || theme >= CrossPointSettings::UI_THEME_COUNT) {
-      fail("Invalid smoke test theme index: %d", theme);
-    }
-
-    SETTINGS.uiTheme = static_cast<uint8_t>(theme);
-    UITheme::getInstance().reload();
-    LOG_INF("SMOKE", "Using theme index %d", theme);
-  }
-
   [[noreturn]] static void fail(const char* message) {
     LOG_ERR("SMOKE", "%s", message);
     std::_Exit(2);
@@ -161,7 +145,6 @@ class SimulatorSmokeTest {
         if (!SimulatorHomeKeyInput::verifyTimingContract()) {
           fail("Simulator Home key timing contract failed");
         }
-        applyRequestedTheme();
         activityManager.goHome();
         queueStep("Home", SmokeStep::Home);
         break;
@@ -462,6 +445,22 @@ class SimulatorSmokeTest {
 SimulatorSmokeTest smokeTest;
 
 }  // namespace
+
+void applySimulatorSmokeTestTheme() {
+  const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_THEME");
+  if (raw == nullptr || raw[0] == '\0') {
+    return;
+  }
+
+  const int theme = std::atoi(raw);
+  if (theme < 0 || theme >= CrossPointSettings::UI_THEME_COUNT) {
+    LOG_ERR("SMOKE", "Invalid smoke test theme index: %d", theme);
+    std::_Exit(2);
+  }
+
+  SETTINGS.uiTheme = static_cast<uint8_t>(theme);
+  LOG_INF("SMOKE", "Using theme index %d", theme);
+}
 
 void runSimulatorSmokeTestTick() { smokeTest.tick(); }
 

@@ -493,16 +493,17 @@ CrossPointWebServer::WsUploadStatus CrossPointWebServer::getWsUploadStatus() con
   return status;
 }
 
-static void sendHtmlContent(WebServer* server, const char* data, size_t len) {
+static void sendHtmlContent(WebServer* server, const uint8_t* data, size_t len) {
   server->sendHeader("Content-Encoding", "gzip");
-  server->send_P(200, "text/html", data, len);
+  server->send_P(200, "text/html", reinterpret_cast<const char*>(data), len);
 }
 
 void CrossPointWebServer::handleRoot() const { sendHtmlContent(server.get(), HomePageHtml, sizeof(HomePageHtml)); }
 
 void CrossPointWebServer::handleJszip() const {
   server->sendHeader("Content-Encoding", "gzip");
-  server->send_P(200, "application/javascript", jszip_minJs, jszip_minJsCompressedSize);
+  server->send_P(200, "application/javascript", reinterpret_cast<const char*>(jszip_minJs),
+                 jszip_minJsCompressedSize);
 }
 
 // Shared stylesheet and logo are referenced with a content-hashed ?v= query,
@@ -510,13 +511,13 @@ void CrossPointWebServer::handleJszip() const {
 void CrossPointWebServer::handleStyleCss() const {
   server->sendHeader("Content-Encoding", "gzip");
   server->sendHeader("Cache-Control", "public, max-age=31536000, immutable");
-  server->send_P(200, "text/css", StyleCss, StyleCssCompressedSize);
+  server->send_P(200, "text/css", reinterpret_cast<const char*>(StyleCss), StyleCssCompressedSize);
 }
 
 void CrossPointWebServer::handleLogo() const {
   // Raw PNG (already compressed); no Content-Encoding.
   server->sendHeader("Cache-Control", "public, max-age=31536000, immutable");
-  server->send_P(200, "image/png", LogoPng, LogoPngSize);
+  server->send_P(200, "image/png", reinterpret_cast<const char*>(LogoPng), LogoPngSize);
 }
 
 void CrossPointWebServer::handleNotFound() const {

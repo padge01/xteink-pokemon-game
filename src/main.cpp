@@ -875,6 +875,9 @@ void setup() {
   HalSystem::checkPanic();
 
   SETTINGS.loadFromFile();
+#ifdef SIMULATOR
+  applySimulatorSmokeTestTheme();
+#endif
   Storage.installDateTimeCallback(&SETTINGS.clockUtcOffsetQ);
   APP_STATE.loadFromFile();
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));

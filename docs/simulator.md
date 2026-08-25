@@ -9,13 +9,9 @@ CrossInk can run in the [CrossPoint simulator](https://github.com/uxjulia/crossp
 
 ## Platform Support
 
-The simulator is currently configured for macOS on Apple Silicon.
+The simulator supports macOS and Linux. Its native MD5 shim uses CommonCrypto on macOS and OpenSSL on Linux.
 
-The `platformio.ini` `[env:simulator]` section contains hardcoded `-arch arm64` and Homebrew paths under `/opt/homebrew`.
-
-- Intel Mac users need to remove `-arch arm64` and change Homebrew paths to `/usr/local`.
-- Linux requires similar path changes plus a replacement for `lib/simulator_mock/src/MD5Builder.h`, which uses the macOS-only `CommonCrypto` API.
-- Native Windows is not supported. Use WSL and follow the Linux adjustments.
+Native Windows is not supported. Use WSL and follow the Linux instructions.
 
 ## Prerequisites
 
@@ -24,7 +20,7 @@ The `platformio.ini` `[env:simulator]` section contains hardcoded `-arch arm64` 
 brew install sdl2
 
 # Linux (Debian/Ubuntu)
-sudo apt install libsdl2-dev
+sudo apt install libsdl2-dev libssl-dev
 ```
 
 ## Setup
