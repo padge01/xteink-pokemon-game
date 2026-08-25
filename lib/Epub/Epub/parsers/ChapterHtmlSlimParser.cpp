@@ -2949,15 +2949,9 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
   // Closing a footnote link — create entry from collected text and href
   if (self->insideFootnoteLink && self->depth == self->footnoteLinkDepth) {
     if (self->currentFootnote.number[0] != '\0' && self->currentFootnote.href[0] != '\0') {
-      FootnoteEntry entry;
-      strncpy(entry.number, self->currentFootnote.number, sizeof(entry.number) - 1);
-      entry.number[sizeof(entry.number) - 1] = '\0';
-      strncpy(entry.href, self->currentFootnote.href, sizeof(entry.href) - 1);
-      entry.href[sizeof(entry.href) - 1] = '\0';
-      entry.linkId = self->currentFootnote.linkId;
       int wordIndex =
           self->wordsExtractedInBlock + (self->currentTextBlock ? static_cast<int>(self->currentTextBlock->size()) : 0);
-      self->pendingFootnotes.push_back({wordIndex, entry});
+      self->pendingFootnotes.emplace_back(wordIndex, self->currentFootnote);
       if (self->pendingFootnotes.size() >= MAX_PENDING_FOOTNOTES_BEFORE_LAYOUT && self->tableDepth == 0) {
         if (self->partWordBufferIndex > 0) {
           self->flushPartWordBuffer();

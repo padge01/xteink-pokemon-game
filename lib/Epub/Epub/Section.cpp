@@ -11,18 +11,19 @@
 
 #include "Epub/css/CssParser.h"
 #include "Page.h"
+#include "SectionCacheFormat.h"
 #include "hyphenation/Hyphenator.h"
 #include "parsers/ChapterHtmlSlimParser.h"
 
 namespace {
-constexpr uint32_t SECTION_CACHE_MAGIC = 0x535843FF;  // bytes: 0xFF, "CXS"
-// v60: reserve page-edge space for ruby overhang and prefer longer equal-cost
-// CJK lines, invalidating cached pagination from the prior layout contract.
-constexpr uint8_t SECTION_FILE_VERSION = 60;
+constexpr uint32_t SECTION_CACHE_MAGIC = section_cache::MAGIC;
+// v61: footnote targets use 256-byte storage, invalidating cached page records
+// written with v60's 96-byte target field.
+constexpr uint8_t SECTION_FILE_VERSION = section_cache::FINALIZED_VERSION;
 // Suspended incremental build: valid pages plus LUTs and a parse-watermark trailer.
 // Change this with layout or payload changes so stale partial pages cannot resume
 // under a different layout contract.
-constexpr uint8_t SECTION_FILE_PARTIAL_VERSION = 0xF9;
+constexpr uint8_t SECTION_FILE_PARTIAL_VERSION = section_cache::PARTIAL_VERSION;
 constexpr uint16_t INITIAL_SECTION_PAGE_LUT_ENTRIES = 1024;
 constexpr uint32_t HEADER_SIZE = sizeof(SECTION_CACHE_MAGIC) + sizeof(uint8_t) + sizeof(int) + sizeof(float) +
                                  sizeof(bool) + sizeof(bool) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t) +
@@ -278,14 +279,14 @@ bool Section::loadSectionFile(const ReaderRenderSpec& spec) {
       clearCache();
       return false;
     }
-    if (version != SECTION_FILE_VERSION && version != SECTION_FILE_PARTIAL_VERSION) {
+    if (!section_cache::isSupportedVersion(version)) {
       // Explicit close() required: member variable persists beyond function scope
       file.close();
       LOG_ERR("SCT", "Deserialization failed: Unknown version %u", version);
       clearCache();
       return false;
     }
-    filePartial = (version == SECTION_FILE_PARTIAL_VERSION);
+    filePartial = section_cache::isPartialVersion(version);
 
     int fileFontId;
     uint16_t fileViewportWidth, fileViewportHeight;
@@ -1766,7 +1767,7 @@ std::optional<uint16_t> Section::getPageForVisibleTextOffset(const uint32_t offs
   uint32_t magic = 0;
   uint8_t version = 0;
   if (!serialization::tryReadPod(f, magic) || magic != SECTION_CACHE_MAGIC || !serialization::tryReadPod(f, version) ||
-      (version != SECTION_FILE_VERSION && version != SECTION_FILE_PARTIAL_VERSION) ||
+      !section_cache::isSupportedVersion(version) ||
       !f.seek(HEADER_SIZE - sizeof(uint32_t) * 5 - sizeof(uint16_t))) {
     return std::nullopt;
   }
@@ -1791,6 +1792,6 @@ std::optional<uint16_t> Section::getPageForVisibleTextOffset(const uint32_t offs
     result = i;
     if (preferFirstAtOffset && start == offset) break;
   }
-  if (version == SECTION_FILE_PARTIAL_VERSION && offset > last) return std::nullopt;
+  if (section_cache::isPartialVersion(version) && offset > last) return std::nullopt;
   return result;
 }

@@ -8,6 +8,7 @@
 - Generated web assets now use byte-safe storage so the Linux simulator builds cleanly with GCC.
 - Linux simulator builds now link their OpenSSL crypto dependency, and the setup guide lists the required development package.
 - Simulator smoke tests now apply requested themes before activities are created, avoiding invalid theme references during test startup.
+- EPUB footnotes with long encoded targets now retain the complete link instead of truncating it and opening the wrong location.
 
 ## [v1.5.0] - 2026-08-08
 

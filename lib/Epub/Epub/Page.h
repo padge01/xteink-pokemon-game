@@ -148,13 +148,8 @@ class Page {
     if (footnotes.empty()) {
       footnotes.reserve(INITIAL_FOOTNOTE_RESERVE);
     }
-    FootnoteEntry entry;
-    std::strncpy(entry.number, number, sizeof(entry.number) - 1);
-    entry.number[sizeof(entry.number) - 1] = '\0';
-    std::strncpy(entry.href, href, sizeof(entry.href) - 1);
-    entry.href[sizeof(entry.href) - 1] = '\0';
-    entry.linkId = linkId;
-    footnotes.push_back(entry);
+    footnotes.emplace_back();
+    footnote_cache::assign(footnotes.back(), number, href, linkId);
   }
 
   void addPublisherPageMarker(const char* label, const int yPos) {

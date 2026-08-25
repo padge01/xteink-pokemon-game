@@ -251,11 +251,20 @@ Binary layout:
 
 ## `section.bin`
 
-### Version 59
+### Version 61
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
+
+Version 61 expands each footnote target from 96 to 256 bytes, increasing the
+fixed footnote record from 129 to 289 bytes. Finalized version 60 caches and
+suspended partial caches marked `0xF9` are rejected and rebuilt; version 61
+uses `0xF8` for suspended partial caches.
+
+Version 60 reserves page-edge space for ruby overhang and prefers longer
+equal-cost CJK lines, invalidating cached pagination from the prior layout
+contract.
 
 Version 59 adds a compact page-start visible-text-offset lookup table. The
 offset is a Unicode codepoint coordinate in the spine XHTML, so reader progress
@@ -329,10 +338,10 @@ import std.mem;
 import std.string;
 import std.core;
 
-#define EXPECTED_VERSION 59
+#define EXPECTED_VERSION 61
 #define MAX_STRING_LENGTH 65535
 #define FOOTNOTE_NUMBER_LEN 32
-#define FOOTNOTE_HREF_LEN 96
+#define FOOTNOTE_HREF_LEN 256
 
 struct String {
     u32 length [[hidden, comment("String byte length")]];
