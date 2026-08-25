@@ -22,10 +22,42 @@ def warn(msg):
     print(f'WARNING [git_branch.py]: {msg}', file=sys.stderr)
 
 
+def _git_command(project_dir, args):
+    command = ['git']
+    git_file = os.path.join(project_dir, '.git')
+    if os.name != 'posix' or not os.path.isfile(git_file):
+        return [*command, *args]
+
+    try:
+        with open(git_file, encoding='utf-8') as file:
+            git_pointer = file.readline().strip()
+    except OSError:
+        return [*command, *args]
+
+    match = re.fullmatch(r'gitdir:\s*([A-Za-z]:[\\/].+)', git_pointer)
+    if not match:
+        return [*command, *args]
+
+    try:
+        git_dir = subprocess.check_output(
+            ['wslpath', '-u', match.group(1)],
+            text=True, stderr=subprocess.PIPE
+        ).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError, OSError):
+        return [*command, *args]
+
+    return [
+        *command,
+        f'--git-dir={git_dir}',
+        f'--work-tree={project_dir}',
+        *args,
+    ]
+
+
 def get_git_short_hash(project_dir, length=5):
     try:
         return subprocess.check_output(
-            ['git', 'rev-parse', '--short', 'HEAD'],
+            _git_command(project_dir, ['rev-parse', '--short', 'HEAD']),
             text=True, stderr=subprocess.PIPE, cwd=project_dir
         ).strip()[:length]
     except Exception as e:
@@ -36,7 +68,7 @@ def get_git_short_hash(project_dir, length=5):
 def run_git_value(project_dir, args, label):
     try:
         value = subprocess.check_output(
-            ['git', *args],
+            _git_command(project_dir, args),
             text=True, stderr=subprocess.PIPE, cwd=project_dir
         ).strip()
         # Strip characters that would break a C string literal
