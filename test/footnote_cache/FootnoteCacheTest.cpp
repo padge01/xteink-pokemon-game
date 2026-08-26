@@ -79,12 +79,12 @@ int main() {
   if (!check(match != reloaded.footnotes.end(), "Reloaded link ID did not resolve")) return 1;
   if (!check(std::string(match->href) == target, "Reloaded link resolved to a different target")) return 1;
 
-  if (!check(!section_cache::isSupportedVersion(60), "Legacy full cache version 60 was accepted")) return 1;
-  if (!check(!section_cache::isSupportedVersion(0xF9), "Legacy partial cache version 0xF9 was accepted")) return 1;
-  if (!check(section_cache::isSupportedVersion(61), "Current full cache version 61 was rejected")) return 1;
-  if (!check(section_cache::isSupportedVersion(0xF8), "Current partial cache version 0xF8 was rejected")) return 1;
-  if (!check(!section_cache::isPartialVersion(61), "Full cache version was classified as partial")) return 1;
-  if (!check(section_cache::isPartialVersion(0xF8), "Partial cache version was classified as full")) return 1;
+  if (!check(!section_cache::isSupportedVersion(62), "Legacy full cache version 62 was accepted")) return 1;
+  if (!check(!section_cache::isSupportedVersion(0xF7), "Legacy partial cache version 0xF7 was accepted")) return 1;
+  if (!check(section_cache::isSupportedVersion(63), "Current full cache version 63 was rejected")) return 1;
+  if (!check(section_cache::isSupportedVersion(0xF6), "Current partial cache version 0xF6 was rejected")) return 1;
+  if (!check(!section_cache::isPartialVersion(63), "Full cache version was classified as partial")) return 1;
+  if (!check(section_cache::isPartialVersion(0xF6), "Partial cache version was classified as full")) return 1;
 
   return 0;
 }

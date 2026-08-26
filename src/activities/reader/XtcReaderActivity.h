@@ -23,6 +23,7 @@ class XtcReaderActivity final : public Activity {
 
   uint32_t currentPage = 0;
   int pagesUntilFullRefresh = 0;
+  uint32_t lastPageTurnTime = 0;
   unsigned long pageShownAtMs = 0UL;
   uint32_t sessionReadingSeconds = 0;
   BookReadingStats stats;
@@ -43,11 +44,11 @@ class XtcReaderActivity final : public Activity {
     std::string title;
   };
 
-  void renderPage();
-  void renderStatusBarOverlay(StatusBarOverlayPosition position) const;
-  StatusBarInfo getStatusBarInfo() const;
+  void renderPage(uint32_t pageToRender);
+  void renderStatusBarOverlay(StatusBarOverlayPosition position, uint32_t pageToRender) const;
+  StatusBarInfo getStatusBarInfo(uint32_t pageToRender) const;
   bool saveProgress(uint32_t page);
-  bool queueProgressSave();
+  bool queueProgressSave(uint32_t pageToRender);
   bool flushQueuedProgress();
   void loadProgress();
   void pauseReadingStatsTimer(const char* source = "unknown");
@@ -56,7 +57,7 @@ class XtcReaderActivity final : public Activity {
   bool forwardPageReadElapsed(uint32_t& seconds, const char* source) const;
   void recordCurrentPageReadingTime(const char* source = "unknown");
   void recordForwardPageTurn(uint32_t seconds, bool recordPace);
-  bool formatTimeLeftLabel(char* buf, size_t len) const;
+  bool formatTimeLeftLabel(char* buf, size_t len, uint32_t pageToRender) const;
   void commitReadingStats();
   void resetCurrentBookStatsAfterDelete();
   void setBookCompleted(bool isCompleted);

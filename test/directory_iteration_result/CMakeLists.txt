@@ -1,0 +1,9 @@
+add_executable(DirectoryIterationResultTest
+  DirectoryIterationResultTest.cpp
+)
+
+target_link_libraries(DirectoryIterationResultTest PRIVATE
+  crosspoint_test_common
+)
+
+add_test(NAME DirectoryIterationResultTest COMMAND DirectoryIterationResultTest)

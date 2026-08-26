@@ -1,0 +1,9 @@
+add_executable(DeferredRepositionStateTest
+  DeferredRepositionStateTest.cpp
+)
+
+target_link_libraries(DeferredRepositionStateTest PRIVATE
+  crosspoint_test_common
+)
+
+add_test(NAME DeferredRepositionStateTest COMMAND DeferredRepositionStateTest)

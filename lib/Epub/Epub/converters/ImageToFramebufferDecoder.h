@@ -1,6 +1,4 @@
 #pragma once
-#include <HalStorage.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -32,15 +30,20 @@ class ImageToFramebufferDecoder {
 
   virtual const char* getFormatName() const = 0;
 
- protected:
-  // Size validation helpers
-  static constexpr int MAX_SOURCE_WIDTH = 2048;
-  // JPEGDEC streams scaled MCU blocks, so moderately wider JPEG sources are
-  // safe as long as the total-pixel and heap guards still pass.
-  static constexpr int MAX_JPEG_SOURCE_WIDTH = 4096;
-  static constexpr int MAX_SOURCE_HEIGHT = 3072;
-  static constexpr int64_t MAX_SOURCE_PIXELS = 2048LL * 3072LL;
+  // Decode callbacks can run for seconds on large, valid source images. Yield
+  // occasionally so the watchdog's idle task can run without changing limits.
+  static void yieldDuringDecode(uint32_t& lastYieldMs);
 
-  bool validateImageDimensions(int width, int height, const std::string& format, int maxSourceWidth = MAX_SOURCE_WIDTH);
+  // Validate in the decoder's wide source type before narrowing dimensions into
+  // the int16_t section-cache representation. The output is unchanged on failure.
+  static bool validateAndStoreDimensions(int64_t width, int64_t height, ImageDimensions& out, const char* format);
+
+ protected:
+  // Both decoders stream instead of allocating by source area: JPEG uses scaled
+  // MCU bands and PNG uses scanlines with an independent row-buffer guard. The
+  // cap therefore bounds decode time; the callbacks above yield during long work.
+  static constexpr int64_t MAX_SOURCE_DIMENSION = INT16_MAX;
+  static constexpr int64_t MAX_SOURCE_PIXELS = 8388608;  // 8 MP (for example 2048 * 4096)
+
   void warnUnsupportedFeature(const std::string& feature, const std::string& imagePath);
 };

@@ -4,8 +4,6 @@
 #include <Logging.h>
 #include <SdCardFont.h>
 
-#include <cstring>
-
 FontCacheManager::FontCacheManager(const std::map<int, EpdFontFamily>& fontMap,
                                    const std::map<int, SdCardFont*>& sdCardFonts)
     : fontMap_(fontMap), sdCardFonts_(sdCardFonts) {}
@@ -66,22 +64,44 @@ void FontCacheManager::resetStats() {
 bool FontCacheManager::isScanning() const { return scanMode_ == ScanMode::Scanning; }
 
 void FontCacheManager::recordText(const char* text, int fontId, EpdFontFamily::Style style) {
+  if (!text || *text == '\0') return;
+
+  ScanEntry* entry = nullptr;
+  for (auto& candidate : scanEntries_) {
+    if (candidate.used && candidate.fontId == fontId) {
+      entry = &candidate;
+      break;
+    }
+    if (!candidate.used) {
+      candidate.used = true;
+      candidate.fontId = fontId;
+      // Entry zero normally holds page text. Later entries usually hold short
+      // UI strings; capacities stay allocated and converge instead of churning.
+      candidate.text.reserve(&candidate == &scanEntries_[0] ? 2048 : 256);
+      entry = &candidate;
+      break;
+    }
+  }
+  if (!entry) return;
+
   if ((style & EpdFontFamily::SMALL_CAPS) != 0) {
     for (const char* p = text; *p != '\0'; ++p) {
-      scanText_.push_back((*p >= 'a' && *p <= 'z') ? static_cast<char>(*p - ('a' - 'A')) : *p);
+      entry->text.push_back((*p >= 'a' && *p <= 'z') ? static_cast<char>(*p - ('a' - 'A')) : *p);
     }
   } else {
-    scanText_ += text;
+    entry->text += text;
   }
-  if (scanFontId_ < 0) scanFontId_ = fontId;
-  const uint8_t baseStyle = static_cast<uint8_t>(style) & 0x03;
-  const unsigned char* p = reinterpret_cast<const unsigned char*>(text);
-  uint32_t cpCount = 0;
-  while (*p) {
-    if ((*p & 0xC0) != 0x80) cpCount++;
-    p++;
+  entry->styleMask |= static_cast<uint8_t>(1U << (static_cast<uint8_t>(style) & 0x03));
+}
+
+void FontCacheManager::resetScanEntries() {
+  for (auto& entry : scanEntries_) {
+    entry.used = false;
+    entry.fontId = 0;
+    entry.styleMask = 0;
+    // Keep grown capacity so repeated page turns avoid allocate-copy-free churn.
+    entry.text.clear();
   }
-  scanStyleCounts_[baseStyle] += cpCount;
 }
 
 // --- PrewarmScope implementation ---
@@ -91,34 +111,26 @@ FontCacheManager::PrewarmScope::PrewarmScope(FontCacheManager& manager, const Pr
   manager_->scanMode_ = ScanMode::Scanning;
   manager_->clearCache();
   manager_->resetStats();
-  manager_->scanText_.clear();
-  manager_->scanText_.reserve(2048);  // Pre-allocate to avoid heap fragmentation from repeated concat
-  memset(manager_->scanStyleCounts_, 0, sizeof(manager_->scanStyleCounts_));
-  manager_->scanFontId_ = -1;
+  manager_->resetScanEntries();
 }
 
 bool FontCacheManager::PrewarmScope::endScanAndPrewarm() {
   manager_->scanMode_ = ScanMode::None;
-  if (manager_->scanText_.empty()) return true;
-
-  // Build style bitmask from all styles that appeared during the scan
-  uint8_t styleMask = 0;
-  for (uint8_t i = 0; i < 4; i++) {
-    if (manager_->scanStyleCounts_[i] > 0) styleMask |= (1 << i);
+  bool ok = true;
+  for (auto& entry : manager_->scanEntries_) {
+    if (!entry.used || entry.text.empty()) continue;
+    if (!manager_->prewarmCache(entry.fontId, entry.text.c_str(), entry.styleMask != 0 ? entry.styleMask : 1,
+                                policy_)) {
+      ok = false;
+    }
   }
-  if (styleMask == 0) styleMask = 1;  // default to regular
-
-  const bool ok = manager_->prewarmCache(manager_->scanFontId_, manager_->scanText_.c_str(), styleMask, policy_);
-
-  // Keep the grown capacity around so the next page can reuse it without
-  // another allocate-grow-shrink cycle.
-  manager_->scanText_.clear();
+  manager_->resetScanEntries();
   return ok;
 }
 
 FontCacheManager::PrewarmScope::~PrewarmScope() {
   if (active_) {
-    endScanAndPrewarm();  // no-op if already called (scanText_ is empty)
+    endScanAndPrewarm();  // no-op if already called (scan entries are empty)
     manager_->clearCache();
   }
 }

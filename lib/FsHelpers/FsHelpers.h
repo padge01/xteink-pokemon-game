@@ -5,9 +5,30 @@
 #include <string_view>
 #include <vector>
 
+#include "DirectoryIterationResult.h"
 #include "NaturalSort.h"
 
+class HalFile;
+
 namespace FsHelpers {
+
+// Distinguishes clean EOF from wrapper allocation and underlying SD read
+// failures after openNextFile() returns an invalid entry.
+DirectoryIterationResult directoryIterationResult(const HalFile& directory);
+bool directoryIterationFailed(const HalFile& directory);
+
+// Validates that a directory can be walked to normal EOF.
+bool directoryCanBeEnumerated(const char* path);
+
+enum class DirectoryEntryVisibility : uint8_t {
+  Visible,
+  Missing,
+  IterationFailed,
+};
+
+// Checks whether a direct child is reachable through normal directory
+// enumeration, using its stored name in case FAT normalized the requested path.
+DirectoryEntryVisibility directoryEntryVisibility(const char* directoryPath, const char* entryPath);
 
 std::string decodeUriEscapes(const std::string& path);
 

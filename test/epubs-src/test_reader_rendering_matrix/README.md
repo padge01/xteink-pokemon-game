@@ -7,7 +7,7 @@ This fixture exercises common EPUB text rendering scenarios in one book:
 3. Inline styling: bold, italic, bold italic, underline, strikethrough, nested spans, and mixed styles in one paragraph.
 4. Line breaking: long words, soft hyphens, nonbreaking spaces, punctuation attachment, and guide-dot spacing.
 5. Page breaking: explicit page-break-before and page-break-after boundaries.
-6. Lists, headings, blockquotes, preformatted text, and basic tables.
+6. Lists, headings, blockquotes, preformatted text, and basic tables with a caption before the first row.
 
 Build from this directory with the same EPUB packaging pattern used by the other fixtures:
 

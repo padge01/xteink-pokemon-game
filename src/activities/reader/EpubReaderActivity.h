@@ -13,6 +13,7 @@
 
 #include "BookReadingStats.h"
 #include "BookmarkStore.h"
+#include "DeferredRepositionState.h"
 #include "EndOfBookOptions.h"
 #include "EpubReaderMenuActivity.h"
 #include "GlobalReadingStats.h"
@@ -109,11 +110,7 @@ class EpubReaderActivity final : public Activity {
   // one-shot clean base for its first image page; normal image-page cleanup
   // uses pagesUntilFullRefresh independently.
   bool cleanImageBasePending = false;
-  int cachedSpineIndex = 0;
-  int cachedChapterPageNumber = 0;
-  int cachedChapterTotalPageCount = 0;
-  int cachedChapterPageWatermark = 0;
-  std::optional<uint32_t> cachedVisibleTextOffset;
+  DeferredRepositionState deferredReposition;
   struct ChapterGroupEstimateCache {
     int currentSpineIndex = -1;
     int firstSpineIndex = -1;
@@ -129,10 +126,6 @@ class EpubReaderActivity final : public Activity {
     bool siblingEstimateUsed = false;
     bool valid = false;
   } chapterGroupEstimate;
-  bool pendingRelayoutReposition = false;
-  uint16_t cachedPageParagraphIndex = UINT16_MAX;
-  uint16_t cachedPageParagraphOffset = 0;
-  uint16_t cachedPageParagraphSpan = 0;
   std::atomic<uint8_t> pendingHeapShapeReaderRedrawStages{0};
   static constexpr uint8_t HEAP_SHAPE_REDRAW_CLIP = 1U << 0;
   static constexpr uint8_t HEAP_SHAPE_REDRAW_DICT = 1U << 1;
@@ -330,6 +323,9 @@ class EpubReaderActivity final : public Activity {
   // (used after a settings change re-paginates a chapter). Returns true if currentPage moved.
   bool isRelayoutCatchUpComplete() const;
   bool applyDeferredReposition();
+  // A resume/reflow anchor is valid only until it establishes the landing page.
+  // Explicit navigation must discard it before a background build can reapply it.
+  void clearDeferredReposition();
   bool saveProgress(int spineIndex, int currentPage, int pageCount);
   bool queueProgressSave(int spineIndex, int currentPage, int pageCount, bool forceSave = false);
   bool flushQueuedProgress();

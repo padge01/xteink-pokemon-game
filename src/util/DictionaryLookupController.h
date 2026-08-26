@@ -9,6 +9,7 @@
 #include <string>
 
 #include "Dictionary.h"
+#include "DictionaryLookupPolicy.h"
 #include "LookupHistory.h"
 #include "WordSelectNavigator.h"
 
@@ -26,15 +27,8 @@ class DictionaryLookupController {
   friend class DictionaryLookupWorker;
 
  public:
-  enum class LookupState { Idle, LookingUp, AltFormPrompt, NotFound, ReadError };
-  enum class LookupEvent {
-    None,
-    FoundDefinition,
-    NotFoundDismissedBack,
-    NotFoundDismissedDone,
-    SwitchDictionary,
-    Cancelled
-  };
+  using LookupState = DictionaryLookupPolicy::LookupState;
+  using LookupEvent = DictionaryLookupPolicy::LookupEvent;
 
   // How the word was ultimately resolved when FoundDefinition fires.
   enum class FoundStatus { Direct, Stem, AltForm, Suggestion };

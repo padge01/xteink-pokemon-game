@@ -246,6 +246,20 @@ bool FileBrowserActivity::loadFilesIntoVector(size_t cap, bool& overflow) {
     files.emplace_back(fileNameBuffer.get());
     file.close();
   }
+
+  const auto iterationResult = FsHelpers::directoryIterationResult(root);
+  if (FsHelpers::directoryIterationFailed(iterationResult)) {
+    if (iterationResult == FsHelpers::DirectoryIterationResult::ReadFailed) {
+      fileListReadFailed = true;
+      LOG_ERR("FileBrowser", "Directory read failed while loading %s", basepath.c_str());
+    } else {
+      fileListMemoryLimited = true;
+      LOG_ERR("FileBrowser", "Directory entry allocation failed while loading %s", basepath.c_str());
+    }
+    root.close();
+    files.clear();
+    return false;
+  }
   root.close();
   return true;
 }
@@ -254,6 +268,7 @@ void FileBrowserActivity::loadFiles() {
   usingIndex = false;
   clearIndexNameCache();
   fileListMemoryLimited = false;
+  fileListReadFailed = false;
   if (fileIndex) fileIndex->close();
 
   bool overflow = false;
@@ -281,6 +296,13 @@ void FileBrowserActivity::loadFiles() {
         mode == Mode::PickFirmware ? acceptFirmware : (mode == Mode::PickDirectory ? acceptDirectory : acceptCommon);
     if (fileIndex->open(basepath.c_str(), accept)) {
       usingIndex = true;
+      requestUpdate(true);
+      return;
+    }
+
+    if (fileIndex->directoryReadFailed()) {
+      fileListReadFailed = true;
+      LOG_ERR("FileBrowser", "index scan failed while reading %s", basepath.c_str());
       requestUpdate(true);
       return;
     }
@@ -1043,9 +1065,12 @@ void FileBrowserActivity::buildListScreen(UiApp::ScreenType& screen) {
 
   const size_t totalEntries = entryCount();
   if (totalEntries == 0) {
-    const char* emptyMessage = fileListMemoryLimited
-                                   ? tr(STR_MEMORY_ERROR)
-                                   : (mode == Mode::PickFirmware ? tr(STR_NO_BIN_FILES) : tr(STR_NO_FILES_FOUND));
+    const char* emptyMessage =
+        fileListReadFailed
+            ? tr(STR_ERROR_GENERAL_FAILURE)
+            : (fileListMemoryLimited
+                   ? tr(STR_MEMORY_ERROR)
+                   : (mode == Mode::PickFirmware ? tr(STR_NO_BIN_FILES) : tr(STR_NO_FILES_FOUND)));
     screen.centeredText(emptyMessage, screen.theme().bodyText);
     return;
   }

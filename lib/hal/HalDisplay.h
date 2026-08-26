@@ -30,6 +30,7 @@ class HalDisplay {
   static constexpr uint16_t DISPLAY_HEIGHT = EInkDisplay::DISPLAY_HEIGHT;
   static constexpr uint16_t DISPLAY_WIDTH_BYTES = DISPLAY_WIDTH / 8;
   static constexpr uint32_t BUFFER_SIZE = DISPLAY_WIDTH_BYTES * DISPLAY_HEIGHT;
+  static constexpr uint32_t X3_BUFFER_SIZE = EInkDisplay::X3_BUFFER_SIZE;
 
   // Frame buffer operations
   void clearScreen(uint8_t color = 0xFF) const;

@@ -1,4 +1,6 @@
 #include "ParsedText.h"
+#include "ReorderedWidthScratch.h"
+#include "TokenBoundary.h"
 
 #include <Arena.h>
 #include <ArenaVector.h>
@@ -62,6 +64,12 @@ uint32_t lastCodepoint(const std::string& word) {
   }
   const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str() + i);
   return utf8NextCodepoint(&ptr);
+}
+
+// A visible explicit hyphen or dash may end a line. Soft hyphens render only when their
+// conditional break is selected, while U+2011 is explicitly non-breaking.
+bool endsWithBreakableHyphen(const std::string& token) {
+  return !token.empty() && TokenBoundary::allowsBreakAfterExplicitHyphen(lastCodepoint(token));
 }
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
@@ -393,11 +401,11 @@ int naturalGapBeforeToken(const GfxRenderer& renderer, const int fontId, const s
     const int extraGap = guideDotWordSpacingExtra(renderer, fontId, leftWord, rightWord, leftStyle, wordSpacing);
     return guideDotNaturalGap(renderer, fontId, leftWord, rightWord, leftStyle) + extraGap;
   }
-  if (noSpaceBefore) {
-    return 0;
-  }
   if (continues) {
     return renderer.getKerning(fontId, lastCodepoint(leftWord), firstCodepoint(rightWord), leftStyle);
+  }
+  if (noSpaceBefore) {
+    return 0;
   }
   const int naturalGap =
       renderer.getSpaceAdvance(fontId, lastCodepoint(leftWord), firstCodepoint(rightWord), leftStyle);
@@ -409,11 +417,8 @@ size_t gapSlotsBeforeToken(const std::string& rightWord, const bool continues, c
   if (guideDotBefore) {
     return guideDotGapSlots(rightWord);
   }
-  if (noSpaceBefore) {
-    return isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1;
-  }
-  if (continues) {
-    return rightWord == " " ? 1 : 0;
+  if (!TokenBoundary::isJustifiableGap(continues, noSpaceBefore, rightWord == " ")) {
+    return 0;
   }
   return isClosingPunctuationForJustify(firstCodepoint(rightWord)) ? 0 : 1;
 }
@@ -695,10 +700,13 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
       size_t segmentLen = currentCpStart - segmentStart;
       std::string_view segment(reinterpret_cast<const char*>(segmentStart), segmentLen);
 
-      // Only the very first segment inherits the original attachToPrevious flag.
-      // Every subsequent segment MUST attach=true so it glues seamlessly to the prefix.
+      // Subsequent segments stay attached to the prefix. The fourth boundary state records a
+      // legal break after a visible hyphen while preserving kerning and suppressing justification
+      // when both segments remain on the same line.
+      const bool breakAfterPrevious =
+          !isFirstSegment && !words.empty() && endsWithBreakableHyphen(words.back());
       processSegment(segment, inWordSegment, isFirstSegment ? effectiveAttachToPrevious : true,
-                     isFirstSegment ? effectiveNoSpaceBefore : false);
+                     isFirstSegment ? effectiveNoSpaceBefore : breakAfterPrevious);
 
       // Setup for the next segment
       segmentStart = currentCpStart;
@@ -710,8 +718,9 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
   // Process the final remaining segment
   size_t segmentLen = end - segmentStart;
   std::string_view segment(reinterpret_cast<const char*>(segmentStart), segmentLen);
+  const bool breakAfterPrevious = !isFirstSegment && !words.empty() && endsWithBreakableHyphen(words.back());
   processSegment(segment, inWordSegment, isFirstSegment ? effectiveAttachToPrevious : true,
-                 isFirstSegment ? effectiveNoSpaceBefore : false);
+                 isFirstSegment ? effectiveNoSpaceBefore : breakAfterPrevious);
   if (wordStartsRtl) {
     hasRtlWord = true;
   }
@@ -740,7 +749,8 @@ void ParsedText::setRubyGroupAt(size_t startIndex, size_t count, const std::stri
     rubyTexts[idx] = "";
     wordStyles[idx] =
         static_cast<EpdFontFamily::Style>(static_cast<uint8_t>(wordStyles[idx]) | EpdFontFamily::RUBY_CONTINUE);
-    wordContinues[idx] = true;  // Prevent page breaker from splitting the Group Ruby!
+    wordContinues[idx] = true;       // Prevent the page breaker from splitting the group ruby.
+    wordNoSpaceBefore[idx] = false;  // Keep this in the unbreakable attachment state.
   }
 }
 
@@ -1080,7 +1090,8 @@ bool ParsedText::computeLineBreaks(Arena& scratchArena, const GfxRenderer& rende
   }
 
   auto nextTokenAttaches = [&](const size_t index, const size_t totalWordCount) {
-    return index + 1 < totalWordCount && continuesVec[index + 1];
+    return index + 1 < totalWordCount &&
+           !TokenBoundary::allowsBreak(continuesVec[index + 1], noSpaceBeforeVec[index + 1]);
   };
 
   const int firstLineIndent = resolveFirstLineIndent(true, renderer, fontId);
@@ -1214,7 +1225,9 @@ bool ParsedText::computeHyphenatedLineBreaks(const GfxRenderer& renderer, const 
 
   size_t currentIndex = 0;
   bool isFirstLine = true;
-  auto currentTokenAttaches = [&](const size_t index) { return index < wordWidths.size() && continuesVec[index]; };
+  auto currentTokenAttaches = [&](const size_t index) {
+    return index < wordWidths.size() && !TokenBoundary::allowsBreak(continuesVec[index], noSpaceBeforeVec[index]);
+  };
 
   while (currentIndex < wordWidths.size()) {
     const size_t lineStart = currentIndex;
@@ -1571,11 +1584,22 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
   int activeJustifyExtra = justifyExtra;
 
   if (willReorder) {
+    ArenaVector<uint16_t> reorderedWidths(scratchArena);
+    const auto widthBuildResult =
+        ReorderedWidthScratch::build(reorderedWidths, lineWordWidths, visualOrderScratch);
+    if (widthBuildResult == ReorderedWidthScratch::BuildResult::ReserveFailed) {
+      LOG_ERR("PTX", "OOM allocating reordered word-width scratch (%u words)",
+              static_cast<unsigned>(visualOrderScratch.size()));
+      return false;
+    }
+    if (widthBuildResult == ReorderedWidthScratch::BuildResult::AppendFailed) {
+      LOG_ERR("PTX", "OOM growing reordered word-width scratch");
+      return false;
+    }
     std::vector<std::string> reorderedRubyTexts;
     if (!lineRubyTexts.empty()) reorderedRubyTexts.reserve(visualOrderScratch.size());
     reorderedWordsScratch.clear();
     reorderedStylesScratch.clear();
-    reorderedWidthsScratch.clear();
     reorderedContinuesScratch.clear();
     reorderedNoSpaceBeforeScratch.clear();
     reorderedBionicBoundaryScratch.clear();
@@ -1583,7 +1607,6 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
     reorderedBackgroundBlackScratch.clear();
     reorderedWordsScratch.reserve(visualOrderScratch.size());
     reorderedStylesScratch.reserve(visualOrderScratch.size());
-    reorderedWidthsScratch.reserve(visualOrderScratch.size());
     reorderedContinuesScratch.reserve(visualOrderScratch.size());
     reorderedNoSpaceBeforeScratch.reserve(visualOrderScratch.size());
     reorderedBionicBoundaryScratch.reserve(visualOrderScratch.size());
@@ -1594,7 +1617,6 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
       const uint16_t src = visualOrderScratch[i];
       reorderedWordsScratch.push_back(std::move(lineWords[src]));
       reorderedStylesScratch.push_back(lineWordStyles[src]);
-      reorderedWidthsScratch.push_back(lineWordWidths[src]);
       reorderedBionicBoundaryScratch.push_back(lineBionicBoundary[src]);
       reorderedBackgroundBlackScratch.push_back(lineBackgroundBlack[src]);
       if (!lineRubyTexts.empty()) reorderedRubyTexts.push_back(std::move(lineRubyTexts[src]));
@@ -1623,8 +1645,8 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
     int reorderedWordWidthSum = 0;
     size_t reorderedGapCount = 0;
     int reorderedNaturalGaps = 0;
-    for (size_t wordIdx = 0; wordIdx < reorderedWidthsScratch.size(); ++wordIdx) {
-      reorderedWordWidthSum += reorderedWidthsScratch[wordIdx];
+    for (size_t wordIdx = 0; wordIdx < reorderedWidths.size(); ++wordIdx) {
+      reorderedWordWidthSum += reorderedWidths[wordIdx];
       if (wordIdx > 0) {
         reorderedGapCount +=
             gapSlotsBeforeToken(reorderedWordsScratch[wordIdx], reorderedContinuesScratch[wordIdx],
@@ -1663,14 +1685,14 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
       }
     }
 
-    for (size_t wordIdx = 0; wordIdx < reorderedWidthsScratch.size(); ++wordIdx) {
+    for (size_t wordIdx = 0; wordIdx < reorderedWidths.size(); ++wordIdx) {
       if (!lineXPos.push_back(static_cast<int16_t>(xpos))) {
         LOG_ERR("PTX", "OOM growing RTL line x-position scratch");
         return false;
       }
-      xpos += reorderedWidthsScratch[wordIdx];
+      xpos += reorderedWidths[wordIdx];
 
-      if (wordIdx + 1 < reorderedWidthsScratch.size()) {
+      if (wordIdx + 1 < reorderedWidths.size()) {
         const bool nextContinues = reorderedContinuesScratch[wordIdx + 1];
         const bool nextNoSpace = reorderedNoSpaceBeforeScratch[wordIdx + 1];
         const bool nextGuideDot = reorderedGuideDotBeforeScratch[wordIdx + 1];
@@ -1685,7 +1707,6 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
 
     lineWords.swap(reorderedWordsScratch);
     lineWordStyles.swap(reorderedStylesScratch);
-    lineWordWidths.swap(reorderedWidthsScratch);
     lineBionicBoundary.swap(reorderedBionicBoundaryScratch);
     lineGuideDotBefore.swap(reorderedGuideDotBeforeScratch);
     lineBackgroundBlack.swap(reorderedBackgroundBlackScratch);

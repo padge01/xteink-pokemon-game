@@ -107,6 +107,7 @@ inline esp_sleep_wakeup_cause_t esp_sleep_get_wakeup_cause() { return ESP_SLEEP_
 #include "util/Dictionary.h"
 #include "util/DictionaryRegistry.h"
 #include "util/ScreenshotUtil.h"
+#include "util/SleepWakePolicy.h"
 
 GfxRenderer renderer(display);
 MappedInputManager mappedInputManager(gpio, renderer);
@@ -310,12 +311,7 @@ constexpr uint32_t READER_RENDER_TASK_STACK_BYTES = 16384;
 // How the device is coming back to life, resolved once at boot. Both resume
 // flows suppress the splash and leave the panel holding its pre-boot frame; a
 // plain boot shows the splash. See setup() for the resolution.
-enum class BootResume : uint8_t {
-  Splash,       // cold boot, flash, panic, or plain reboot
-  Silent,       // heap-defrag ESP.restart() (RTC flag; lost on power loss)
-  Network,      // minimal boot directly into a memory-intensive network activity
-  QuickResume,  // wake from a quick-resume deep sleep (SD flag; survives power loss)
-};
+using BootResume = SleepWakePolicy::Resume;
 
 // Latched true once enterDeepSleep() commits to sleeping, before it tears down
 // the current activity. WiFi activities call silentRestart() in onExit() to
@@ -628,6 +624,37 @@ static bool loadSleepFrameBuffer() {
   return true;
 }
 
+static bool preflightSleepFrameBuffer() {
+  if (!Storage.exists(SLEEP_FRAME_FILE)) {
+    return false;
+  }
+
+  HalFile file;
+  if (!Storage.openFileForRead("SLP", SLEEP_FRAME_FILE, file)) {
+    LOG_ERR("SLP", "Failed to open Quick Resume frame for preflight");
+    Storage.remove(SLEEP_FRAME_FILE);
+    return false;
+  }
+
+#ifdef SIMULATOR
+  // The simulator cannot identify a UC8279 X3 profile, so this size is not
+  // consumed at runtime there. Keep the function compilable for host builds.
+  const size_t expectedSize = HalDisplay::BUFFER_SIZE;
+#else
+  const size_t expectedSize = HalDisplay::X3_BUFFER_SIZE;
+#endif
+  const size_t actualSize = file.fileSize();
+  file.close();
+  if (SleepWakePolicy::hasValidSavedFrame(true, actualSize, expectedSize)) {
+    return true;
+  }
+
+  LOG_ERR("SLP", "Invalid Quick Resume frame: expected=%u actual=%u", static_cast<unsigned>(expectedSize),
+          static_cast<unsigned>(actualSize));
+  Storage.remove(SLEEP_FRAME_FILE);
+  return false;
+}
+
 // The wake-hold verification runs before the SD card is mounted (see setup()),
 // so the one setting it needs — "short press = sleep", which makes any tap a
 // valid wake — is mirrored into NVS. Written at sleep entry (the value that
@@ -938,13 +965,22 @@ void setup() {
   // skips the panel-clearing pass and the X3 initial-full-sync arming (see
   // HalDisplay::begin), so the first paint is FAST_REFRESH (~500ms) over the
   // retained frame and input dispatches against a visible UI.
-  const BootResume resume = isNetworkResume             ? BootResume::Network
-                            : isSilentReboot            ? BootResume::Silent
-                            : !APP_STATE.showBootScreen ? BootResume::QuickResume
-                                                        : BootResume::Splash;
+  // C3 sleep wake is normalized to PowerButton by HalGPIO. Requiring that
+  // route prevents a stale persisted flag from suppressing a cold-boot splash.
+  const bool isSleepWake = wakeupReason == HalGPIO::WakeupReason::PowerButton;
+  const BootResume resume =
+      SleepWakePolicy::resolveResume(isNetworkResume, isSilentReboot, isSleepWake, APP_STATE.showBootScreen);
+  bool isUc8279X3 = false;
+#ifndef SIMULATOR
+  isUc8279X3 = gpio.deviceIsX3() && BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3Uc8279;
+#endif
+  const bool hasValidSleepFrame = resume == BootResume::QuickResume && isUc8279X3 && preflightSleepFrameBuffer();
+  const bool shouldRestoreSleepFrame =
+      resume == BootResume::QuickResume && (isUc8279X3 ? hasValidSleepFrame : Storage.exists(SLEEP_FRAME_FILE));
   bool allowFastInitialReaderRefresh = false;
 
-  setupDisplayAndFonts(resume != BootResume::Splash, resume != BootResume::Network);
+  setupDisplayAndFonts(SleepWakePolicy::shouldInitializeSeamlessly(resume, isUc8279X3, hasValidSleepFrame),
+                       resume != BootResume::Network);
   logBootHeap("display and selected fonts ready");
 
   switch (resume) {
@@ -962,7 +998,7 @@ void setup() {
       // us in a quick-resume-with-no-frame loop on the next boot.
       APP_STATE.showBootScreen = true;
       APP_STATE.saveToFile();
-      if (loadSleepFrameBuffer()) {
+      if (shouldRestoreSleepFrame && loadSleepFrameBuffer()) {
         const bool useDifferentialRefresh = gpio.deviceIsX3();
         if (useDifferentialRefresh) {
           // begin() clears the X3 controller RAM, so restore the saved frame as
@@ -983,7 +1019,15 @@ void setup() {
         } else {
           renderer.displayBuffer(HalDisplay::HALF_REFRESH);
         }
-      } else {
+      } else if (isUc8279X3 && hasValidSleepFrame) {
+        // The frame passed the size preflight but could not be read after
+        // display setup. Establish a clean controller baseline instead of
+        // painting differentially against invalid RAM contents.
+        LOG_ERR("BOOT", "Quick Resume frame load failed; rebuilding UC8279 X3 display baseline");
+        Storage.remove(SLEEP_FRAME_FILE);
+        renderer.clearScreen();
+        renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+      } else if (!isUc8279X3) {
         activityManager.goToBoot();  // frame file missing, fall back to the splash
       }
       break;

@@ -1,0 +1,9 @@
+add_executable(LongTextRunFlushPolicyTest
+  LongTextRunFlushPolicyTest.cpp
+)
+
+target_link_libraries(LongTextRunFlushPolicyTest PRIVATE
+  crosspoint_test_common
+)
+
+add_test(NAME LongTextRunFlushPolicyTest COMMAND LongTextRunFlushPolicyTest)

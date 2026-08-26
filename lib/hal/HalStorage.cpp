@@ -200,7 +200,9 @@ HalFile& HalFile::operator=(HalFile&& other) {
   close();
   impl = std::move(other.impl);
   allocationFailed_ = other.allocationFailed_;
+  iterationFailed_ = other.iterationFailed_;
   other.allocationFailed_ = false;
+  other.iterationFailed_ = false;
   return *this;
 }
 
@@ -373,21 +375,36 @@ size_t HalFile::write(uint8_t b) { HAL_FILE_WRAPPED_CALL(write, b); }
 bool HalFile::sync() { HAL_FILE_WRAPPED_CALL(sync, ); }
 bool HalFile::rename(const char* newPath) { HAL_FILE_WRAPPED_CALL(rename, newPath); }
 bool HalFile::isDirectory() const { HAL_FILE_FORWARD_CALL(isDirectory, ); }  // already thread-safe, no need to wrap
-void HalFile::rewindDirectory() { HAL_FILE_WRAPPED_CALL(rewindDirectory, ); }
+void HalFile::rewindDirectory() {
+  HalStorage::StorageLock lock;
+  assert(impl != nullptr);
+  impl->file.rewindDirectory();
+  allocationFailed_ = false;
+  // SdFat read-error bits remain sticky for the lifetime of the handle and
+  // FsFile does not expose clearError(). Reopen the directory to retry after
+  // an iteration failure rather than making rewind appear to clear it.
+}
 bool HalFile::close() {
   if (!impl) return true;
   HalStorage::StorageLock lock;
   const bool ok = impl->file.close();
   impl.reset();
   allocationFailed_ = false;
+  iterationFailed_ = false;
   return ok;
 }
 HalFile HalFile::openNextFile() {
   allocationFailed_ = false;
+  iterationFailed_ = false;
   HalStorage::StorageLock lock;
   assert(impl != nullptr);
   auto fsFile = impl->file.openNextFile();
   if (!fsFile) {
+    const uint8_t error = impl->file.getError();
+    if (error != 0) {
+      iterationFailed_ = true;
+      LOG_ERR("SD", "Directory iteration failed (SdFat error 0x%02x)", error);
+    }
     return HalFile();
   }
   void* const storage = allocateImplStorage();

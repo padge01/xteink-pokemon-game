@@ -26,7 +26,10 @@
 #include "Epub/converters/ImageDimsProbe.h"
 #include "Epub/converters/ImageToFramebufferDecoder.h"
 #include "Epub/htmlEntities.h"
+#include "ImagePlacementPolicy.h"
+#include "LongTextRunFlushPolicy.h"
 #include "PreviewBlockLocator.h"
+#include "TableElementPolicy.h"
 
 // Minimum file size (in bytes) to show indexing popup - smaller chapters don't benefit from it
 constexpr size_t MIN_SIZE_FOR_POPUP = 10 * 1024;  // 10KB
@@ -231,7 +234,8 @@ bool attributeContainsToken(const char* value, const char* token) {
 }
 
 bool isHeaderOrBlock(const char* name) {
-  return matches(name, HEADER_TAGS, std::size(HEADER_TAGS)) || matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS));
+  return matches(name, HEADER_TAGS, std::size(HEADER_TAGS)) || matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS)) ||
+         EpubTableElementPolicy::isCaption(name);
 }
 
 bool isTableStructuralTag(const char* name) {
@@ -567,6 +571,14 @@ void ChapterHtmlSlimParser::flushPartWordBuffer() {
     return;
   }
 
+  if (!currentTextBlock) {
+    LOG_ERR("EHP", "Discarding text without an active paragraph or table cell");
+    partWordBufferIndex = 0;
+    currentTextRunBytes = 0;
+    nextWordContinues = false;
+    return;
+  }
+
   // Determine font style from depth-based tracking and CSS effective style
   const bool isBold = boldUntilDepth < depth || effectiveBold;
   const bool isItalic = italicUntilDepth < depth || effectiveItalic;
@@ -636,7 +648,7 @@ void ChapterHtmlSlimParser::flushLongTextRunIfNeeded(const bool force) {
   const size_t wordLimit = bufferedWordsBeforeLayoutLimit();
   const uint16_t byteLimit = textRunBytesBeforeLayoutLimit();
   const size_t wordCount = currentTextBlock->size();
-  if (!force && wordCount <= wordLimit && currentTextRunBytes <= byteLimit) {
+  if (!LongTextRunFlushPolicy::shouldFlush(force, inRuby, wordCount, wordLimit, currentTextRunBytes, byteLimit)) {
     return;
   }
 
@@ -1786,8 +1798,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     return;
   }
 
-  if (self->tableDepth == 1 &&
-      (matches(name, HEADER_TAGS, std::size(HEADER_TAGS)) || matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS)))) {
+  if (EpubTableElementPolicy::isTransparentCellWrapper(name, self->tableDepth, isHeaderOrBlock(name))) {
     // Treat block/header tags inside a table cell as transparent wrappers around the
     // cell's text content instead of forcing the whole table back to paragraph mode.
     // This covers common EPUB patterns like <td><p>...</p></td> and
@@ -2088,6 +2099,8 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
                   }
                 }
 
+                imageMarginTop = static_cast<int16_t>(ImagePlacementPolicy::clampTopMarginToViewport(
+                    self->currentPageNextY, imageMarginTop, displayHeight, self->viewportHeight));
                 self->currentPageNextY += imageMarginTop;
                 self->attachPendingPublisherPageMarkers(self->currentPageNextY);
 
@@ -2296,8 +2309,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
   }
 
   const bool cssPageBreakBefore =
-      userAlignmentBlockStyle.pageBreakBefore &&
-      (matches(name, HEADER_TAGS, std::size(HEADER_TAGS)) || matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS)));
+      userAlignmentBlockStyle.pageBreakBefore && isHeaderOrBlock(name);
   if (cssPageBreakBefore && ((self->currentTextBlock && !self->currentTextBlock->isEmpty()) ||
                              (self->currentPage && !self->currentPage->elements.empty()))) {
     if (self->partWordBufferIndex > 0) {
@@ -2339,7 +2351,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     self->startNewTextBlock(accumulated.withoutBottom());
     self->boldUntilDepth = std::min(self->boldUntilDepth, self->depth);
     self->updateEffectiveInlineStyle();
-  } else if (matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS))) {
+  } else if (matches(name, BLOCK_TAGS, std::size(BLOCK_TAGS)) || EpubTableElementPolicy::isCaption(name)) {
     if (self->headingOpenerActive) {
       self->headingOpenerActive = false;
     }
@@ -3046,6 +3058,14 @@ void XMLCALL ChapterHtmlSlimParser::endElement(void* userData, const XML_Char* n
       }
       self->blockStyleCount_--;
     }
+  }
+  if (EpubTableElementPolicy::isStandaloneCaption(name, self->tableDepth)) {
+    if (self->currentTextBlock && !self->currentTextBlock->isEmpty()) {
+      self->makePages();
+    }
+    self->currentTextBlock.reset();
+    self->currentTextRunBytes = 0;
+    self->nextWordContinues = false;
   }
   if (self->headingDepth == self->depth) {
     self->headingDepth = -1;

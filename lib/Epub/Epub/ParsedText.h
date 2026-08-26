@@ -28,8 +28,13 @@ class ParsedText {
   // each, they never approach the contiguous-block ceiling.
   std::deque<std::string> words;
   std::vector<EpdFontFamily::Style> wordStyles;
-  std::vector<bool> wordContinues;          // true = word attaches to previous (no space before it)
-  std::vector<bool> wordNoSpaceBefore;      // true = may break before token, but no synthetic space when joined
+  // Boundary flags use all four combinations:
+  //   continues=false, noSpace=false: ordinary breakable word gap
+  //   continues=false, noSpace=true:  breakable zero-width, stretchable CJK/Korean gap
+  //   continues=true,  noSpace=false: unbreakable attachment, including ruby groups
+  //   continues=true,  noSpace=true:  breakable zero-width, non-stretching visible-hyphen attachment
+  std::vector<bool> wordContinues;
+  std::vector<bool> wordNoSpaceBefore;
   std::vector<uint8_t> wordBionicBoundary;  // UTF-8 byte offset where the regular suffix starts; 0 = no split
   std::vector<bool> wordGuideDotBefore;     // true = virtual guide dot belongs between previous token and this one
   std::vector<uint8_t> wordBackgroundBlack;
@@ -56,7 +61,6 @@ class ParsedText {
   bool isContinuation_ = false;
   std::vector<std::string> reorderedWordsScratch;
   std::vector<EpdFontFamily::Style> reorderedStylesScratch;
-  std::vector<uint16_t> reorderedWidthsScratch;
   std::vector<bool> reorderedContinuesScratch;
   std::vector<bool> reorderedNoSpaceBeforeScratch;
   std::vector<uint8_t> reorderedBionicBoundaryScratch;

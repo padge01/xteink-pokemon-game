@@ -24,6 +24,7 @@
 #include "fontIds.h"
 #include "util/Dictionary.h"
 #include "util/DictionaryActivityUtils.h"
+#include "util/DictionaryLookupPolicy.h"
 
 namespace {
 
@@ -797,7 +798,13 @@ void DictionaryWordSelectActivity::loop() {
   }
 
   if (controller.isActive()) {
-    switch (controller.handleInput()) {
+    const auto lookupEvent = controller.handleInput();
+    if (DictionaryLookupPolicy::exitsWordSelection(lookupEvent)) {
+      setResult(ActivityResult{});
+      finish();
+      return;
+    }
+    switch (lookupEvent) {
       case DictionaryLookupController::LookupEvent::FoundDefinition: {
         // Rebuild the reader page while its font is still resident. The child
         // then overlays the modal after swapping to the dictionary font, so we
@@ -846,14 +853,6 @@ void DictionaryWordSelectActivity::loop() {
         });
         break;
       }
-      case DictionaryLookupController::LookupEvent::NotFoundDismissedBack:
-        forceFullRepaintOnNextRender();
-        requestUpdate();
-        break;
-      case DictionaryLookupController::LookupEvent::NotFoundDismissedDone:
-        setResult(ActivityResult{});
-        finish();
-        break;
       case DictionaryLookupController::LookupEvent::SwitchDictionary:
         openDictionarySwitch();
         break;

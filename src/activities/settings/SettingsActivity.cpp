@@ -540,6 +540,7 @@ void SettingsActivity::openLanguagePicker() {
 
     SETTINGS.language = langIndex;
     SETTINGS.saveToFile();
+    rebuildSettingsLists();
     requestUpdate();
   });
   requestUpdate();

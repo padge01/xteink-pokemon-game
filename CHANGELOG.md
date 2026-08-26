@@ -1,7 +1,22 @@
 ## [Unreleased]
 
+### Changed
+
+- The web EPUB optimizer now removes unused publisher-embedded fonts, their stylesheet rules, manifest records, and font-obfuscation metadata to produce smaller books.
+
 ### Fixed
 
+- Large EPUB images now reject unsafe dimensions before narrowing, keep the reader responsive while decoding, and remain inside the reader viewport.
+- EPUB lines can now wrap after visible hyphens and dashes, while ruby annotations stay grouped during incremental layout.
+- EPUB metadata now loads when books use arbitrary XML namespace prefixes, and `&apos;` renders as an apostrophe.
+- Explicit EPUB navigation no longer snaps back to the session-start position after background layout completes.
+- Settings labels now refresh immediately after changing the interface language.
+- Starting a clipping with buttons now highlights a word near the middle of the current page instead of its first word.
+- EPUB table captions now render before their rows instead of merging into nearby text or reaching an invalid text destination.
+- Mixed-font EPUB pages now retain both page and status-bar glyphs, avoiding repeated SD-card font reads during rendering.
+- Holding page-turn buttons while browsing saved clippings no longer risks a low-memory restart.
+- EPUB bidirectional text layout now exits safely instead of restarting when an X3/X4 cannot allocate reordered word-width scratch.
+- Declining an alternate dictionary-form lookup now returns to the reader, and dictionary prompt and miss screens remain readable in Dark Mode.
 - KOReader Sync now accepts successful responses from compatible servers such as BookLore and Grimmory, including an empty `204` progress response.
 - The web EPUB optimizer now removes XML comments without damaging CDATA, processing instructions, DOCTYPE declarations, or malformed input.
 - Long front-button labels are now ellipsized within their button guides instead of overlapping neighboring controls.
@@ -9,6 +24,10 @@
 - Linux simulator builds now link their OpenSSL crypto dependency, and the setup guide lists the required development package.
 - Simulator smoke tests now apply requested themes before activities are created, avoiding invalid theme references during test startup.
 - EPUB footnotes with long encoded targets now retain the complete link instead of truncating it and opening the wrong location.
+- EPUB, XTC, and XTCH readers now reject overlapping page turns while the display is updating, preventing mixed or corrupted page renders.
+- Grayscale custom sleep images retain their detail, transparent overlays stay clean, and newer X3 displays recover safely when a Quick Resume frame is missing or invalid.
+- File browsing, web, USB, and WebDAV transfers now report incomplete SD-card directory listings instead of accepting partial results or invisible new folders.
+- Saved EPUB clipping highlights now remain continuous across hidden layout spacing, including adjacent ellipsis fragments.
 
 ## [v1.5.0] - 2026-08-08
 

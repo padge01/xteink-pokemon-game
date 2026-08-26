@@ -1,5 +1,8 @@
 #include "FsHelpers.h"
 
+#include <HalStorage.h>
+#include <Logging.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -7,6 +10,87 @@
 #include <vector>
 
 namespace FsHelpers {
+
+DirectoryIterationResult directoryIterationResult(const HalFile& directory) {
+#ifdef SIMULATOR
+  // The host filesystem adapter cannot surface an SdFat read error.
+  return classifyDirectoryIterationEnd(directory.allocationFailed(), false);
+#else
+  return classifyDirectoryIterationEnd(directory.allocationFailed(), directory.iterationFailed());
+#endif
+}
+
+bool directoryIterationFailed(const HalFile& directory) {
+  return directoryIterationFailed(directoryIterationResult(directory));
+}
+
+bool directoryCanBeEnumerated(const char* path) {
+  if (!path) {
+    return false;
+  }
+
+  HalFile directory = Storage.open(path);
+  if (!directory || !directory.isDirectory()) {
+    directory.close();
+    return false;
+  }
+
+  for (HalFile entry = directory.openNextFile(); entry; entry = directory.openNextFile()) {
+    entry.close();
+    yield();
+  }
+
+  const bool complete = !directoryIterationFailed(directory);
+  if (!complete) {
+    LOG_ERR("FS", "Directory listing failed before EOF: %s", path);
+  }
+  directory.close();
+  return complete;
+}
+
+DirectoryEntryVisibility directoryEntryVisibility(const char* directoryPath, const char* entryPath) {
+  if (!directoryPath || !entryPath || entryPath[0] == '\0') {
+    return DirectoryEntryVisibility::Missing;
+  }
+
+  HalFile expectedEntry = Storage.open(entryPath);
+  if (!expectedEntry) {
+    return expectedEntry.allocationFailed() ? DirectoryEntryVisibility::IterationFailed
+                                            : DirectoryEntryVisibility::Missing;
+  }
+
+  char expectedName[256] = {};  // FAT long filenames are at most 255 bytes.
+  expectedEntry.getName(expectedName, sizeof(expectedName));
+  expectedEntry.close();
+  if (expectedName[0] == '\0') {
+    return DirectoryEntryVisibility::IterationFailed;
+  }
+
+  HalFile directory = Storage.open(directoryPath);
+  if (!directory || !directory.isDirectory()) {
+    directory.close();
+    return DirectoryEntryVisibility::IterationFailed;
+  }
+
+  char name[256] = {};  // FAT long filenames are at most 255 bytes.
+  for (HalFile entry = directory.openNextFile(); entry; entry = directory.openNextFile()) {
+    entry.getName(name, sizeof(name));
+    entry.close();
+    if (strcmp(name, expectedName) == 0) {
+      directory.close();
+      return DirectoryEntryVisibility::Visible;
+    }
+    yield();
+  }
+
+  if (directoryIterationFailed(directory)) {
+    LOG_ERR("FS", "Directory listing failed before finding %s in %s", expectedName, directoryPath);
+    directory.close();
+    return DirectoryEntryVisibility::IterationFailed;
+  }
+  directory.close();
+  return DirectoryEntryVisibility::Missing;
+}
 
 namespace {
 bool isHexDigit(const char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }

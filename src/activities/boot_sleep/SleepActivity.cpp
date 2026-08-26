@@ -523,6 +523,8 @@ void SleepActivity::renderCustomSleepScreen() const {
 
     LOG_INF("SLP", "Loading custom sleep image: %s", selection.path.c_str());
     delay(100);
+    // Dither grayscale custom sleep images so their tonal detail survives the
+    // 1-bit sleep-screen render.
     Bitmap bitmap(file, true);
     const BmpReaderError parseResult = bitmap.parseHeaders();
     if (parseResult != BmpReaderError::Ok) {
@@ -892,7 +894,9 @@ void SleepActivity::renderOverlaySleepScreen() const {
       LOG_DBG("SLP", "BMP overlay not found: %s", filename.c_str());
       return OverlayDrawResult::NotFound;
     }
-    Bitmap bitmap(file, true);
+    // Keep dithering off here: error diffusion can make nominally white
+    // transparent pixels visible over the preserved reader page.
+    Bitmap bitmap(file);
     const BmpReaderError parseResult = bitmap.parseHeaders();
     if (parseResult != BmpReaderError::Ok) {
       LOG_ERR("SLP", "BMP overlay header parse failed for %s: %s", filename.c_str(),

@@ -181,9 +181,8 @@ DictionaryLookupController::LookupEvent DictionaryLookupController::handleInput(
         || headerTapped || touchAction == ACTION_ALT_FORM_NO
 #endif
     ) {
-      state = LookupState::Idle;
       nextIsSuggestion = false;
-      return LookupEvent::Cancelled;
+      return DictionaryLookupPolicy::declineAltForm(state);
     }
     return LookupEvent::None;
   }
@@ -245,6 +244,8 @@ bool DictionaryLookupController::render() {
     // which naturally wipes the toast overlay).
     return false;
   }
+
+  DictionaryLookupPolicy::prepareFullScreenOverlay(renderer, state);
 
   if (state == LookupState::AltFormPrompt) {
     const int pageWidth = renderer.getScreenWidth();

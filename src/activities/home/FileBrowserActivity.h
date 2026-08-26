@@ -67,6 +67,7 @@ class FileBrowserActivity final : public Activity {
   std::array<size_t, INDEX_ROW_CACHE_SIZE> indexCachedRows{};
   bool usingIndex = false;
   bool fileListMemoryLimited = false;
+  bool fileListReadFailed = false;
 
   freeink::ui::GfxRendererTarget uiTarget;  // must precede `app`: the app holds a reference to it
   UiApp app;

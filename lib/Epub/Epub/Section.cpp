@@ -17,8 +17,8 @@
 
 namespace {
 constexpr uint32_t SECTION_CACHE_MAGIC = section_cache::MAGIC;
-// v61: footnote targets use 256-byte storage, invalidating cached page records
-// written with v60's 96-byte target field.
+// v63: image top margins are clamped to the reader viewport so full-height images remain renderable.
+// Cached image positions from v62 no longer match this layout contract.
 constexpr uint8_t SECTION_FILE_VERSION = section_cache::FINALIZED_VERSION;
 // Suspended incremental build: valid pages plus LUTs and a parse-watermark trailer.
 // Change this with layout or payload changes so stale partial pages cannot resume

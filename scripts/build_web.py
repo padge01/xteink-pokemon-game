@@ -94,7 +94,10 @@ for slug, (ident, title, active, head_extra) in PAGES.items():
     page_html = read(WEB, "pages", f"{slug}.html")
     page_js = read(WEB, "pages", f"{slug}.js").strip()
     if slug == "files":
-        helper_js = read(WEB, "lib", "strip-xml-comments.js").strip()
+        helper_js = "\n\n".join([
+            read(WEB, "lib", "strip-xml-comments.js").strip(),
+            read(WEB, "lib", "strip-epub-fonts.js").strip(),
+        ])
         page_js = f"{helper_js}\n\n{page_js}"
     script = f"<script>\n{page_js}\n</script>" if page_js else ""
     values = {

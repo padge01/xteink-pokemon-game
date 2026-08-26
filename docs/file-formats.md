@@ -251,11 +251,21 @@ Binary layout:
 
 ## `section.bin`
 
-### Version 61
+### Version 63
 
 Each file in `sections/*.bin` stores one laid-out spine section. The header is
 also the cache-busting key: if any layout-affecting setting differs from the
 current reader settings, the section is discarded and rebuilt.
+
+Version 63 clamps EPUB image top margins to the reader viewport so full-height
+images remain inside the drawable page. Finalized version 62 caches and
+suspended partial caches marked `0xF7` are rejected and rebuilt; version 63
+uses `0xF6` for suspended partial caches.
+
+Version 62 permits line breaks after visible hyphens and dashes and keeps ruby
+groups intact across incremental layout flushes. Finalized version 61 caches
+and suspended partial caches marked `0xF8` are rejected and rebuilt; version 62
+uses `0xF7` for suspended partial caches.
 
 Version 61 expands each footnote target from 96 to 256 bytes, increasing the
 fixed footnote record from 129 to 289 bytes. Finalized version 60 caches and
