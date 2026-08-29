@@ -26,14 +26,14 @@
 - No more than 2,200 handwritten production lines. Generated species/i18n/art data and tests are excluded.
 - One framebuffer; no roster-sized in-memory container; no per-render allocation; no bare `new`.
 - Snapshot storage is bounded to 1,024 records and about 49 KB per file.
-- Final image retains at least 128 KB partition headroom and adds no more than 100 KB without review.
+- Run an approved X3 link/size check at the core exit gate and again for the final candidate. Each image retains at least 128 KB partition headroom; V2 adds no more than 100 KB without review.
 - Activity open/close cycles return heap to within 2 KB of baseline; no allocation failure may abort.
 - Long PlatformIO checks are batched and require a visible approval immediately before execution.
 
 ## Phase sequence
 
-1. **Baseline:** preserve V1, create this clean worktree, save plans, capture clean firmware size and produce clean X3 diagnostic firmware.
-2. **Core and storage:** execute `2026-08-29-pokemon-companion-v2-core.md` using host tests and the 2,200-line projection gate.
+1. **Baseline:** preserve V1, create this clean worktree, save plans, capture clean firmware size, preserve the clean X3 firmware/ELF, and record their hashes. This is a clean reference build, not an instrumented diagnostic build.
+2. **Core and storage:** execute `2026-08-29-pokemon-companion-v2-core.md` using host tests, the 2,200-line projection gate, and one approved X3 link/size check before UI work.
 3. **UI and dashboards:** execute `2026-08-29-pokemon-companion-v2-ui-dashboard.md`; require visual approval of every surface.
 4. **Hardware and release:** execute `2026-08-29-pokemon-companion-v2-hardware-release.md`; flash clean baseline first, then V2.
 

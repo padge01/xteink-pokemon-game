@@ -42,7 +42,8 @@
 **Modify:** `HomeActivity` and the Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff theme paths only.
 
 - Compile the accessory entirely out of standard builds.
-- Each theme clears and owns a measured full-width band containing sprite, identity, level/gender, numeric EXP, and optional notice.
+- Each theme clears and owns a measured full-width band, but it does not force every datum into one row. Priority is: an 80x60 sprite and name/level always; numeric EXP next; gender next; optional notice last. A notice may replace lower-priority secondary text or use a second line, but must never shrink the sprite or collide with controls.
+- Measure each real theme independently. One-line and two-line bands are both valid; sharing the data/view-model does not require sharing identical geometry.
 - Do not change Classic, Minimal, Lyra Carousel, or other themes.
 - Generate actual simulator captures in portrait and landscape; browser mockups are not acceptance evidence.
 - Require explicit visual approval for every activity screen and each of the eight theme/orientation captures.
@@ -53,4 +54,4 @@
 - Navigation tests cover wraparound, page boundaries, full Party, one-member Party, empty/full PC, and all pending events.
 - Simulator walkthrough shows consistent headers and no selected-row sprite erasure.
 - UI/dashboard production code keeps the overall workstream within 2,200 lines.
-- No PlatformIO X3 build begins until visual approval.
+- The core gate may run its one approved X3 link/size build. Do not build the integrated UI/dashboard X3 candidate until visual approval.
