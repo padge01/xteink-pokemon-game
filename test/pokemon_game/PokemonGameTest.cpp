@@ -480,31 +480,41 @@ void fullPartyCatchLeavesTheNewRecordForPcStorage() {
   CHECK(mutation.record.recordId == 99);
 }
 
-void resolvingABlockingEncounterQueuesAnEarnedEvolution() {
+void resolvingABlockingEncounterWaitsForTheNextLevel() {
   pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
   bulbasaur.speciesId = 1;
-  bulbasaur.totalXp = pokemon::xpRequired(16);
+  bulbasaur.totalXp = pokemon::xpRequired(17) - 1U;
   pokemon::PokemonState state = stateWithEncounter(bulbasaur);
   pokemon::RecordMutation mutation{};
 
   CHECK(pokemon::resolveEncounter(state, bulbasaur, pokemon::EncounterChoice::Pass, nullptr, mutation));
+  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+
+  const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
+  const pokemon::CreditResult result =
+      pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
   CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.recordId == bulbasaur.recordId);
   CHECK(state.pending.speciesId == 2);
 }
 
-void acknowledgingABlockingItemQueuesAnEarnedEvolution() {
+void acknowledgingABlockingItemWaitsForTheNextLevel() {
   pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
   bulbasaur.speciesId = 1;
-  bulbasaur.totalXp = pokemon::xpRequired(16);
+  bulbasaur.totalXp = pokemon::xpRequired(17) - 1U;
   pokemon::PokemonState state = stateWithLeader(bulbasaur);
   state.pending.kind = pokemon::PendingEventKind::Item;
   state.pending.item = pokemon::EvolutionItem::MoonStone;
   state.dashboardNotice = pokemon::DashboardNotice::ItemFound;
 
   CHECK(pokemon::acknowledgeItem(state, bulbasaur));
+  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+
+  const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
+  const pokemon::CreditResult result =
+      pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
   CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.recordId == bulbasaur.recordId);
   CHECK(state.pending.speciesId == 2);
 }
 
@@ -541,7 +551,34 @@ void levelEvolutionPromptsOnceAndCanBeConfirmedOrBlocked() {
   CHECK(state.pending.kind == pokemon::PendingEventKind::None);
 }
 
-void promptToggleQueuesAlreadyEarnedEvolutionAndSupportsStopAsking() {
+void reenablingPromptsWaitsForTheNextLevel() {
+  pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
+  bulbasaur.speciesId = 1;
+  bulbasaur.totalXp = pokemon::xpRequired(17) - 1U;
+  bulbasaur.flags = pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled);
+  pokemon::PokemonState state = stateWithLeader(bulbasaur);
+  pokemon::RecordMutation mutation{};
+
+  CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, true, mutation));
+  CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0);
+  CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+
+  const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
+  const pokemon::CreditResult result =
+      pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pending.speciesId == 2);
+
+  mutation = {};
+  CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, false, mutation));
+  CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) != 0);
+  CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+}
+
+void levelHundredDoesNotCatchUpOrChainLevelEvolutions() {
   pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
   bulbasaur.speciesId = 1;
   bulbasaur.totalXp = pokemon::MAXIMUM_TOTAL_XP;
@@ -550,21 +587,22 @@ void promptToggleQueuesAlreadyEarnedEvolutionAndSupportsStopAsking() {
   pokemon::RecordMutation mutation{};
 
   CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, true, mutation));
-  CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0);
-  CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.speciesId == 2);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
 
+  state.pending.kind = pokemon::PendingEventKind::Evolution;
+  state.pending.recordId = bulbasaur.recordId;
+  state.pending.speciesId = 2;
+  state.dashboardNotice = pokemon::DashboardNotice::WhatsThis;
   mutation = {};
   CHECK(pokemon::resolveEvolution(state, bulbasaur, pokemon::EvolutionChoice::Evolve, mutation));
   CHECK(bulbasaur.speciesId == 2);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.speciesId == 3);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
 
-  mutation = {};
-  CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, false, mutation));
-  CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) != 0);
-  CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
+  const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
+  const pokemon::CreditResult result =
+      pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
+  CHECK(result.currentLevel == 100);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::None);
   CHECK(state.pending.kind == pokemon::PendingEventKind::None);
 }
 
@@ -720,10 +758,11 @@ int main() {
   legendaryEligibilityAndMewOverrideRegularEncounters();
   catchCreatesOneAppendAndPassCreatesNone();
   fullPartyCatchLeavesTheNewRecordForPcStorage();
-  resolvingABlockingEncounterQueuesAnEarnedEvolution();
-  acknowledgingABlockingItemQueuesAnEarnedEvolution();
+  resolvingABlockingEncounterWaitsForTheNextLevel();
+  acknowledgingABlockingItemWaitsForTheNextLevel();
   levelEvolutionPromptsOnceAndCanBeConfirmedOrBlocked();
-  promptToggleQueuesAlreadyEarnedEvolutionAndSupportsStopAsking();
+  reenablingPromptsWaitsForTheNextLevel();
+  levelHundredDoesNotCatchUpOrChainLevelEvolutions();
   promptTogglePreservesAnUnrelatedPendingEvent();
   rejectedPromptToggleDoesNotPartiallyMutate();
   everyLevelEvolutionQueuesAtItsThreshold();

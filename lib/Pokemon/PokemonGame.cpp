@@ -120,7 +120,7 @@ bool evolveCandidate(PokemonState& state, PokemonRecord& record, const uint16_t 
   return true;
 }
 
-bool queueEligibleEvolution(PokemonState& state, const PokemonRecord& record, bool& queued) {
+bool queueEvolutionAfterLevelGain(PokemonState& state, const PokemonRecord& record, bool& queued) {
   queued = false;
   if (state.pending.kind != PendingEventKind::None ||
       (record.flags & recordFlag(RecordFlag::EvolutionPromptsDisabled)) != 0) {
@@ -300,7 +300,7 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, co
     const uint8_t minuteLevel = levelForXp(leaderCandidate.totalXp);
     if (minuteLevel > result.currentLevel) {
       bool queued = false;
-      if (!queueEligibleEvolution(stateCandidate, leaderCandidate, queued)) return result;
+      if (!queueEvolutionAfterLevelGain(stateCandidate, leaderCandidate, queued)) return result;
       if (queued) generatedEvent = PendingEventKind::Evolution;
     }
     result.currentLevel = minuteLevel;
@@ -328,8 +328,6 @@ bool acknowledgeItem(PokemonState& state, const PokemonRecord& leader) {
   }
   PokemonState candidate = state;
   clearPending(candidate);
-  bool queued = false;
-  if (!queueEligibleEvolution(candidate, leader, queued)) return false;
   state = candidate;
   return true;
 }
@@ -350,11 +348,7 @@ bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool 
     recordCandidate.flags |= recordFlag(RecordFlag::EvolutionPromptsDisabled);
     if (dismissingCurrentPrompt) clearPending(stateCandidate);
   }
-  bool queued = false;
-  if (!validateRecord(recordCandidate) ||
-      (enabled && !queueEligibleEvolution(stateCandidate, recordCandidate, queued))) {
-    return false;
-  }
+  if (!validateRecord(recordCandidate)) return false;
 
   RecordMutation mutationCandidate = mutation;
   mutationCandidate.record = recordCandidate;
@@ -401,8 +395,6 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const En
   }
 
   clearPending(stateCandidate);
-  bool queued = false;
-  if (!queueEligibleEvolution(stateCandidate, leader, queued)) return false;
   if (!validateState(stateCandidate)) return false;
   state = stateCandidate;
   mutation = mutationCandidate;
@@ -430,10 +422,6 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
   }
 
   clearPending(stateCandidate);
-  if (choice == EvolutionChoice::Evolve) {
-    bool queued = false;
-    if (!queueEligibleEvolution(stateCandidate, recordCandidate, queued)) return false;
-  }
   state = stateCandidate;
   record = recordCandidate;
   mutation = mutationCandidate;

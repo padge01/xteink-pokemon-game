@@ -10,7 +10,7 @@
 
 ### Fixed
 
-- Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and rechecks already-earned evolutions when prompts are enabled.
+- Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
 - Large EPUB images now reject unsafe dimensions before narrowing, keep the reader responsive while decoding, and remain inside the reader viewport.
 - EPUB lines can now wrap after visible hyphens and dashes, while ruby annotations stay grouped during incremental layout.
 - EPUB metadata now loads when books use arbitrary XML namespace prefixes, and `&apos;` renders as an apostrophe.

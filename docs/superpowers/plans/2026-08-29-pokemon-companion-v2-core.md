@@ -44,7 +44,11 @@ bool useEvolutionItem(PokemonState&, PokemonRecord&, EvolutionItem, RecordMutati
 - Encounter events take priority when both systems are due. When no encounter is created, run the item check at 5%, forced after nineteen misses; encounter-blocked hours still advance item pity. Prefer an unsaturated item in the six-bit
   `OwnedEvolutionNeeds` mask, otherwise choose any item. `PokemonService` computes the mask by
   streaming records once at an item-check boundary; the rules layer never reads storage.
-- Enabling evolution prompts immediately queues an already-earned level evolution when no other event is pending. Completing an over-levelled evolution queues its next eligible stage; disabling prompts from an evolution event dismisses it.
+- Level evolutions queue only after an actual level gain with prompts enabled.
+  Re-enabling prompts, clearing another event, or completing one evolution does
+  not retroactively queue an old threshold. A later level gain can prompt again;
+  a level-100 Pokémon may remain unevolved. Disabling prompts from an evolution
+  event dismisses it.
 - Allow only one pending event. Accrue counters while blocked and generate at most one event per commit after resolution.
 - Always catch on Catch; append to Party below six, otherwise PC. Use Link Cable for Kadabra, Machoke, Graveler, and Haunter.
 - Tests cover every level and item evolution branch, exact pity boundaries, every regular weighted interval at all five progress bands, full Party, legendary eligibility, and Mew. Full-PC/storage-exhaustion behavior belongs to the atomic store/service tests because the rules layer has no PC capacity.
