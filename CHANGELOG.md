@@ -3,6 +3,7 @@
 ### Added
 
 - Private Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
+- Private Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
 
 ### Changed
 

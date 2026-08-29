@@ -27,6 +27,7 @@ class PokemonStore {
   StoreBeginResult begin();
   bool loadState(PokemonState& output) const;
   bool readRecord(uint32_t recordId, PokemonRecord& output) const;
+  bool loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const;
   size_t readPcPage(PcOrder order, size_t offset, std::span<PokemonRecord> output) const;
   bool commit(const PokemonState& state, const RecordMutation& mutation = {});
   bool reset();

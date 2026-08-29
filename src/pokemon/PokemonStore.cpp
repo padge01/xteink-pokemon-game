@@ -1,3 +1,5 @@
+#if defined(CROSSINK_ENABLE_POKEMON)
+
 #include "PokemonStore.h"
 
 #include "Pokemon/PokemonSpecies.h"
@@ -306,6 +308,36 @@ bool PokemonStore::readRecord(const uint32_t recordId, PokemonRecord& output) co
   return false;
 }
 
+bool PokemonStore::loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const {
+  output = {};
+  if (!ready_) return false;
+
+  const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
+  FsFile file = Storage.open(path, O_RDONLY);
+  if (!file || !file.seek(RECORDS_OFFSET)) {
+    LOG_ERR("Pokemon store: failed to open owned records");
+    file.close();
+    return false;
+  }
+
+  for (uint32_t index = 0; index < activeHeader_.recordCount; ++index) {
+    RecordBytes bytes{};
+    PokemonRecord record{};
+    if (!readExact(file, bytes.data(), bytes.size()) || !decodeRecord(bytes, record)) {
+      LOG_ERR("Pokemon store: failed to scan owned evolution needs");
+      file.close();
+      return false;
+    }
+    for (const EvolutionRule& rule : evolutionsFor(record.speciesId)) {
+      const uint8_t item = static_cast<uint8_t>(rule.item);
+      if (rule.trigger == EvolutionTrigger::Item && item >= 1 && item <= EVOLUTION_ITEM_COUNT) {
+        output.mask |= static_cast<uint8_t>(1U << (item - 1U));
+      }
+    }
+  }
+  return file.close();
+}
+
 size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::span<PokemonRecord> output) const {
   if (!ready_ || output.empty() || order > PcOrder::Alphabetical) return 0;
   PokemonState state{};
@@ -418,3 +450,5 @@ bool PokemonStore::reset() {
 }
 
 }  // namespace pokemon
+
+#endif

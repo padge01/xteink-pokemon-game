@@ -50,6 +50,10 @@ target_include_directories(PokemonStoreTest PRIVATE
   "${REPO_ROOT}/src"
 )
 
+target_compile_definitions(PokemonStoreTest PRIVATE
+  CROSSINK_ENABLE_POKEMON=1
+)
+
 target_link_libraries(PokemonStoreTest PRIVATE
   crosspoint_test_common
 )

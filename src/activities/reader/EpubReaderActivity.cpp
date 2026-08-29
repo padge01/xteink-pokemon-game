@@ -57,6 +57,9 @@
 #include "clippings/ClippingInitialSelection.h"
 #include "clippings/ClippingsManager.h"
 #include "components/UITheme.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include "pokemon/PokemonService.h"
+#endif
 #if CROSSINK_APP_CAP_TOUCH
 #include "components/TouchHeaderBackButton.h"
 #endif
@@ -1989,6 +1992,10 @@ void EpubReaderActivity::onEnter() {
     return;
   }
 
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().beginReadingSession();
+#endif
+
   captureGlobalReaderSettings();
   epub->setupCacheDir();
   loadBookReaderSettings();
@@ -2114,6 +2121,9 @@ void EpubReaderActivity::onEnter() {
 }
 
 void EpubReaderActivity::onExit() {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().flushOnExit(static_cast<uint32_t>(millis()));
+#endif
   // The extraction callback holds the Epub as a raw context pointer.
   ImageBlock::setExtractor(nullptr, nullptr);
   releaseGrayscaleStripScratch();
@@ -2340,6 +2350,10 @@ void EpubReaderActivity::loop() {
     finish();
     return;
   }
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().checkpointIfDue(static_cast<uint32_t>(millis()));
+#endif
 
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
   const bool userInputPending = mappedInput.wasAnyPressed() || mappedInput.wasAnyReleased() || touch.tapped ||
@@ -4556,6 +4570,14 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
     requestUpdate();
     return;
   }
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+  const bool trackPokemonTurn = source == nullptr || std::strcmp(source, "auto") != 0;
+  const int pokemonPreviousSpine = currentSpineIndex;
+  const int pokemonPreviousPage = section ? section->currentPage : -1;
+  const uint8_t pokemonProgress = static_cast<uint8_t>(
+      std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f));
+#endif
   // Once the reader moves, a session-start resume/reflow anchor is stale. If
   // retained, a later background-build completion can snap back to that page.
   {
@@ -4615,6 +4637,15 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
   }
   lastPageTurnTime = millis();
   requestUpdate();
+#if defined(CROSSINK_ENABLE_POKEMON)
+  const int pokemonCurrentPage = section ? section->currentPage : -1;
+  if (trackPokemonTurn &&
+      (currentSpineIndex != pokemonPreviousSpine || pokemonCurrentPage != pokemonPreviousPage)) {
+    auto& service = pokemon::devicePokemonService();
+    service.setBookProgressPercent(pokemonProgress);
+    service.onSuccessfulPageTurn(static_cast<uint32_t>(lastPageTurnTime));
+  }
+#endif
 }
 
 // TODO: Failure handling

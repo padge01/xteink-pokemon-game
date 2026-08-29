@@ -30,6 +30,9 @@
 #include "components/themes/lyra/LyraCarouselTheme.h"
 #include "fontIds.h"
 #include "util/BookCacheUtils.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include "pokemon/PokemonService.h"
+#endif
 
 namespace {
 constexpr unsigned long MIN_READING_STATS_PAGE_MS = 2000UL;
@@ -111,6 +114,10 @@ void XtcReaderActivity::onEnter() {
     return;
   }
 
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().beginReadingSession();
+#endif
+
   xtc->setupCacheDir();
 
   // Activate reader-specific front button mapping (if configured).
@@ -135,6 +142,9 @@ void XtcReaderActivity::onEnter() {
 }
 
 void XtcReaderActivity::onExit() {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().flushOnExit(static_cast<uint32_t>(millis()));
+#endif
   Activity::onExit();
 
   mappedInput.setReaderMode(false);
@@ -189,6 +199,10 @@ void XtcReaderActivity::loop() {
   if (!xtc) {
     return;
   }
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().checkpointIfDue(static_cast<uint32_t>(millis()));
+#endif
 
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
@@ -415,6 +429,7 @@ void XtcReaderActivity::loop() {
 
   bool goHome = false;
   bool needsUpdate = false;
+  const uint32_t previousPage = currentPage;
   {
     RenderLock lock(*this);
     const uint32_t pageCount = xtc->getPageCount();
@@ -455,6 +470,14 @@ void XtcReaderActivity::loop() {
   if (goHome) {
     onGoHome();
   } else if (needsUpdate) {
+#if defined(CROSSINK_ENABLE_POKEMON)
+    if (currentPage != previousPage) {
+      auto& service = pokemon::devicePokemonService();
+      service.setBookProgressPercent(static_cast<uint8_t>(
+          std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f)));
+      service.onSuccessfulPageTurn(static_cast<uint32_t>(millis()));
+    }
+#endif
     requestUpdate();
   }
 }

@@ -22,6 +22,9 @@
 #include "activities/home/FileBrowserActionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include "pokemon/PokemonService.h"
+#endif
 
 namespace {
 constexpr size_t CHUNK_SIZE = 8 * 1024;  // 8KB chunk for reading
@@ -105,6 +108,10 @@ void TxtReaderActivity::onEnter() {
     return;
   }
 
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().beginReadingSession();
+#endif
+
   sdFontSystem.ensureLoaded(renderer);
   ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
 
@@ -127,6 +134,9 @@ void TxtReaderActivity::onEnter() {
 }
 
 void TxtReaderActivity::onExit() {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().flushOnExit(static_cast<uint32_t>(millis()));
+#endif
   Activity::onExit();
 
   // Deactivate reader-specific front button mapping.
@@ -168,6 +178,9 @@ void TxtReaderActivity::openReaderMenu() {
 }
 
 void TxtReaderActivity::loop() {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::devicePokemonService().checkpointIfDue(static_cast<uint32_t>(millis()));
+#endif
   if (consumeLongPowerButtonRelease()) {
     return;
   }
@@ -283,6 +296,8 @@ void TxtReaderActivity::loop() {
     return;
   }
 
+  const int previousPage = currentPage;
+
   if (prevTriggered && currentPage > 0) {
     currentPage--;
     requestUpdate();
@@ -292,6 +307,14 @@ void TxtReaderActivity::loop() {
       requestUpdate();
     }
   }
+#if defined(CROSSINK_ENABLE_POKEMON)
+  if (currentPage != previousPage) {
+    const int percent = totalPages > 0 ? ((currentPage + 1) * 100 + totalPages / 2) / totalPages : 0;
+    auto& service = pokemon::devicePokemonService();
+    service.setBookProgressPercent(static_cast<uint8_t>(std::clamp(percent, 0, 100)));
+    service.onSuccessfulPageTurn(static_cast<uint32_t>(millis()));
+  }
+#endif
 }
 
 void TxtReaderActivity::toggleDarkMode() {
