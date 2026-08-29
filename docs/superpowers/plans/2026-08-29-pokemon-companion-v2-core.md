@@ -13,7 +13,7 @@
 - Write failing tests for 48-byte explicit record encoding, nickname bounds, all 151 species, types, gender ratios, XP levels, and every Kanto evolution.
 - Define `PokemonRecord`: record ID, species ID, total XP, caught level, gender, origin, evolution-prompt flag, and `nickname[33]`.
 - Define `PokemonState`: compact Party IDs, one tagged pending event, six item counts, 19-byte seen/caught bitsets, reading remainder/counters, lifetime minutes, sequence, and dashboard notice.
-- Pin species names, types, gender rates, capture rates, and Kanto evolution facts to PokeAPI `api-data` revision `837b3642001d4853249114d2b5601d46e1004a45`. Check in a compact CSV with that provenance and an offline generator; firmware builds consume the checked-in generated table and never require network access.
+- Pin species names, types, gender rates, capture rates, and Kanto evolution facts to PokeAPI `api-data` revision `837b3642001d4853249114d2b5601d46e1004a45`. Check in a compact CSV with that provenance and an offline generator; host and firmware builds generate the ignored header from the checked-in CSV before compilation and never require network access.
 - Generate only immutable species/evolution tables; keep them `static const` in flash. Generated rows also tag evolution stage and acquisition as Wild, EvolutionOnly, Legendary, or Special.
 - Prove malformed species, levels, flags, nicknames, and disk bytes fail without partial mutation.
 - Commit: `feat: define lightweight pokemon v2 records`.
