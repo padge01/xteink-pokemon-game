@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+### Added
+
+- Private Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
+
 ### Changed
 
 - The web EPUB optimizer now removes unused publisher-embedded fonts, their stylesheet rules, manifest records, and font-obfuscation metadata to produce smaller books.

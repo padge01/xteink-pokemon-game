@@ -1,9 +1,77 @@
 # File Formats
 
-These formats describe the SD-card cache files under `/.crosspoint/epub_<hash>/`.
+These formats describe global and per-book SD-card files under `/.crosspoint/`.
 All POD fields are written in the ESP32 little-endian representation used by
 `Serialization.h`; strings are length-prefixed UTF-8 unless a format notes a
 fixed-size char buffer.
+
+## `/.crosspoint/pokemon-v2-{a,b}.bin`
+
+### Version 1
+
+Private Pokémon companion builds alternate complete snapshots between
+`pokemon-v2-a.bin` and `pokemon-v2-b.bin`. Startup validates both files and uses
+the newest supported sequence. A commit streams the active roster into the
+inactive file, applies at most one append or replacement, syncs and closes it,
+then reopens and verifies the complete snapshot before making it active. The
+older file is not removed, so an interrupted write leaves a bootable snapshot.
+If either slot uses a newer unsupported format, an older build refuses to write
+instead of risking progress loss by truncating that slot. An unsupported slot
+paired with a corrupt slot is reported as corruption rather than a safe upgrade
+case.
+
+If `sync()` reports failure after all bytes were written, the live store keeps
+using its previous snapshot and reports failure. A later startup may use either
+the previous snapshot or the fully written higher-sequence snapshot, but only
+after complete size, record, reference, and CRC validation. It never accepts a
+partial snapshot.
+
+All integers are explicitly encoded little-endian; C++ struct padding is never
+written. The file is:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 4 | Magic `PKV2` |
+| 4 | 2 | Format version (`1`) |
+| 6 | 2 | Header size (`24`) |
+| 8 | 4 | Non-zero snapshot sequence |
+| 12 | 2 | State size (`96`) |
+| 14 | 2 | Record size (`48`) |
+| 16 | 4 | Record count |
+| 20 | 4 | Payload size (`96 + recordCount * 48`) |
+| 24 | 96 | Encoded `PokemonState` |
+| 120 | `recordCount * 48` | Records in ascending record/capture ID order |
+| end - 4 | 4 | Standard CRC-32 over header, state, and records |
+
+The 96-byte state payload is:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 24 | Six Party record IDs (`u32` each; packed from slot 1) |
+| 24 | 4 | Pending-event record ID |
+| 28 | 2 | Pending-event species ID |
+| 30 | 1 | Pending-event level |
+| 31 | 1 | Pending-event gender |
+| 32 | 1 | Pending-event item |
+| 33 | 1 | Pending-event kind |
+| 34 | 12 | Six evolution-item counts (`u16` each) |
+| 46 | 19 | Seen Pokédex bitset, species 1-151 |
+| 65 | 19 | Caught Pokédex bitset, species 1-151 |
+| 84 | 4 | Lifetime verified-reading minutes |
+| 88 | 4 | Snapshot sequence (must match the header) |
+| 92 | 1 | Reading-minute remainder (`0-59`) |
+| 93 | 1 | Encounter misses (`0-5`) |
+| 94 | 1 | Item misses (`0-19`) |
+| 95 | 1 | Dashboard notice |
+
+Each 48-byte record contains record ID at offset 0, total XP at 4, species ID
+at 8, caught level at 10, gender at 11, origin at 12, flags at 13, a canonical
+33-byte null-padded UTF-8 nickname at 14, and a zero reserved byte at 47.
+Record IDs are strictly increasing. Every Party ID and pending evolution ID
+must resolve to a record, and every stored record's current species must be
+marked caught. PC order is derived without a roster allocation: physical order
+is catch order, while Pokédex and alphabetical views rescan through a bounded
+19-byte species bitset.
 
 ## `book.bin`
 
