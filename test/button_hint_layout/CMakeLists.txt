@@ -7,6 +7,7 @@ target_link_libraries(ButtonHintLayoutTest PRIVATE
 )
 
 target_include_directories(ButtonHintLayoutTest PRIVATE
+  ${REPO_ROOT}/src
   ${REPO_ROOT}/lib/EpdFont
 )
 
