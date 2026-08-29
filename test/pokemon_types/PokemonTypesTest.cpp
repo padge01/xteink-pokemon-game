@@ -122,6 +122,31 @@ void invalidRecordsDoNotMutateOutputs() {
   CHECK(decoded == decodedBefore);
 }
 
+void recordValidationRejectsImpossibleLevelAndGender() {
+  PokemonRecord record = validRecord();
+  record.totalXp = pokemon::xpRequired(record.caughtLevel) - 1U;
+  CHECK(!pokemon::validateRecord(record));
+
+  record = validRecord();
+  record.gender = Gender::Genderless;
+  CHECK(!pokemon::validateRecord(record));
+
+  record = validRecord();
+  record.speciesId = 81;
+  record.gender = Gender::Genderless;
+  CHECK(pokemon::validateRecord(record));
+  record.gender = Gender::Female;
+  CHECK(!pokemon::validateRecord(record));
+
+  record = validRecord();
+  record.speciesId = 29;
+  record.gender = Gender::Male;
+  CHECK(!pokemon::validateRecord(record));
+  record.speciesId = 32;
+  record.gender = Gender::Female;
+  CHECK(!pokemon::validateRecord(record));
+}
+
 void xpBoundariesStartAtZeroAndClampAtLevelOneHundred() {
   CHECK(pokemon::xpRequired(0) == 0);
   CHECK(pokemon::xpRequired(1) == 0);
@@ -136,6 +161,13 @@ void xpBoundariesStartAtZeroAndClampAtLevelOneHundred() {
   CHECK(pokemon::levelForXp(52) == 5);
   CHECK(pokemon::levelForXp(8340) == 100);
   CHECK(pokemon::levelForXp(UINT32_MAX) == 100);
+
+  for (uint8_t level = 1; level <= 100; ++level) {
+    CHECK(pokemon::levelForXp(pokemon::xpRequired(level)) == level);
+    if (level < 100) {
+      CHECK(pokemon::levelForXp(pokemon::xpRequired(static_cast<uint8_t>(level + 1U)) - 1U) == level);
+    }
+  }
 }
 
 PokemonState validState() {
@@ -197,6 +229,14 @@ void pendingEventValidationFollowsItsTag() {
   state.pending.gender = Gender::Genderless;
   CHECK(pokemon::validateState(state));
 
+  state.pending.gender = Gender::Female;
+  CHECK(!pokemon::validateState(state));
+  state.pending.speciesId = 1;
+  state.pending.gender = Gender::Genderless;
+  CHECK(!pokemon::validateState(state));
+
+  state.pending.speciesId = 81;
+  state.pending.gender = Gender::Genderless;
   state.pending.item = pokemon::EvolutionItem::MoonStone;
   CHECK(!pokemon::validateState(state));
 
@@ -395,6 +435,7 @@ int main() {
   recordEncodingIsExplicitAndRoundTrips();
   nicknameValidationEnforcesTheStoredBoundary();
   invalidRecordsDoNotMutateOutputs();
+  recordValidationRejectsImpossibleLevelAndGender();
   xpBoundariesStartAtZeroAndClampAtLevelOneHundred();
   stateValidationRejectsPartyAndPokedexCorruption();
   pendingEventValidationFollowsItsTag();

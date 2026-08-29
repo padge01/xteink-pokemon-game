@@ -1,5 +1,7 @@
 #include "PokemonTypes.h"
 
+#include "PokemonSpecies.h"
+
 #include <algorithm>
 #include <cstring>
 
@@ -85,6 +87,15 @@ bool canonicalNickname(const std::array<char, POKEMON_NICKNAME_BYTES>& nickname)
   return validateNickname(std::string_view(nickname.data(), static_cast<size_t>(terminator - nickname.begin())));
 }
 
+bool genderMatchesSpecies(const uint16_t speciesId, const Gender gender) {
+  const SpeciesData* species = speciesData(speciesId);
+  if (species == nullptr) return false;
+  if (species->genderRate == 255) return gender == Gender::Genderless;
+  if (species->genderRate == 0) return gender == Gender::Male;
+  if (species->genderRate == 8) return gender == Gender::Female;
+  return gender == Gender::Male || gender == Gender::Female;
+}
+
 }  // namespace
 
 bool validateNickname(const std::string_view nickname) {
@@ -103,13 +114,12 @@ bool setNickname(PokemonRecord& record, const std::string_view nickname) {
 bool validateRecord(const PokemonRecord& record) {
   if (record.recordId == 0 || record.speciesId == 0 || record.speciesId > KANTO_SPECIES_COUNT ||
       record.totalXp > MAXIMUM_TOTAL_XP || record.caughtLevel == 0 || record.caughtLevel > 100 ||
+      record.totalXp < xpRequired(record.caughtLevel) ||
       (record.flags & static_cast<uint8_t>(~ALLOWED_RECORD_FLAGS)) != 0 || !canonicalNickname(record.nickname)) {
     return false;
   }
-  if (record.gender != Gender::Male && record.gender != Gender::Female && record.gender != Gender::Genderless) {
-    return false;
-  }
-  return record.origin == Origin::Caught || record.origin == Origin::Starter;
+  return genderMatchesSpecies(record.speciesId, record.gender) &&
+         (record.origin == Origin::Caught || record.origin == Origin::Starter);
 }
 
 bool encodeRecord(const PokemonRecord& record, RecordBytes& output) {
@@ -206,8 +216,7 @@ bool validateState(const PokemonState& state) {
              event.item == EvolutionItem::None;
     case PendingEventKind::Encounter:
       return event.recordId == 0 && event.speciesId >= 1 && event.speciesId <= KANTO_SPECIES_COUNT &&
-             event.level >= 1 && event.level <= 100 &&
-             (event.gender == Gender::Male || event.gender == Gender::Female || event.gender == Gender::Genderless) &&
+             event.level >= 1 && event.level <= 100 && genderMatchesSpecies(event.speciesId, event.gender) &&
              event.item == EvolutionItem::None;
     case PendingEventKind::Item:
       return event.recordId == 0 && event.speciesId == 0 && event.level == 0 && event.gender == Gender::Unknown &&

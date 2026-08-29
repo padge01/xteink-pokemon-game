@@ -191,7 +191,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, default=root / "scripts/data/pokemon-kanto-v2.csv")
-    parser.add_argument("--output", type=Path, default=root / "lib/Pokemon/PokemonSpecies.generated.h")
+    parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     rendered = generate(load_species(args.input))

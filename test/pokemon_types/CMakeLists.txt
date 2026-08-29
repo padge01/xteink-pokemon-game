@@ -33,3 +33,11 @@ target_link_libraries(PokemonTypesTest PRIVATE
 )
 
 add_test(NAME PokemonTypesTest COMMAND PokemonTypesTest)
+
+add_test(
+  NAME PokemonSpeciesGeneratorTest
+  COMMAND ${Python3_EXECUTABLE}
+          "${CMAKE_CURRENT_SOURCE_DIR}/PokemonSpeciesGeneratorTest.py"
+          "${REPO_ROOT}/scripts/generate_pokemon_v2_species.py"
+          "${REPO_ROOT}/scripts/data/pokemon-kanto-v2.csv"
+)
