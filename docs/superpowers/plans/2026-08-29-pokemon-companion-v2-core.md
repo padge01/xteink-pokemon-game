@@ -28,23 +28,26 @@ Public operations:
 CreditResult applyCreditedMinutes(PokemonState&, PokemonRecord& leader, uint16_t minutes,
                                   uint8_t bookProgressPercent, OwnedEvolutionNeeds,
                                   RandomSource&);
-bool resolveEncounter(PokemonState&, EncounterChoice, const char* nickname, RecordMutation&);
+bool resolveEncounter(PokemonState&, const PokemonRecord& leader, EncounterChoice,
+                      const char* nickname, RecordMutation&);
 bool resolveEvolution(PokemonState&, PokemonRecord&, EvolutionChoice, RecordMutation&);
+bool setEvolutionPrompts(PokemonState&, PokemonRecord&, bool enabled, RecordMutation&);
 bool useEvolutionItem(PokemonState&, PokemonRecord&, EvolutionItem, RecordMutation&);
 ```
 
-- One XP per minute. Let `n = clamp(level, 1, 100) - 1`; use `xpRequired(level) = 10*n + 3*n*n/4`, so Level 1 begins at zero XP, and clamp accumulated XP at Level 100.
+- One XP per minute, processed chronologically so each hourly, evolution, and lifetime threshold sees only the minutes credited before it. Let `n = clamp(level, 1, 100) - 1`; use `xpRequired(level) = 10*n + 3*n*n/4`, so Level 1 begins at zero XP, and clamp accumulated XP at Level 100.
 - Encounter check each 60 verified minutes: 25%, with the sixth consecutive check forced after five misses. Book-progress bands 0/25/50/75/95 percent produce levels 2-6/5-10/9-16/14-24/18-30.
 - A regular encounter pool excludes Legendary, Special, and EvolutionOnly rows. Base-stage rows are eligible at all progress, middle-stage rows at 50%+, and final-stage rows at 75%+. Select among eligible rows using the pinned capture rate as the integer weight, except Bulbasaur, Charmander, Squirtle, and Pikachu use weight 8 so all four remain rare wild encounters.
 - EvolutionOnly contains the twenty item/Link Cable targets: Raichu, Nidoqueen, Nidoking, Clefable, Ninetales, Wigglytuff, Vileplume, Arcanine, Poliwrath, Alakazam, Machamp, Victreebel, Golem, Cloyster, Gengar, Exeggutor, Starmie, Vaporeon, Jolteon, and Flareon. They never appear wild, keeping all six items necessary for completion.
 - On a triggered encounter, make one 5% legendary substitution roll. Articuno, Zapdos, and Moltres become eligible at 1,200 lifetime verified minutes and 75% current-book progress; Mewtwo becomes eligible at 3,000 lifetime minutes and 95% progress. Prefer an uncaught eligible legendary, then allow duplicates when all eligible candidates are caught.
 - Once species 1-150 are all caught and Mew is not, the next triggered encounter is Mew instead of running the regular or legendary selection. This is the only Special acquisition rule.
-- Item check each hour: 5%, forced after nineteen misses; prefer an item in the six-bit
+- Encounter events take priority when both systems are due. When no encounter is created, run the item check at 5%, forced after nineteen misses; encounter-blocked hours still advance item pity. Prefer an unsaturated item in the six-bit
   `OwnedEvolutionNeeds` mask, otherwise choose any item. `PokemonService` computes the mask by
   streaming records once at an item-check boundary; the rules layer never reads storage.
+- Enabling evolution prompts immediately queues an already-earned level evolution when no other event is pending. Completing an over-levelled evolution queues its next eligible stage; disabling prompts from an evolution event dismisses it.
 - Allow only one pending event. Accrue counters while blocked and generate at most one event per commit after resolution.
 - Always catch on Catch; append to Party below six, otherwise PC. Use Link Cable for Kadabra, Machoke, Graveler, and Haunter.
-- Tests cover all evolution branches, exact pity boundaries, deterministic rarity, full Party, full PC, and Mew.
+- Tests cover every level and item evolution branch, exact pity boundaries, every regular weighted interval at all five progress bands, full Party, legendary eligibility, and Mew. Full-PC/storage-exhaustion behavior belongs to the atomic store/service tests because the rules layer has no PC capacity.
 - Commit: `feat: add lightweight pokemon v2 rules`.
 
 ## Task 3: Implement alternating atomic snapshots
@@ -70,6 +73,7 @@ bool reset();
 - Startup chooses the newest valid snapshot. Preserve both files and return Corrupt if neither validates.
 - PC ordering is capture order or stable species/record-ID order without loading the roster.
 - Fault-injection tests interrupt every header/state/record/CRC boundary and prove the previous snapshot survives.
+- Treat PC capacity as SD-storage-bounded rather than an arbitrary game limit. Test append failure with a full/unwritable store and prove the pending encounter and previous snapshot survive.
 - Commit: `feat: add atomic pokemon v2 snapshots`.
 
 ## Task 4: Implement the service and Joshua-compatible reading tracker
@@ -94,6 +98,7 @@ bool PokemonService::creditMinutes(uint16_t minutes, uint8_t bookProgressPercent
 ## Core exit gate
 
 - Run only the targeted host CMake/CTest targets during implementation.
-- Count production lines and project UI/dashboard totals. Stop if core exceeds 1,050 lines or the total projection exceeds 2,200.
+- Track nonblank production lines and project UI/dashboard totals as review signals. Stop if the total projection exceeds 2,200 lines or if a new abstraction cannot justify its flash, RAM, or failure-path cost; do not compress readable fixed-memory code to satisfy a physical-line quota.
 - Review every heap allocation and storage failure path before beginning UI work.
+- Keep rules and tracker code free of runtime heap allocation. Measure X3 stack high-water marks for the game/service path; investigate any measured frame above 512 bytes or any task with less than 1 KB remaining headroom.
 - With visible approval, build `pokemon-x3` once at this gate. Compare against the recorded clean baseline, reject less than 128 KB partition headroom, and stop for review if the core delta makes the 100 KB total budget implausible.

@@ -56,8 +56,10 @@ struct RecordMutation {
 CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, uint16_t minutes,
                                   uint8_t bookProgressPercent, OwnedEvolutionNeeds ownedEvolutionNeeds,
                                   const RandomSource& random);
-bool acknowledgeItem(PokemonState& state);
-bool resolveEncounter(PokemonState& state, EncounterChoice choice, const char* nickname, RecordMutation& mutation);
+bool acknowledgeItem(PokemonState& state, const PokemonRecord& leader);
+bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, bool enabled, RecordMutation& mutation);
+bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, EncounterChoice choice,
+                      const char* nickname, RecordMutation& mutation);
 bool resolveEvolution(PokemonState& state, PokemonRecord& record, EvolutionChoice choice,
                       RecordMutation& mutation);
 bool useEvolutionItem(PokemonState& state, PokemonRecord& record, EvolutionItem item, RecordMutation& mutation);

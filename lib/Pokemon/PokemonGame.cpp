@@ -1,6 +1,5 @@
 #include "PokemonGame.h"
 
-#include <algorithm>
 #include <array>
 #include <cstdint>
 
@@ -121,6 +120,26 @@ bool evolveCandidate(PokemonState& state, PokemonRecord& record, const uint16_t 
   return true;
 }
 
+bool queueEligibleEvolution(PokemonState& state, const PokemonRecord& record, bool& queued) {
+  queued = false;
+  if (state.pending.kind != PendingEventKind::None ||
+      (record.flags & recordFlag(RecordFlag::EvolutionPromptsDisabled)) != 0) {
+    return true;
+  }
+  const uint8_t level = levelForXp(record.totalXp);
+  for (const EvolutionRule& rule : evolutionsFor(record.speciesId)) {
+    if (rule.trigger != EvolutionTrigger::Level || level < rule.minimumLevel) continue;
+    state.pending.kind = PendingEventKind::Evolution;
+    state.pending.recordId = record.recordId;
+    state.pending.speciesId = rule.targetSpeciesId;
+    state.dashboardNotice = DashboardNotice::WhatsThis;
+    if (!markSpecies(state.seenSpecies, rule.targetSpeciesId)) return false;
+    queued = true;
+    return true;
+  }
+  return true;
+}
+
 bool finalizeEncounter(PokemonState& state, const uint16_t speciesId, const uint8_t bookProgressPercent,
                        const RandomSource& random) {
   uint8_t level = 0;
@@ -183,24 +202,32 @@ bool createEncounter(PokemonState& state, const uint8_t bookProgressPercent, con
   return finalizeEncounter(state, speciesId, bookProgressPercent, random);
 }
 
-bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNeeds, const RandomSource& random) {
+bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNeeds, const RandomSource& random,
+                bool& created) {
+  created = false;
   std::array<uint8_t, EVOLUTION_ITEM_COUNT> candidates{};
   size_t candidateCount = 0;
   for (uint8_t index = 0; index < EVOLUTION_ITEM_COUNT; ++index) {
-    if ((ownedEvolutionNeeds.mask & static_cast<uint8_t>(1U << index)) != 0) candidates[candidateCount++] = index;
+    if (state.itemCounts[index] != UINT16_MAX &&
+        (ownedEvolutionNeeds.mask & static_cast<uint8_t>(1U << index)) != 0) {
+      candidates[candidateCount++] = index;
+    }
   }
   if (candidateCount == 0) {
-    for (uint8_t index = 0; index < EVOLUTION_ITEM_COUNT; ++index) candidates[candidateCount++] = index;
+    for (uint8_t index = 0; index < EVOLUTION_ITEM_COUNT; ++index) {
+      if (state.itemCounts[index] != UINT16_MAX) candidates[candidateCount++] = index;
+    }
   }
+  if (candidateCount == 0) return true;
 
   uint32_t selectedIndex = 0;
   if (candidateCount > 1 && !randomBelow(random, static_cast<uint32_t>(candidateCount), selectedIndex)) return false;
   const uint8_t itemIndex = candidates[selectedIndex];
-  if (state.itemCounts[itemIndex] == UINT16_MAX) return false;
   ++state.itemCounts[itemIndex];
   state.pending.kind = PendingEventKind::Item;
   state.pending.item = static_cast<EvolutionItem>(itemIndex + 1U);
   state.dashboardNotice = DashboardNotice::ItemFound;
+  created = true;
   return true;
 }
 
@@ -234,9 +261,10 @@ bool processHourlyCheck(PokemonState& state, const uint8_t bookProgressPercent, 
     itemTriggered = itemRoll == 0;
   }
   if (itemTriggered) {
-    if (!createItem(state, ownedEvolutionNeeds, random)) return false;
+    bool itemCreated = false;
+    if (!createItem(state, ownedEvolutionNeeds, random, itemCreated)) return false;
     state.itemMisses = 0;
-    generatedEvent = PendingEventKind::Item;
+    if (itemCreated) generatedEvent = PendingEventKind::Item;
     return true;
   }
   incrementCapped(state.itemMisses, 19);
@@ -263,31 +291,25 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, co
 
   PokemonState stateCandidate = state;
   PokemonRecord leaderCandidate = leader;
-  leaderCandidate.totalXp = std::min<uint32_t>(MAXIMUM_TOTAL_XP, leaderCandidate.totalXp + minutes);
-  const uint32_t lifetimeHeadroom = UINT32_MAX - stateCandidate.lifetimeMinutes;
-  stateCandidate.lifetimeMinutes += std::min<uint32_t>(minutes, lifetimeHeadroom);
-  const uint32_t accumulatedMinutes = static_cast<uint32_t>(stateCandidate.readingMinuteRemainder) + minutes;
-  const uint32_t hourlyChecks = accumulatedMinutes / 60U;
-  stateCandidate.readingMinuteRemainder = static_cast<uint8_t>(accumulatedMinutes % 60U);
-
-  result.currentLevel = levelForXp(leaderCandidate.totalXp);
   PendingEventKind generatedEvent = PendingEventKind::None;
-  if (stateCandidate.pending.kind == PendingEventKind::None && result.currentLevel > result.previousLevel &&
-      (leaderCandidate.flags & recordFlag(RecordFlag::EvolutionPromptsDisabled)) == 0) {
-    for (const EvolutionRule& rule : evolutionsFor(leaderCandidate.speciesId)) {
-      if (rule.trigger != EvolutionTrigger::Level || result.currentLevel < rule.minimumLevel) continue;
-      stateCandidate.pending.kind = PendingEventKind::Evolution;
-      stateCandidate.pending.recordId = leaderCandidate.recordId;
-      stateCandidate.pending.speciesId = rule.targetSpeciesId;
-      stateCandidate.dashboardNotice = DashboardNotice::WhatsThis;
-      if (!markSpecies(stateCandidate.seenSpecies, rule.targetSpeciesId)) return result;
-      generatedEvent = PendingEventKind::Evolution;
-      break;
+  for (uint32_t minute = 0; minute < minutes; ++minute) {
+    if (leaderCandidate.totalXp < MAXIMUM_TOTAL_XP) ++leaderCandidate.totalXp;
+    if (stateCandidate.lifetimeMinutes < UINT32_MAX) ++stateCandidate.lifetimeMinutes;
+    ++stateCandidate.readingMinuteRemainder;
+
+    const uint8_t minuteLevel = levelForXp(leaderCandidate.totalXp);
+    if (minuteLevel > result.currentLevel) {
+      bool queued = false;
+      if (!queueEligibleEvolution(stateCandidate, leaderCandidate, queued)) return result;
+      if (queued) generatedEvent = PendingEventKind::Evolution;
     }
-  }
-  for (uint32_t check = 0; check < hourlyChecks; ++check) {
-    if (!processHourlyCheck(stateCandidate, bookProgressPercent, random, ownedEvolutionNeeds, generatedEvent)) {
-      return result;
+    result.currentLevel = minuteLevel;
+
+    if (stateCandidate.readingMinuteRemainder == 60) {
+      stateCandidate.readingMinuteRemainder = 0;
+      if (!processHourlyCheck(stateCandidate, bookProgressPercent, random, ownedEvolutionNeeds, generatedEvent)) {
+        return result;
+      }
     }
   }
 
@@ -299,18 +321,54 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, co
   return result;
 }
 
-bool acknowledgeItem(PokemonState& state) {
-  if (!validateState(state) || state.pending.kind != PendingEventKind::Item) return false;
+bool acknowledgeItem(PokemonState& state, const PokemonRecord& leader) {
+  if (!validateState(state) || !validateRecord(leader) || state.partyRecordIds[0] != leader.recordId ||
+      state.pending.kind != PendingEventKind::Item) {
+    return false;
+  }
   PokemonState candidate = state;
   clearPending(candidate);
+  bool queued = false;
+  if (!queueEligibleEvolution(candidate, leader, queued)) return false;
   state = candidate;
   return true;
 }
 
-bool resolveEncounter(PokemonState& state, const EncounterChoice choice, const char* nickname,
-                      RecordMutation& mutation) {
-  if (!validateState(state) || state.pending.kind != PendingEventKind::Encounter ||
-      mutation.kind != RecordMutationKind::None) {
+bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool enabled,
+                         RecordMutation& mutation) {
+  const bool dismissingCurrentPrompt = !enabled && state.pending.kind == PendingEventKind::Evolution &&
+                                       state.pending.recordId == record.recordId;
+  if (!validateState(state) || !validateRecord(record) || mutation.kind != RecordMutationKind::None) {
+    return false;
+  }
+
+  PokemonState stateCandidate = state;
+  PokemonRecord recordCandidate = record;
+  if (enabled) {
+    recordCandidate.flags &= static_cast<uint8_t>(~recordFlag(RecordFlag::EvolutionPromptsDisabled));
+  } else {
+    recordCandidate.flags |= recordFlag(RecordFlag::EvolutionPromptsDisabled);
+    if (dismissingCurrentPrompt) clearPending(stateCandidate);
+  }
+  bool queued = false;
+  if (!validateRecord(recordCandidate) ||
+      (enabled && !queueEligibleEvolution(stateCandidate, recordCandidate, queued))) {
+    return false;
+  }
+
+  RecordMutation mutationCandidate = mutation;
+  mutationCandidate.record = recordCandidate;
+  mutationCandidate.kind = RecordMutationKind::Replace;
+  state = stateCandidate;
+  record = recordCandidate;
+  mutation = mutationCandidate;
+  return true;
+}
+
+bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const EncounterChoice choice,
+                      const char* nickname, RecordMutation& mutation) {
+  if (!validateState(state) || !validateRecord(leader) || state.partyRecordIds[0] != leader.recordId ||
+      state.pending.kind != PendingEventKind::Encounter || mutation.kind != RecordMutationKind::None) {
     return false;
   }
 
@@ -343,6 +401,8 @@ bool resolveEncounter(PokemonState& state, const EncounterChoice choice, const c
   }
 
   clearPending(stateCandidate);
+  bool queued = false;
+  if (!queueEligibleEvolution(stateCandidate, leader, queued)) return false;
   if (!validateState(stateCandidate)) return false;
   state = stateCandidate;
   mutation = mutationCandidate;
@@ -370,6 +430,10 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
   }
 
   clearPending(stateCandidate);
+  if (choice == EvolutionChoice::Evolve) {
+    bool queued = false;
+    if (!queueEligibleEvolution(stateCandidate, recordCandidate, queued)) return false;
+  }
   state = stateCandidate;
   record = recordCandidate;
   mutation = mutationCandidate;
