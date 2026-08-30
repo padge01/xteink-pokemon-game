@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
 - The private firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
 - Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
 - Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.

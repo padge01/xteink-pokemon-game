@@ -68,7 +68,7 @@ def _apply_one(jpeg_dir, patch_path):
         # Not applied, not appliable -- the libdep source has diverged from
         # what the patch expects. Don't write a half-patched file.
         result = subprocess.run(
-            ["git", "apply", "--check", patch_path],
+            ["git", "apply", "--check", "--ignore-space-change", patch_path],
             cwd=jpeg_dir,
             capture_output=True,
             text=True,
@@ -78,7 +78,7 @@ def _apply_one(jpeg_dir, patch_path):
             % (name, result.stdout, result.stderr)
         )
         raise SystemExit(1)
-    subprocess.run(["git", "apply", patch_path], cwd=jpeg_dir, check=True)
+    subprocess.run(["git", "apply", "--ignore-space-change", patch_path], cwd=jpeg_dir, check=True)
     print("Applied JPEGDEC patch: %s" % name)
 
 
@@ -105,7 +105,7 @@ def _patch_already_satisfied(jpeg_dir, patch_name):
 
 
 def _git_apply_succeeds(jpeg_dir, patch_path, *, reverse):
-    cmd = ["git", "apply", "--check"]
+    cmd = ["git", "apply", "--check", "--ignore-space-change"]
     if reverse:
         cmd.append("--reverse")
     cmd.append(patch_path)
