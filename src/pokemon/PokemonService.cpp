@@ -22,7 +22,7 @@ uint32_t deviceRandomBelow(void*, const uint32_t upperExclusive) {
 
 bool PokemonService::beginReadingSession() {
   readingSessionActive_ = false;
-  if (store_.begin() != StoreBeginResult::Ready) return false;
+  if (!store_.isReady() && store_.begin() != StoreBeginResult::Ready) return false;
 
   PokemonState state{};
   PokemonRecord leader{};
@@ -31,7 +31,10 @@ bool PokemonService::beginReadingSession() {
     return false;
   }
 
-  tracker_.beginSession();
+  if (!tracker_.beginSession()) {
+    LOG_ERR("PokemonService", "Failed to retry unsaved reading credit");
+    return false;
+  }
   readingSessionActive_ = true;
   return true;
 }
@@ -50,7 +53,9 @@ void PokemonService::checkpointIfDue(const uint32_t nowMs) {
 
 void PokemonService::flushOnExit(const uint32_t nowMs) {
   if (!readingSessionActive_) return;
-  tracker_.flushOnExit(nowMs);
+  if (!tracker_.flushOnExit(nowMs)) {
+    LOG_ERR("PokemonService", "Retaining unsaved reading credit for the next session");
+  }
   readingSessionActive_ = false;
 }
 
@@ -65,31 +70,30 @@ bool PokemonService::creditMinutes(const uint16_t minutes, const uint8_t bookPro
 
   PokemonRecord leader{};
   if (!store_.readRecord(state.partyRecordIds[0], leader)) {
-    LOG_ERR("Pokemon service: failed to load party leader");
+    LOG_ERR("PokemonService", "Failed to load party leader");
     return false;
   }
 
   OwnedEvolutionNeeds ownedEvolutionNeeds{};
   if (static_cast<uint32_t>(state.readingMinuteRemainder) + minutes >= 60U &&
       !store_.loadOwnedEvolutionNeeds(ownedEvolutionNeeds)) {
-    LOG_ERR("Pokemon service: failed to load owned evolution needs");
+    LOG_ERR("PokemonService", "Failed to load owned evolution needs");
     return false;
   }
 
-  PokemonState stateCandidate = state;
-  PokemonRecord leaderCandidate = leader;
-  const CreditResult result = applyCreditedMinutes(stateCandidate, leaderCandidate, minutes,
-                                                    bookProgressPercent, ownedEvolutionNeeds, random_);
+  const uint32_t originalLeaderXp = leader.totalXp;
+  const CreditResult result =
+      applyCreditedMinutes(state, leader, minutes, bookProgressPercent, ownedEvolutionNeeds, random_);
   if (result.status != CreditStatus::Applied) return false;
 
   RecordMutation mutation{};
-  if (leaderCandidate != leader) {
-    mutation.requestedRecordId = leaderCandidate.recordId;
-    mutation.record = leaderCandidate;
+  if (leader.totalXp != originalLeaderXp) {
+    mutation.requestedRecordId = leader.recordId;
+    mutation.record = leader;
     mutation.kind = RecordMutationKind::Replace;
   }
-  if (!store_.commit(stateCandidate, mutation)) {
-    LOG_ERR("Pokemon service: failed to commit credited reading");
+  if (!store_.commit(state, mutation)) {
+    LOG_ERR("PokemonService", "Failed to commit credited reading");
     return false;
   }
   return true;

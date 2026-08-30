@@ -7,6 +7,9 @@
 #include "CrossPointSettings.h"
 #include "ReaderProgressSaveDebouncer.h"
 #include "activities/Activity.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include <PokemonTracker.h>
+#endif
 
 class TxtReaderActivity final : public Activity {
   std::unique_ptr<Txt> txt;
@@ -19,6 +22,9 @@ class TxtReaderActivity final : public Activity {
   bool longPowerButtonHandled = false;
   bool longPressBackHandled = false;
   ReaderProgressSaveDebouncer progressSaveDebouncer;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::PokemonTurnVerifier pokemonTurnVerifier;
+#endif
 
   // Streaming text reader - stores file offsets for each page
   std::vector<size_t> pageOffsets;  // File offset for start of each page

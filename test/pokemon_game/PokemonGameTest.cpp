@@ -200,6 +200,46 @@ void simultaneousEncounterAndItemPityPrioritizesTheEncounter() {
   CHECK(sequence.index == std::size(draws));
 }
 
+void encounterDueWithLevelGainPrioritizesTheEncounter() {
+  pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
+  bulbasaur.speciesId = 1;
+  bulbasaur.totalXp = pokemon::xpRequired(16) - 1U;
+  pokemon::PokemonState state = stateWithLeader(bulbasaur);
+  state.readingMinuteRemainder = 59;
+  state.encounterMisses = 5;
+  constexpr uint32_t draws[] = {1, 0, 0, 0};
+  SequenceRandom sequence{draws, std::size(draws)};
+  pokemon::RandomSource random{&sequence, SequenceRandom::next};
+
+  const pokemon::CreditResult result =
+      pokemon::applyCreditedMinutes(state, bulbasaur, 1, 0, pokemon::OwnedEvolutionNeeds{}, random);
+
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::Encounter);
+  CHECK(state.pending.speciesId == 1);
+  CHECK(state.itemMisses == 1);
+}
+
+void forcedItemWithLevelGainPrioritizesTheHourlyItem() {
+  pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
+  bulbasaur.speciesId = 1;
+  bulbasaur.totalXp = pokemon::xpRequired(16) - 1U;
+  pokemon::PokemonState state = stateWithLeader(bulbasaur);
+  state.readingMinuteRemainder = 59;
+  state.itemMisses = 19;
+  constexpr uint32_t draws[] = {1, 0};  // Miss encounter, then select the first forced item.
+  SequenceRandom sequence{draws, std::size(draws)};
+  pokemon::RandomSource random{&sequence, SequenceRandom::next};
+
+  const pokemon::CreditResult result =
+      pokemon::applyCreditedMinutes(state, bulbasaur, 1, 0, pokemon::OwnedEvolutionNeeds{}, random);
+
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Item);
+  CHECK(state.pending.kind == pokemon::PendingEventKind::Item);
+  CHECK(state.itemCounts[0] == 1);
+  CHECK(sequence.index == std::size(draws));
+}
+
 void multiHourCreditUsesLifetimeAtEachHourlyBoundary() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   pokemon::PokemonState state = stateWithLeader(leader);
@@ -561,6 +601,7 @@ void reenablingPromptsWaitsForTheNextLevel() {
 
   CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, true, mutation));
   CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0);
+  CHECK(mutation.requestedRecordId == bulbasaur.recordId);
   CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
   CHECK(state.pending.kind == pokemon::PendingEventKind::None);
 
@@ -664,6 +705,7 @@ void everyLevelEvolutionQueuesAtItsThreshold() {
       CHECK(pokemon::resolveEvolution(state, record, pokemon::EvolutionChoice::Evolve, mutation));
       CHECK(record.speciesId == rule.targetSpeciesId);
       CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
+      CHECK(mutation.requestedRecordId == record.recordId);
       CHECK(mutation.record.speciesId == rule.targetSpeciesId);
       CHECK(pokemon::isSpeciesMarked(state.seenSpecies, rule.targetSpeciesId));
       CHECK(pokemon::isSpeciesMarked(state.caughtSpecies, rule.targetSpeciesId));
@@ -704,6 +746,7 @@ void everyItemEvolutionConsumesExactlyOneItem() {
     CHECK(record.speciesId == itemCase.target);
     CHECK(state.itemCounts[itemIndex] == 0);
     CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
+    CHECK(mutation.requestedRecordId == record.recordId);
     CHECK(mutation.record.speciesId == itemCase.target);
     CHECK(pokemon::isSpeciesMarked(state.caughtSpecies, itemCase.target));
   }
@@ -750,6 +793,8 @@ int main() {
   sixthEncounterCheckIsForcedAndCreatesOnlyOneEvent();
   pendingEventBlocksRollsButStillAdvancesPity();
   simultaneousEncounterAndItemPityPrioritizesTheEncounter();
+  encounterDueWithLevelGainPrioritizesTheEncounter();
+  forcedItemWithLevelGainPrioritizesTheHourlyItem();
   multiHourCreditUsesLifetimeAtEachHourlyBoundary();
   progressBandsGateStagesAndEncounterLevels();
   everyEligibleRegularEncounterWeightIntervalSelectsItsSpecies();

@@ -11,6 +11,10 @@
 
 ### Fixed
 
+- The private firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
+- Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
+- Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.
+- Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves encounter then item priority at hourly level-up boundaries.
 - Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
 - Large EPUB images now reject unsafe dimensions before narrowing, keep the reader responsive while decoding, and remain inside the reader viewport.
 - EPUB lines can now wrap after visible hyphens and dashes, while ruby annotations stay grouped during incremental layout.

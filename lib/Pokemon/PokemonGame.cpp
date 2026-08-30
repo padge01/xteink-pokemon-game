@@ -115,6 +115,7 @@ bool evolveCandidate(PokemonState& state, PokemonRecord& record, const uint16_t 
       !markSpecies(state.caughtSpecies, targetSpeciesId)) {
     return false;
   }
+  mutation.requestedRecordId = record.recordId;
   mutation.record = record;
   mutation.kind = RecordMutationKind::Replace;
   return true;
@@ -231,8 +232,9 @@ bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNee
   return true;
 }
 
-bool processHourlyCheck(PokemonState& state, const uint8_t bookProgressPercent, const RandomSource& random,
-                        const OwnedEvolutionNeeds ownedEvolutionNeeds, PendingEventKind& generatedEvent) {
+bool processHourlyEncounter(PokemonState& state, const uint8_t bookProgressPercent, const RandomSource& random,
+                            bool& checkItem, PendingEventKind& generatedEvent) {
+  checkItem = false;
   if (state.pending.kind != PendingEventKind::None) {
     incrementCapped(state.encounterMisses, 5);
     incrementCapped(state.itemMisses, 19);
@@ -254,6 +256,16 @@ bool processHourlyCheck(PokemonState& state, const uint8_t bookProgressPercent, 
   }
   incrementCapped(state.encounterMisses, 5);
 
+  checkItem = true;
+  return true;
+}
+
+bool processHourlyItem(PokemonState& state, const RandomSource& random,
+                       const OwnedEvolutionNeeds ownedEvolutionNeeds, PendingEventKind& generatedEvent) {
+  if (state.pending.kind != PendingEventKind::None) {
+    incrementCapped(state.itemMisses, 19);
+    return true;
+  }
   bool itemTriggered = state.itemMisses == 19;
   if (!itemTriggered) {
     uint32_t itemRoll = 0;
@@ -298,18 +310,25 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, co
     ++stateCandidate.readingMinuteRemainder;
 
     const uint8_t minuteLevel = levelForXp(leaderCandidate.totalXp);
-    if (minuteLevel > result.currentLevel) {
+    const bool gainedLevel = minuteLevel > result.currentLevel;
+    result.currentLevel = minuteLevel;
+
+    bool checkItem = false;
+    if (stateCandidate.readingMinuteRemainder == 60) {
+      stateCandidate.readingMinuteRemainder = 0;
+      if (!processHourlyEncounter(stateCandidate, bookProgressPercent, random, checkItem, generatedEvent)) {
+        return result;
+      }
+    }
+
+    if (checkItem && !processHourlyItem(stateCandidate, random, ownedEvolutionNeeds, generatedEvent)) {
+      return result;
+    }
+
+    if (gainedLevel) {
       bool queued = false;
       if (!queueEvolutionAfterLevelGain(stateCandidate, leaderCandidate, queued)) return result;
       if (queued) generatedEvent = PendingEventKind::Evolution;
-    }
-    result.currentLevel = minuteLevel;
-
-    if (stateCandidate.readingMinuteRemainder == 60) {
-      stateCandidate.readingMinuteRemainder = 0;
-      if (!processHourlyCheck(stateCandidate, bookProgressPercent, random, ownedEvolutionNeeds, generatedEvent)) {
-        return result;
-      }
     }
   }
 
@@ -351,6 +370,7 @@ bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool 
   if (!validateRecord(recordCandidate)) return false;
 
   RecordMutation mutationCandidate = mutation;
+  mutationCandidate.requestedRecordId = recordCandidate.recordId;
   mutationCandidate.record = recordCandidate;
   mutationCandidate.kind = RecordMutationKind::Replace;
   state = stateCandidate;

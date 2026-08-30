@@ -2,7 +2,7 @@
 
 #include "PokemonStore.h"
 
-#include "Pokemon/PokemonSpecies.h"
+#include <PokemonSpecies.h>
 
 #include <HalStorage.h>
 #include <Logging.h>
@@ -46,13 +46,13 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
   if (!Storage.exists(path)) return InspectionResult::Missing;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file) {
-    LOG_ERR("Pokemon store: failed to open %s", path);
+    LOG_ERR("PokemonStore", "Failed to open %s", path);
     return InspectionResult::Corrupt;
   }
 
   HeaderBytes headerBytes{};
   if (!readExact(file, headerBytes.data(), headerBytes.size())) {
-    LOG_ERR("Pokemon store: short header in %s", path);
+    LOG_ERR("PokemonStore", "Short header in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
@@ -64,20 +64,20 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
                                                            : InspectionResult::Corrupt;
   }
   if (file.fileSize64() != snapshotFileBytes(header)) {
-    LOG_ERR("Pokemon store: invalid snapshot size in %s", path);
+    LOG_ERR("PokemonStore", "Invalid snapshot size in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
 
   StateBytes stateBytes{};
   if (!readExact(file, stateBytes.data(), stateBytes.size())) {
-    LOG_ERR("Pokemon store: short payload in %s", path);
+    LOG_ERR("PokemonStore", "Short payload in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
   PokemonState state{};
   if (!decodeState(stateBytes, state) || state.sequence != header.sequence) {
-    LOG_ERR("Pokemon store: invalid state in %s", path);
+    LOG_ERR("PokemonStore", "Invalid state in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
@@ -91,7 +91,7 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
     PokemonRecord record{};
     if (!readExact(file, recordBytes.data(), recordBytes.size()) || !decodeRecord(recordBytes, record) ||
         record.recordId <= previousRecordId || !isSpeciesMarked(state.caughtSpecies, record.speciesId)) {
-      LOG_ERR("Pokemon store: invalid record in %s", path);
+      LOG_ERR("PokemonStore", "Invalid record in %s", path);
       file.close();
       return InspectionResult::Corrupt;
     }
@@ -111,13 +111,13 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
   }
   uint8_t crcBytes[POKEMON_SNAPSHOT_CRC_BYTES]{};
   if (foundPartySlots != requiredPartySlots || !foundPendingRecord || !readExact(file, crcBytes, sizeof(crcBytes))) {
-    LOG_ERR("Pokemon store: unresolved state reference in %s", path);
+    LOG_ERR("PokemonStore", "Unresolved state reference in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
   file.close();
   if (finishSnapshotCrc32(crc) != read32(crcBytes)) {
-    LOG_ERR("Pokemon store: CRC mismatch in %s", path);
+    LOG_ERR("PokemonStore", "CRC mismatch in %s", path);
     return InspectionResult::Corrupt;
   }
   outputHeader = header;
@@ -143,7 +143,7 @@ StoreBeginResult PokemonStore::begin() {
   activeHeader_ = {};
   activeIsA_ = false;
   if (!Storage.ensureDirectoryExists(STORE_DIRECTORY)) {
-    LOG_ERR("Pokemon store: failed to prepare data directory");
+    LOG_ERR("PokemonStore", "Failed to prepare data directory");
     return StoreBeginResult::Corrupt;
   }
 
@@ -178,7 +178,7 @@ bool PokemonStore::loadState(PokemonState& output) const {
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file || !file.seek(POKEMON_SNAPSHOT_HEADER_BYTES)) {
-    LOG_ERR("Pokemon store: failed to open active state");
+    LOG_ERR("PokemonStore", "Failed to open active state");
     file.close();
     return false;
   }
@@ -186,7 +186,7 @@ bool PokemonStore::loadState(PokemonState& output) const {
   const bool readOk = readExact(file, bytes.data(), bytes.size());
   file.close();
   if (!readOk || !decodeState(bytes, output)) {
-    LOG_ERR("Pokemon store: failed to decode active state");
+    LOG_ERR("PokemonStore", "Failed to decode active state");
     return false;
   }
   return true;
@@ -221,14 +221,14 @@ bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutat
     const char* sourcePath = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
     source = Storage.open(sourcePath, O_RDONLY);
     if (!source || !source.seek(POKEMON_SNAPSHOT_HEADER_BYTES + POKEMON_STATE_BYTES)) {
-      LOG_ERR("Pokemon store: failed to open active snapshot records");
+      LOG_ERR("PokemonStore", "Failed to open active snapshot records");
       source.close();
       return false;
     }
   }
   FsFile destination = Storage.open(destinationPath, O_WRONLY | O_CREAT | O_TRUNC);
   if (!destination) {
-    LOG_ERR("Pokemon store: failed to open inactive snapshot");
+    LOG_ERR("PokemonStore", "Failed to open inactive snapshot");
     source.close();
     return false;
   }
@@ -265,13 +265,13 @@ bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutat
   writeOk = writeOk && writeExact(destination, crcBytes, sizeof(crcBytes)) && destination.sync();
   const bool closeOk = destination.close();
   if (!writeOk || !sourceCloseOk || !closeOk) {
-    LOG_ERR("Pokemon store: failed to write inactive snapshot");
+    LOG_ERR("PokemonStore", "Failed to write inactive snapshot");
     return false;
   }
 
   SnapshotHeader verified{};
   if (inspectSnapshot(destinationPath, verified) != InspectionResult::Ready || verified != header) {
-    LOG_ERR("Pokemon store: inactive snapshot verification failed");
+    LOG_ERR("PokemonStore", "Inactive snapshot verification failed");
     return false;
   }
   activeHeader_ = verified;
@@ -285,7 +285,7 @@ bool PokemonStore::readRecord(const uint32_t recordId, PokemonRecord& output) co
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file || !file.seek(POKEMON_SNAPSHOT_HEADER_BYTES + POKEMON_STATE_BYTES)) {
-    LOG_ERR("Pokemon store: failed to open active records");
+    LOG_ERR("PokemonStore", "Failed to open active records");
     file.close();
     return false;
   }
@@ -293,7 +293,7 @@ bool PokemonStore::readRecord(const uint32_t recordId, PokemonRecord& output) co
     RecordBytes bytes{};
     PokemonRecord candidate{};
     if (!readExact(file, bytes.data(), bytes.size()) || !decodeRecord(bytes, candidate)) {
-      LOG_ERR("Pokemon store: failed to decode active record");
+      LOG_ERR("PokemonStore", "Failed to decode active record");
       file.close();
       return false;
     }
@@ -315,7 +315,7 @@ bool PokemonStore::loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const {
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file || !file.seek(RECORDS_OFFSET)) {
-    LOG_ERR("Pokemon store: failed to open owned records");
+    LOG_ERR("PokemonStore", "Failed to open owned records");
     file.close();
     return false;
   }
@@ -324,7 +324,7 @@ bool PokemonStore::loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const {
     RecordBytes bytes{};
     PokemonRecord record{};
     if (!readExact(file, bytes.data(), bytes.size()) || !decodeRecord(bytes, record)) {
-      LOG_ERR("Pokemon store: failed to scan owned evolution needs");
+      LOG_ERR("PokemonStore", "Failed to scan owned evolution needs");
       file.close();
       return false;
     }
@@ -345,7 +345,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file || !file.seek(RECORDS_OFFSET)) {
-    LOG_ERR("Pokemon store: failed to open PC records");
+    LOG_ERR("PokemonStore", "Failed to open PC records");
     file.close();
     return 0;
   }
@@ -356,7 +356,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
       RecordBytes bytes{};
       PokemonRecord record{};
       if (!readExact(file, bytes.data(), bytes.size()) || !decodeRecord(bytes, record)) {
-        LOG_ERR("Pokemon store: failed to read PC capture order");
+        LOG_ERR("PokemonStore", "Failed to read PC capture order");
         file.close();
         return 0;
       }
@@ -378,7 +378,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
     PokemonRecord record{};
     if (!readExact(file, bytes.data(), bytes.size()) || !decodeRecord(bytes, record) ||
         (!recordIsInParty(state, record.recordId) && !markSpecies(pcSpecies, record.speciesId))) {
-      LOG_ERR("Pokemon store: failed to scan PC species");
+      LOG_ERR("PokemonStore", "Failed to scan PC species");
       file.close();
       return 0;
     }
@@ -404,7 +404,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
   if (order == PcOrder::PokedexNumber) {
     for (uint16_t speciesId = 1; speciesId <= KANTO_SPECIES_COUNT && written < output.size(); ++speciesId) {
       if (isSpeciesMarked(pcSpecies, speciesId) && !appendSpecies(speciesId)) {
-        LOG_ERR("Pokemon store: failed to order PC by Pokedex number");
+        LOG_ERR("PokemonStore", "Failed to order PC by Pokedex number");
         file.close();
         return 0;
       }
@@ -421,7 +421,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
       }
       if (nextSpeciesId == 0) break;
       if (!appendSpecies(nextSpeciesId)) {
-        LOG_ERR("Pokemon store: failed to order PC alphabetically");
+        LOG_ERR("PokemonStore", "Failed to order PC alphabetically");
         file.close();
         return 0;
       }
@@ -435,11 +435,11 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
 bool PokemonStore::reset() {
   bool removed = true;
   if (Storage.exists(STORE_PATH_A) && !Storage.remove(STORE_PATH_A)) {
-    LOG_ERR("Pokemon store: failed to remove snapshot A");
+    LOG_ERR("PokemonStore", "Failed to remove snapshot A");
     removed = false;
   }
   if (Storage.exists(STORE_PATH_B) && !Storage.remove(STORE_PATH_B)) {
-    LOG_ERR("Pokemon store: failed to remove snapshot B");
+    LOG_ERR("PokemonStore", "Failed to remove snapshot B");
     removed = false;
   }
   ready_ = false;

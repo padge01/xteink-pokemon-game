@@ -179,6 +179,12 @@ void TxtReaderActivity::openReaderMenu() {
 
 void TxtReaderActivity::loop() {
 #if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::VerifiedTurn pokemonTurn{};
+  if (pokemonTurnVerifier.consume(pokemonTurn)) {
+    auto& service = pokemon::devicePokemonService();
+    service.setBookProgressPercent(pokemonTurn.bookProgressPercent);
+    service.onSuccessfulPageTurn(pokemonTurn.renderedAtMs);
+  }
   pokemon::devicePokemonService().checkpointIfDue(static_cast<uint32_t>(millis()));
 #endif
   if (consumeLongPowerButtonRelease()) {
@@ -300,21 +306,18 @@ void TxtReaderActivity::loop() {
 
   if (prevTriggered && currentPage > 0) {
     currentPage--;
-    requestUpdate();
   } else if (nextTriggered) {
     if (currentPage < totalPages - 1) {
       currentPage++;
-      requestUpdate();
     }
   }
 #if defined(CROSSINK_ENABLE_POKEMON)
   if (currentPage != previousPage) {
     const int percent = totalPages > 0 ? ((currentPage + 1) * 100 + totalPages / 2) / totalPages : 0;
-    auto& service = pokemon::devicePokemonService();
-    service.setBookProgressPercent(static_cast<uint8_t>(std::clamp(percent, 0, 100)));
-    service.onSuccessfulPageTurn(static_cast<uint32_t>(millis()));
+    pokemonTurnVerifier.request(static_cast<uint8_t>(std::clamp(percent, 0, 100)));
   }
 #endif
+  if (currentPage != previousPage) requestUpdate();
 }
 
 void TxtReaderActivity::toggleDarkMode() {
@@ -576,10 +579,14 @@ void TxtReaderActivity::render(RenderLock&&) {
   size_t offset = pageOffsets[currentPage];
   size_t nextOffset;
   currentPageLines.clear();
-  loadPageAtOffset(offset, currentPageLines, nextOffset);
+  const bool pageLoaded = loadPageAtOffset(offset, currentPageLines, nextOffset);
 
   renderer.clearScreen(ReaderUtils::readerBackgroundColor());
   renderPage();
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+  if (pageLoaded) pokemonTurnVerifier.renderSucceeded(static_cast<uint32_t>(millis()));
+#endif
 
   if (!queueProgressSave()) {
     LOG_ERR("TRS", "Failed to save debounced reader progress");

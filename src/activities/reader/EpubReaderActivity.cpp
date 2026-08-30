@@ -2352,6 +2352,12 @@ void EpubReaderActivity::loop() {
   }
 
 #if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::VerifiedTurn pokemonTurn{};
+  if (pokemonTurnVerifier.consume(pokemonTurn)) {
+    auto& service = pokemon::devicePokemonService();
+    service.setBookProgressPercent(pokemonTurn.bookProgressPercent);
+    service.onSuccessfulPageTurn(pokemonTurn.renderedAtMs);
+  }
   pokemon::devicePokemonService().checkpointIfDue(static_cast<uint32_t>(millis()));
 #endif
 
@@ -4575,8 +4581,6 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
   const bool trackPokemonTurn = source == nullptr || std::strcmp(source, "auto") != 0;
   const int pokemonPreviousSpine = currentSpineIndex;
   const int pokemonPreviousPage = section ? section->currentPage : -1;
-  const uint8_t pokemonProgress = static_cast<uint8_t>(
-      std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f));
 #endif
   // Once the reader moves, a session-start resume/reflow anchor is stale. If
   // retained, a later background-build completion can snap back to that page.
@@ -4636,16 +4640,15 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
     }
   }
   lastPageTurnTime = millis();
-  requestUpdate();
 #if defined(CROSSINK_ENABLE_POKEMON)
   const int pokemonCurrentPage = section ? section->currentPage : -1;
   if (trackPokemonTurn &&
       (currentSpineIndex != pokemonPreviousSpine || pokemonCurrentPage != pokemonPreviousPage)) {
-    auto& service = pokemon::devicePokemonService();
-    service.setBookProgressPercent(pokemonProgress);
-    service.onSuccessfulPageTurn(static_cast<uint32_t>(lastPageTurnTime));
+    pokemonTurnVerifier.request(static_cast<uint8_t>(
+        std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f)));
   }
 #endif
+  requestUpdate();
 }
 
 // TODO: Failure handling
@@ -5375,6 +5378,9 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     renderContents(std::move(p), renderFontId, layout.marginTop, layout.marginRight, layout.marginBottom,
                    layout.marginLeft, /*updatePanel=*/true);
     lastRenderCompleteMs = millis();
+#if defined(CROSSINK_ENABLE_POKEMON)
+    pokemonTurnVerifier.renderSucceeded(static_cast<uint32_t>(lastRenderCompleteMs));
+#endif
     const uint8_t heapShapeRedrawStages = pendingHeapShapeReaderRedrawStages.exchange(0, std::memory_order_relaxed);
     if (heapShapeRedrawStages & HEAP_SHAPE_REDRAW_CLIP) {
       MemoryBudget::logHeapShape("clip.reader_redrawn");

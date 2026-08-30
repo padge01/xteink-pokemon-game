@@ -201,6 +201,12 @@ void XtcReaderActivity::loop() {
   }
 
 #if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::VerifiedTurn pokemonTurn{};
+  if (pokemonTurnVerifier.consume(pokemonTurn)) {
+    auto& service = pokemon::devicePokemonService();
+    service.setBookProgressPercent(pokemonTurn.bookProgressPercent);
+    service.onSuccessfulPageTurn(pokemonTurn.renderedAtMs);
+  }
   pokemon::devicePokemonService().checkpointIfDue(static_cast<uint32_t>(millis()));
 #endif
 
@@ -472,10 +478,8 @@ void XtcReaderActivity::loop() {
   } else if (needsUpdate) {
 #if defined(CROSSINK_ENABLE_POKEMON)
     if (currentPage != previousPage) {
-      auto& service = pokemon::devicePokemonService();
-      service.setBookProgressPercent(static_cast<uint8_t>(
+      pokemonTurnVerifier.request(static_cast<uint8_t>(
           std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f)));
-      service.onSuccessfulPageTurn(static_cast<uint32_t>(millis()));
     }
 #endif
     requestUpdate();
@@ -845,7 +849,10 @@ void XtcReaderActivity::render(RenderLock&&) {
     return;
   }
 
-  renderPage(pageToRender);
+  const bool pageRendered = renderPage(pageToRender);
+#if defined(CROSSINK_ENABLE_POKEMON)
+  if (pageRendered) pokemonTurnVerifier.renderSucceeded(static_cast<uint32_t>(millis()));
+#endif
   pageShownAtMs = millis();
   if (!queueProgressSave(pageToRender)) {
     LOG_ERR("XTR", "Failed to save debounced reader progress");
@@ -928,7 +935,7 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
                     false, timeLeft);
 }
 
-void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
+bool XtcReaderActivity::renderPage(const uint32_t pageToRender) {
   const uint16_t pageWidth = xtc->getPageWidth();
   const uint16_t pageHeight = xtc->getPageHeight();
   const uint8_t bitDepth = xtc->getBitDepth();
@@ -947,7 +954,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     renderer.clearScreen();
     if (!streamXtchRenderPass(*xtc, pageToRender, pageWidth, pageHeight, renderer, XtchRenderPass::Base)) {
       showStreamError();
-      return;
+      return false;
     }
 
     if (pagesUntilFullRefresh <= 1) {
@@ -962,14 +969,14 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     renderer.clearScreen(0x00);
     if (!streamXtchRenderPass(*xtc, pageToRender, pageWidth, pageHeight, renderer, XtchRenderPass::Lsb)) {
       showStreamError();
-      return;
+      return false;
     }
     renderer.copyGrayscaleLsbBuffers();
 
     renderer.clearScreen(0x00);
     if (!streamXtchRenderPass(*xtc, pageToRender, pageWidth, pageHeight, renderer, XtchRenderPass::Msb)) {
       showStreamError();
-      return;
+      return false;
     }
     renderer.copyGrayscaleMsbBuffers();
     renderer.displayGrayBuffer();
@@ -977,10 +984,10 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     renderer.clearScreen();
     if (!streamXtchRenderPass(*xtc, pageToRender, pageWidth, pageHeight, renderer, XtchRenderPass::Base)) {
       showStreamError();
-      return;
+      return false;
     }
     renderer.cleanupGrayscaleWithFrameBuffer();
-    return;
+    return true;
   }
 
   // Calculate buffer size for one page
@@ -994,7 +1001,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_MEMORY_ERROR), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
-    return;
+    return false;
   }
 
   // Load page data
@@ -1006,7 +1013,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
-    return;
+    return false;
   }
 
   // Clear screen first
@@ -1045,6 +1052,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
 
   // Display with appropriate refresh
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
+  return true;
 }
 
 bool XtcReaderActivity::saveProgress(const uint32_t page) {

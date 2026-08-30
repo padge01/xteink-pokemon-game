@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Pokemon/PokemonGame.h"
-#include "Pokemon/PokemonStoreCodec.h"
+#include <PokemonGame.h>
+#include <PokemonStoreCodec.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -25,6 +25,7 @@ enum class PcOrder : uint8_t {
 class PokemonStore {
  public:
   StoreBeginResult begin();
+  bool isReady() const { return ready_; }
   bool loadState(PokemonState& output) const;
   bool readRecord(uint32_t recordId, PokemonRecord& output) const;
   bool loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const;

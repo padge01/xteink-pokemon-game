@@ -19,6 +19,9 @@
 #include "GlobalReadingStats.h"
 #include "ReaderProgressSaveDebouncer.h"
 #include "activities/Activity.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include <PokemonTracker.h>
+#endif
 
 struct ToastRect {
   int x = 0;
@@ -127,6 +130,9 @@ class EpubReaderActivity final : public Activity {
     bool valid = false;
   } chapterGroupEstimate;
   std::atomic<uint8_t> pendingHeapShapeReaderRedrawStages{0};
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::PokemonTurnVerifier pokemonTurnVerifier;
+#endif
   static constexpr uint8_t HEAP_SHAPE_REDRAW_CLIP = 1U << 0;
   static constexpr uint8_t HEAP_SHAPE_REDRAW_DICT = 1U << 1;
   unsigned long lastPageTurnTime = 0UL;

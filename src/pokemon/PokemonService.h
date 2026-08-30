@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Pokemon/PokemonTracker.h>
+#include <PokemonTracker.h>
 
 #include "PokemonStore.h"
 

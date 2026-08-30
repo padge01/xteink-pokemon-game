@@ -40,4 +40,6 @@ add_test(
           "${CMAKE_CURRENT_SOURCE_DIR}/PokemonSpeciesGeneratorTest.py"
           "${REPO_ROOT}/scripts/generate_pokemon_v2_species.py"
           "${REPO_ROOT}/scripts/data/pokemon-kanto-v2.csv"
+          "${REPO_ROOT}/scripts/generate_pokemon_v2_species_build.py"
+          "${REPO_ROOT}/platformio.ini"
 )

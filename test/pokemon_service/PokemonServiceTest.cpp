@@ -76,6 +76,28 @@ TEST(PokemonService, FailedSnapshotWriteAdvancesNeitherStateNorLeader) {
   EXPECT_EQ(leader.totalXp, pokemon::xpRequired(5));
 }
 
+TEST(PokemonService, FailedSyncRetryCannotDoubleCreditOnTheNextReaderSession) {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  seedStarter(store);
+  pokemon::PokemonService service(store, {nullptr, zeroRandom});
+  ASSERT_TRUE(service.beginReadingSession());
+  service.setBookProgressPercent(64);
+  service.onSuccessfulPageTurn(0);
+
+  Storage.setFailSync(true);
+  service.flushOnExit(300000);
+  Storage.setFailSync(false);
+
+  ASSERT_TRUE(service.beginReadingSession());
+  pokemon::PokemonState state{};
+  pokemon::PokemonRecord leader{};
+  ASSERT_TRUE(store.loadState(state));
+  ASSERT_TRUE(store.readRecord(1, leader));
+  EXPECT_EQ(state.lifetimeMinutes, 5U);
+  EXPECT_EQ(leader.totalXp, pokemon::xpRequired(5) + 5U);
+}
+
 TEST(PokemonService, ReadingSessionDoesNotStartBeforeStarterExists) {
   Storage.clear();
   pokemon::PokemonStore store;

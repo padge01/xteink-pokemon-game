@@ -17,6 +17,9 @@
 #include "GlobalReadingStats.h"
 #include "ReaderProgressSaveDebouncer.h"
 #include "activities/Activity.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include <PokemonTracker.h>
+#endif
 
 class XtcReaderActivity final : public Activity {
   std::shared_ptr<Xtc> xtc;
@@ -34,6 +37,9 @@ class XtcReaderActivity final : public Activity {
   bool frontButtonLongPressHandled = false;
   bool longPressBackHandled = false;
   ReaderProgressSaveDebouncer progressSaveDebouncer;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::PokemonTurnVerifier pokemonTurnVerifier;
+#endif
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 
@@ -44,7 +50,7 @@ class XtcReaderActivity final : public Activity {
     std::string title;
   };
 
-  void renderPage(uint32_t pageToRender);
+  bool renderPage(uint32_t pageToRender);
   void renderStatusBarOverlay(StatusBarOverlayPosition position, uint32_t pageToRender) const;
   StatusBarInfo getStatusBarInfo(uint32_t pageToRender) const;
   bool saveProgress(uint32_t page);
