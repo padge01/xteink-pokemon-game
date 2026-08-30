@@ -30,11 +30,13 @@ class PokemonStore {
   bool loadState(PokemonState& output) const;
   bool readRecord(uint32_t recordId, PokemonRecord& output) const;
   bool loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const;
-  size_t readPcPage(PcOrder order, size_t offset, std::span<PokemonRecord> output) const;
+  bool readPcPage(PcOrder order, size_t offset, std::span<PokemonRecord> output, size_t& count) const;
   bool commit(const PokemonState& state, const RecordMutation& mutation = {});
   bool reset();
 
  private:
+  bool writeSnapshot(const PokemonState& state, const RecordMutation& mutation, bool discardRecords);
+
   SnapshotHeader activeHeader_{};
   bool activeIsA_ = false;
   bool ready_ = false;

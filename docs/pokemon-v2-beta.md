@@ -53,8 +53,11 @@ Copy `firmware-x3-x4.bin` to the SD-card root and merge the supplied
 folders. Flash the firmware using the device's normal on-device update flow.
 
 V2 snapshots are `/.crosspoint/pokemon-v2-a.bin` and
-`/.crosspoint/pokemon-v2-b.bin`. Back up both to preserve a collection. Deleting
-both resets Pokémon onboarding without touching books or reading statistics.
+`/.crosspoint/pokemon-v2-b.bin`. Back up both to preserve a collection. The
+in-device reset commits an empty snapshot to the inactive slot before replacing
+the current collection, so an interrupted reset can recover the previous save.
+Deleting both files manually also resets Pokémon onboarding without touching
+books or reading statistics.
 
 The artwork is for private demonstration only and is not part of public source
 or ordinary firmware releases. See [Third-party assets](third-party-assets.md).
@@ -68,7 +71,9 @@ physical ESP32-C3. Before treating a package as install-ready:
    choices using both the side buttons and front buttons.
 2. Open and close Pokémon repeatedly from Home, including immediately after
    leaving a book. Confirm no crash report is created.
-3. Move the only Party member to another slot and confirm the save succeeds.
+3. With one Party member, confirm Move and Deposit are absent. After adding a
+   second member, confirm Move reorders only occupied slots and Deposit cannot
+   empty the Party.
 4. Verify list wrapping, Pokédex paging beyond the first screen, PC sorting, and
    the two-step reset.
 5. Turn real pages for at least one five-minute checkpoint, exit the book, and

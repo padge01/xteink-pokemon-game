@@ -59,6 +59,35 @@ pokemon::PokemonState stateWithLeader(const pokemon::PokemonRecord& leader) {
   return state;
 }
 
+void collectionActionsExcludeOperationsThatCannotSucceed() {
+  const pokemon::CollectionActionSet loneParty = pokemon::collectionActions(true, 1);
+  CHECK(loneParty.count == 3);
+  CHECK(loneParty.items[0] == pokemon::CollectionAction::Summary);
+  CHECK(loneParty.items[1] == pokemon::CollectionAction::Rename);
+  CHECK(loneParty.items[2] == pokemon::CollectionAction::EvolutionPrompts);
+
+  const pokemon::CollectionActionSet reorderableParty = pokemon::collectionActions(true, 2);
+  CHECK(reorderableParty.count == 5);
+  CHECK(reorderableParty.items[0] == pokemon::CollectionAction::Summary);
+  CHECK(reorderableParty.items[1] == pokemon::CollectionAction::Move);
+  CHECK(reorderableParty.items[2] == pokemon::CollectionAction::Deposit);
+  CHECK(reorderableParty.items[3] == pokemon::CollectionAction::Rename);
+  CHECK(reorderableParty.items[4] == pokemon::CollectionAction::EvolutionPrompts);
+
+  const pokemon::CollectionActionSet fullPartyPc = pokemon::collectionActions(false, pokemon::PARTY_SIZE);
+  CHECK(fullPartyPc.count == 3);
+  CHECK(fullPartyPc.items[0] == pokemon::CollectionAction::Summary);
+  CHECK(fullPartyPc.items[1] == pokemon::CollectionAction::Rename);
+  CHECK(fullPartyPc.items[2] == pokemon::CollectionAction::EvolutionPrompts);
+
+  const pokemon::CollectionActionSet pcWithRoom = pokemon::collectionActions(false, pokemon::PARTY_SIZE - 1U);
+  CHECK(pcWithRoom.count == 4);
+  CHECK(pcWithRoom.items[0] == pokemon::CollectionAction::Summary);
+  CHECK(pcWithRoom.items[1] == pokemon::CollectionAction::Withdraw);
+  CHECK(pcWithRoom.items[2] == pokemon::CollectionAction::Rename);
+  CHECK(pcWithRoom.items[3] == pokemon::CollectionAction::EvolutionPrompts);
+}
+
 pokemon::Gender validGenderForSpecies(const uint16_t speciesId) {
   const uint8_t genderRate = pokemon::speciesData(speciesId)->genderRate;
   if (genderRate == 255) return pokemon::Gender::Genderless;
@@ -788,6 +817,7 @@ void rejectedInputsAndCancelledEvolutionDoNotPartiallyMutate() {
 }  // namespace
 
 int main() {
+  collectionActionsExcludeOperationsThatCannotSucceed();
   creditedMinutesAdvanceLeaderAndReadingCounters();
   creditClampsAndRejectsInvalidCallsWithoutMutation();
   sixthEncounterCheckIsForcedAndCreatesOnlyOneEvent();

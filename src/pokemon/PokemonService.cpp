@@ -22,10 +22,10 @@ uint32_t deviceRandomBelow(void*, const uint32_t upperExclusive) {
 }  // namespace
 
 ServiceStatus PokemonService::prepareStore() {
-  if (store_.isReady()) return ServiceStatus::Ok;
+  if (store_.isReady()) return store_.recordCount() == 0 ? ServiceStatus::Empty : ServiceStatus::Ok;
   switch (store_.begin()) {
     case StoreBeginResult::Ready:
-      return ServiceStatus::Ok;
+      return store_.recordCount() == 0 ? ServiceStatus::Empty : ServiceStatus::Ok;
     case StoreBeginResult::Empty:
       return ServiceStatus::Empty;
     case StoreBeginResult::Corrupt:
@@ -203,10 +203,10 @@ ServiceStatus PokemonService::loadDashboardSnapshot(PokemonDashboardSnapshot& ou
 ServiceStatus PokemonService::readPcPage(const PcOrder order, const size_t offset,
                                          const std::span<PokemonRecord> output, size_t& count) {
   count = 0;
+  if (output.empty() || order > PcOrder::Alphabetical) return ServiceStatus::Invalid;
   const ServiceStatus prepared = prepareStore();
   if (prepared != ServiceStatus::Ok) return prepared;
-  count = store_.readPcPage(order, offset, output);
-  return ServiceStatus::Ok;
+  return store_.readPcPage(order, offset, output, count) ? ServiceStatus::Ok : ServiceStatus::StorageError;
 }
 
 ServiceStatus PokemonService::resolveEncounter(const EncounterChoice choice, uint32_t& caughtRecordId) {

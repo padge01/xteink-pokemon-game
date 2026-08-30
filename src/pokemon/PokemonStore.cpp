@@ -193,16 +193,24 @@ bool PokemonStore::loadState(PokemonState& output) const {
 }
 
 bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutation) {
+  return writeSnapshot(state, mutation, false);
+}
+
+bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation& mutation,
+                                 const bool discardRecords) {
   const bool appending = mutation.kind == RecordMutationKind::Append;
   const bool replacing = mutation.kind == RecordMutationKind::Replace;
   if (!writable_ || !validateState(state) ||
+      (discardRecords && mutation.kind != RecordMutationKind::None) ||
       ((appending || replacing) &&
        (mutation.requestedRecordId != mutation.record.recordId || !validateRecord(mutation.record))) ||
-      (replacing && !ready_) || (!appending && !replacing && mutation.kind != RecordMutationKind::None)) {
+      (replacing && (!ready_ || discardRecords)) ||
+      (!appending && !replacing && mutation.kind != RecordMutationKind::None)) {
     return false;
   }
 
-  const uint32_t currentRecordCount = ready_ ? activeHeader_.recordCount : 0;
+  const bool preserveRecords = ready_ && !discardRecords;
+  const uint32_t currentRecordCount = preserveRecords ? activeHeader_.recordCount : 0;
   if (appending && currentRecordCount == UINT32_MAX) return false;
 
   const uint32_t nextSequence = !ready_ ? 1U : (activeHeader_.sequence == UINT32_MAX ? 1U : activeHeader_.sequence + 1U);
@@ -217,7 +225,7 @@ bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutat
   const bool destinationIsA = !ready_ || !activeIsA_;
   const char* destinationPath = destinationIsA ? STORE_PATH_A : STORE_PATH_B;
   FsFile source;
-  if (ready_) {
+  if (preserveRecords) {
     const char* sourcePath = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
     source = Storage.open(sourcePath, O_RDONLY);
     if (!source || !source.seek(POKEMON_SNAPSHOT_HEADER_BYTES + POKEMON_STATE_BYTES)) {
@@ -229,7 +237,7 @@ bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutat
   FsFile destination = Storage.open(destinationPath, O_WRONLY | O_CREAT | O_TRUNC);
   if (!destination) {
     LOG_ERR("PokemonStore", "Failed to open inactive snapshot");
-    source.close();
+    if (preserveRecords) source.close();
     return false;
   }
 
@@ -259,7 +267,7 @@ bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutat
     if (writeOk) crc = updateSnapshotCrc32(crc, mutationRecordBytes.data(), mutationRecordBytes.size());
   }
   writeOk = writeOk && replacementFound;
-  const bool sourceCloseOk = !ready_ || source.close();
+  const bool sourceCloseOk = !preserveRecords || source.close();
   uint8_t crcBytes[POKEMON_SNAPSHOT_CRC_BYTES]{};
   write32(crcBytes, finishSnapshotCrc32(crc));
   writeOk = writeOk && writeExact(destination, crcBytes, sizeof(crcBytes)) && destination.sync();
@@ -338,16 +346,18 @@ bool PokemonStore::loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const {
   return file.close();
 }
 
-size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::span<PokemonRecord> output) const {
-  if (!ready_ || output.empty() || order > PcOrder::Alphabetical) return 0;
+bool PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::span<PokemonRecord> output,
+                              size_t& count) const {
+  count = 0;
+  if (!ready_ || output.empty() || order > PcOrder::Alphabetical) return false;
   PokemonState state{};
-  if (!loadState(state)) return 0;
+  if (!loadState(state)) return false;
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
   if (!file || !file.seek(RECORDS_OFFSET)) {
     LOG_ERR("PokemonStore", "Failed to open PC records");
     file.close();
-    return 0;
+    return false;
   }
 
   size_t written = 0;
@@ -358,7 +368,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
       if (!readExact(file, bytes.data(), bytes.size()) || !decodeRecord(bytes, record)) {
         LOG_ERR("PokemonStore", "Failed to read PC capture order");
         file.close();
-        return 0;
+        return false;
       }
       if (recordIsInParty(state, record.recordId)) continue;
       if (offset != 0) {
@@ -368,8 +378,12 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
       output[written++] = record;
       if (written == output.size()) break;
     }
-    file.close();
-    return written;
+    if (!file.close()) {
+      LOG_ERR("PokemonStore", "Failed to close PC capture order");
+      return false;
+    }
+    count = written;
+    return true;
   }
 
   PokedexBits pcSpecies{};
@@ -380,7 +394,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
         (!recordIsInParty(state, record.recordId) && !markSpecies(pcSpecies, record.speciesId))) {
       LOG_ERR("PokemonStore", "Failed to scan PC species");
       file.close();
-      return 0;
+      return false;
     }
   }
 
@@ -406,7 +420,7 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
       if (isSpeciesMarked(pcSpecies, speciesId) && !appendSpecies(speciesId)) {
         LOG_ERR("PokemonStore", "Failed to order PC by Pokedex number");
         file.close();
-        return 0;
+        return false;
       }
     }
   } else {
@@ -423,30 +437,27 @@ size_t PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::s
       if (!appendSpecies(nextSpeciesId)) {
         LOG_ERR("PokemonStore", "Failed to order PC alphabetically");
         file.close();
-        return 0;
+        return false;
       }
       previousSpeciesId = nextSpeciesId;
     }
   }
-  file.close();
-  return written;
+  if (!file.close()) {
+    LOG_ERR("PokemonStore", "Failed to close ordered PC page");
+    return false;
+  }
+  count = written;
+  return true;
 }
 
 bool PokemonStore::reset() {
-  bool removed = true;
-  if (Storage.exists(STORE_PATH_A) && !Storage.remove(STORE_PATH_A)) {
-    LOG_ERR("PokemonStore", "Failed to remove snapshot A");
-    removed = false;
+  if (!writable_) return false;
+  const PokemonState empty{};
+  if (!writeSnapshot(empty, {}, true)) {
+    LOG_ERR("PokemonStore", "Failed to commit empty reset snapshot");
+    return false;
   }
-  if (Storage.exists(STORE_PATH_B) && !Storage.remove(STORE_PATH_B)) {
-    LOG_ERR("PokemonStore", "Failed to remove snapshot B");
-    removed = false;
-  }
-  ready_ = false;
-  writable_ = removed;
-  activeIsA_ = false;
-  activeHeader_ = {};
-  return removed;
+  return true;
 }
 
 }  // namespace pokemon

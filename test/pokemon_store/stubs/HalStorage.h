@@ -84,6 +84,7 @@ class HalStorage {
     failSync_ = false;
     failWritableOpen_ = false;
     failRemove_ = false;
+    failRead_ = false;
   }
 
   void setWriteLimit(const size_t limit) {
@@ -97,6 +98,7 @@ class HalStorage {
   void setFailSync(const bool fail) { failSync_ = fail; }
   void setFailWritableOpen(const bool fail) { failWritableOpen_ = fail; }
   void setFailRemove(const bool fail) { failRemove_ = fail; }
+  void setFailRead(const bool fail) { failRead_ = fail; }
   void setByte(const char* path, const size_t offset, const uint8_t value) {
     auto found = files_.find(path);
     if (found != files_.end() && offset < found->second.size()) found->second[offset] = value;
@@ -128,6 +130,7 @@ class HalStorage {
     return allowed;
   }
   bool syncAllowed() const { return !failSync_; }
+  bool readAllowed() const { return !failRead_; }
 
   void fileClosed(const std::string& path) {
     auto found = openCounts_.find(path);
@@ -142,6 +145,7 @@ class HalStorage {
   bool failSync_ = false;
   bool failWritableOpen_ = false;
   bool failRemove_ = false;
+  bool failRead_ = false;
 };
 
 #define Storage HalStorage::getInstance()
@@ -155,7 +159,7 @@ inline bool HalFile::seek(const size_t position) {
 }
 
 inline int HalFile::read(void* output, const size_t count) {
-  if (!open_ || position_ > bytes_->size()) return -1;
+  if (!open_ || !owner_->readAllowed() || position_ > bytes_->size()) return -1;
   const size_t available = bytes_->size() - position_;
   const size_t copied = std::min(count, available);
   if (copied != 0) std::memcpy(output, bytes_->data() + position_, copied);

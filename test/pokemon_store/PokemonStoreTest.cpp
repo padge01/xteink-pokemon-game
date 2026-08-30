@@ -197,38 +197,118 @@ void pcPagesExcludeThePartyAndSupportAllThreeOrders() {
 
   std::array<pokemon::PokemonRecord, 2> page{};
   std::array<pokemon::PokemonRecord, 1> second{};
-  CHECK(store.readPcPage(pokemon::PcOrder::CatchDate, 0, page) == 2);
+  size_t count = 0;
+  CHECK(store.readPcPage(pokemon::PcOrder::CatchDate, 0, page, count));
+  CHECK(count == 2);
   CHECK(page[0] == abra);
   CHECK(page[1] == bulbasaur);
-  CHECK(store.readPcPage(pokemon::PcOrder::PokedexNumber, 0, page) == 2);
+  CHECK(store.readPcPage(pokemon::PcOrder::PokedexNumber, 0, page, count));
+  CHECK(count == 2);
   CHECK(page[0] == bulbasaur);
   CHECK(page[1] == abra);
-  CHECK(store.readPcPage(pokemon::PcOrder::PokedexNumber, 1, second) == 1);
+  CHECK(store.readPcPage(pokemon::PcOrder::PokedexNumber, 1, second, count));
+  CHECK(count == 1);
   CHECK(second[0] == abra);
-  CHECK(store.readPcPage(pokemon::PcOrder::Alphabetical, 0, page) == 2);
+  CHECK(store.readPcPage(pokemon::PcOrder::Alphabetical, 0, page, count));
+  CHECK(count == 2);
   CHECK(page[0] == abra);
   CHECK(page[1] == bulbasaur);
-  CHECK(store.readPcPage(pokemon::PcOrder::Alphabetical, 1, second) == 1);
+  CHECK(store.readPcPage(pokemon::PcOrder::Alphabetical, 1, second, count));
+  CHECK(count == 1);
   CHECK(second[0] == bulbasaur);
-  CHECK(store.readPcPage(pokemon::PcOrder::CatchDate, 1, second) == 1);
+  CHECK(store.readPcPage(pokemon::PcOrder::CatchDate, 1, second, count));
+  CHECK(count == 1);
   CHECK(second[0] == bulbasaur);
 }
 
-void resetRemovesBothSnapshotsAndClearsReadiness() {
+void pcReadFailureIsDistinctFromAValidEmptyPage() {
   Storage.clear();
   pokemon::PokemonStore store;
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+  const pokemon::PokemonRecord pikachu = starterPikachu();
   pokemon::PokemonState state{};
-  CHECK(store.commit(state));
+  state.partyRecordIds[0] = pikachu.recordId;
+  CHECK(pokemon::markSpecies(state.seenSpecies, pikachu.speciesId));
+  CHECK(pokemon::markSpecies(state.caughtSpecies, pikachu.speciesId));
+  CHECK(store.commit(state, {pikachu.recordId, pikachu, pokemon::RecordMutationKind::Append}));
+
+  std::array<pokemon::PokemonRecord, 2> page{};
+  size_t count = 99;
+  CHECK(store.readPcPage(pokemon::PcOrder::CatchDate, 0, page, count));
+  CHECK(count == 0);
+
+  Storage.setFailRead(true);
+  count = 99;
+  CHECK(!store.readPcPage(pokemon::PcOrder::CatchDate, 0, page, count));
+  CHECK(count == 0);
+  Storage.setFailRead(false);
+}
+
+void resetCommitsANewerEmptySnapshot() {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+  const pokemon::PokemonRecord pikachu = starterPikachu();
+  pokemon::PokemonState state{};
+  state.partyRecordIds[0] = pikachu.recordId;
+  CHECK(pokemon::markSpecies(state.seenSpecies, pikachu.speciesId));
+  CHECK(pokemon::markSpecies(state.caughtSpecies, pikachu.speciesId));
+  const pokemon::RecordMutation append{pikachu.recordId, pikachu, pokemon::RecordMutationKind::Append};
+  CHECK(store.commit(state, append));
   state.lifetimeMinutes = 1;
   CHECK(store.commit(state));
+
   CHECK(store.reset());
-  CHECK(!Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
-  CHECK(!Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
+  CHECK(store.isReady());
+  CHECK(store.recordCount() == 0);
   pokemon::PokemonState loaded{};
-  CHECK(!store.loadState(loaded));
+  CHECK(store.loadState(loaded));
+  CHECK(loaded.sequence == 3);
+  CHECK(loaded.partyRecordIds[0] == 0);
+  CHECK(loaded.lifetimeMinutes == 0);
+  CHECK(!pokemon::isSpeciesMarked(loaded.caughtSpecies, pikachu.speciesId));
+
   pokemon::PokemonStore reopened;
-  CHECK(reopened.begin() == pokemon::StoreBeginResult::Empty);
+  CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(reopened.recordCount() == 0);
+  pokemon::PokemonState reopenedState{};
+  CHECK(reopened.loadState(reopenedState));
+  CHECK(reopenedState == loaded);
+}
+
+void everyInterruptedResetByteLeavesThePreviousSnapshotBootable() {
+  constexpr size_t emptySnapshotBytes = pokemon::POKEMON_SNAPSHOT_HEADER_BYTES +
+                                        pokemon::POKEMON_STATE_BYTES +
+                                        pokemon::POKEMON_SNAPSHOT_CRC_BYTES;
+  for (size_t cut = 0; cut < emptySnapshotBytes; ++cut) {
+    Storage.clear();
+    pokemon::PokemonStore store;
+    CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+    const pokemon::PokemonRecord pikachu = starterPikachu();
+    pokemon::PokemonState state{};
+    state.partyRecordIds[0] = pikachu.recordId;
+    CHECK(pokemon::markSpecies(state.seenSpecies, pikachu.speciesId));
+    CHECK(pokemon::markSpecies(state.caughtSpecies, pikachu.speciesId));
+    const pokemon::RecordMutation append{pikachu.recordId, pikachu, pokemon::RecordMutationKind::Append};
+    CHECK(store.commit(state, append));
+
+    Storage.setWriteLimit(cut);
+    CHECK(!store.reset());
+    Storage.clearWriteLimit();
+
+    pokemon::PokemonStore reopened;
+    CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+    CHECK(reopened.recordCount() == 1);
+    pokemon::PokemonState loaded{};
+    CHECK(reopened.loadState(loaded));
+    CHECK(loaded.partyRecordIds[0] == pikachu.recordId);
+    CHECK(pokemon::isSpeciesMarked(loaded.caughtSpecies, pikachu.speciesId));
+    pokemon::PokemonRecord loadedRecord{};
+    CHECK(reopened.readRecord(pikachu.recordId, loadedRecord));
+    CHECK(loadedRecord == pikachu);
+  }
 }
 
 void everyInterruptedWriteByteLeavesThePreviousSnapshotBootable() {
@@ -440,7 +520,9 @@ int main() {
   laterAppendStreamsExistingRecordsIntoTheInactiveSlot();
   replacementChangesOnlyTheRequestedRecord();
   pcPagesExcludeThePartyAndSupportAllThreeOrders();
-  resetRemovesBothSnapshotsAndClearsReadiness();
+  pcReadFailureIsDistinctFromAValidEmptyPage();
+  resetCommitsANewerEmptySnapshot();
+  everyInterruptedResetByteLeavesThePreviousSnapshotBootable();
   everyInterruptedWriteByteLeavesThePreviousSnapshotBootable();
   unwritableAppendPreservesThePendingEncounterAndRoster();
   interruptedAppendPreservesThePendingEncounterAndRoster();

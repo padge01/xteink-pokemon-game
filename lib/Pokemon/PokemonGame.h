@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 
 #include "PokemonTypes.h"
@@ -41,6 +42,20 @@ enum class EvolutionChoice : uint8_t {
   Cancel = 1,
 };
 
+enum class CollectionAction : uint8_t {
+  Summary = 0,
+  Move = 1,
+  Deposit = 2,
+  Withdraw = 3,
+  Rename = 4,
+  EvolutionPrompts = 5,
+};
+
+struct CollectionActionSet {
+  std::array<CollectionAction, 5> items{};
+  uint8_t count = 0;
+};
+
 enum class RecordMutationKind : uint8_t {
   None = 0,
   Append = 1,
@@ -63,5 +78,6 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, Encounte
 bool resolveEvolution(PokemonState& state, PokemonRecord& record, EvolutionChoice choice,
                       RecordMutation& mutation);
 bool useEvolutionItem(PokemonState& state, PokemonRecord& record, EvolutionItem item, RecordMutation& mutation);
+CollectionActionSet collectionActions(bool party, uint8_t partyCount);
 
 }  // namespace pokemon

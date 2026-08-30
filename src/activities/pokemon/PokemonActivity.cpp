@@ -129,8 +129,11 @@ int PokemonActivity::logicalCount() const {
       return 6;
     case Screen::Party:
       return pokemon::PARTY_SIZE;
-    case Screen::Actions:
-      return actionSource_ == Screen::Party ? 5 : 4;
+    case Screen::Actions: {
+      const auto actions =
+          pokemon::collectionActions(actionSource_ == Screen::Party, snapshot_.partyCount);
+      return actions.count;
+    }
     case Screen::Pc:
       return static_cast<int>(snapshot_.ownedCount - snapshot_.partyCount);
     case Screen::PcOrder:
@@ -247,43 +250,53 @@ void PokemonActivity::activate() {
       setScreen(Screen::Actions);
       return;
     case Screen::Actions: {
-      if (selected_ == 0) {
-        setScreen(Screen::Summary);
-        return;
-      }
       const bool party = actionSource_ == Screen::Party;
-      if (party && selected_ == 1) {
-        int slot = 0;
-        while (slot < snapshot_.partyCount && snapshot_.party[slot].recordId != focusedRecordId_) ++slot;
-        setScreen(Screen::Move, slot);
-        return;
-      }
-      if ((party && selected_ == 2) || (!party && selected_ == 1)) {
-        const auto status = party ? service_.depositPokemon(focusedRecordId_) : service_.withdrawPokemon(focusedRecordId_);
-        if (status == pokemon::ServiceStatus::LastPokemon) showMessage(tr(STR_POKEMON_LAST_PARTY), actionSource_);
-        else if (status == pokemon::ServiceStatus::PartyFull) showMessage(tr(STR_POKEMON_PARTY_FULL), actionSource_);
-        else if (status != pokemon::ServiceStatus::Ok) showMessage(tr(STR_POKEMON_SAVE_ERROR), actionSource_);
-        else {
-          if (!refreshSnapshot()) return;
-          setScreen(actionSource_);
+      const auto actions = pokemon::collectionActions(party, snapshot_.partyCount);
+      if (selected_ < 0 || selected_ >= actions.count) return;
+      switch (actions.items[selected_]) {
+        case pokemon::CollectionAction::Summary:
+          setScreen(Screen::Summary);
+          return;
+        case pokemon::CollectionAction::Move: {
+          int slot = 0;
+          while (slot < snapshot_.partyCount && snapshot_.party[slot].recordId != focusedRecordId_) ++slot;
+          setScreen(Screen::Move, slot);
+          return;
         }
-        return;
+        case pokemon::CollectionAction::Deposit:
+        case pokemon::CollectionAction::Withdraw: {
+          const auto status = party ? service_.depositPokemon(focusedRecordId_)
+                                    : service_.withdrawPokemon(focusedRecordId_);
+          if (status == pokemon::ServiceStatus::LastPokemon)
+            showMessage(tr(STR_POKEMON_LAST_PARTY), actionSource_);
+          else if (status == pokemon::ServiceStatus::PartyFull)
+            showMessage(tr(STR_POKEMON_PARTY_FULL), actionSource_);
+          else if (status != pokemon::ServiceStatus::Ok)
+            showMessage(tr(STR_POKEMON_SAVE_ERROR), actionSource_);
+          else {
+            if (!refreshSnapshot()) return;
+            setScreen(actionSource_);
+          }
+          return;
+        }
+        case pokemon::CollectionAction::Rename:
+          openNickname(focusedRecordId_, false);
+          return;
+        case pokemon::CollectionAction::EvolutionPrompts: {
+          pokemon::PokemonRecord record{};
+          if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) return;
+          const bool enabled =
+              (record.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0;
+          if (service_.setEvolutionPrompts(focusedRecordId_, !enabled) != pokemon::ServiceStatus::Ok) {
+            showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Actions);
+          } else {
+            if (!refreshSnapshot()) return;
+            setScreen(Screen::Summary);
+          }
+          return;
+        }
       }
-      const int renameIndex = party ? 3 : 2;
-      if (selected_ == renameIndex) {
-        openNickname(focusedRecordId_, false);
-        return;
-      }
-      pokemon::PokemonRecord record{};
-      if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) return;
-      const bool enabled = (record.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0;
-      if (service_.setEvolutionPrompts(focusedRecordId_, !enabled) != pokemon::ServiceStatus::Ok) {
-        showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Actions);
-      } else {
-        if (!refreshSnapshot()) return;
-        setScreen(Screen::Summary);
-      }
-      return;
+      break;
     }
     case Screen::Move: {
       int from = 0;
@@ -496,17 +509,29 @@ void PokemonActivity::buildRows() {
         break;
       }
       case Screen::Actions: {
-        const bool party = actionSource_ == Screen::Party;
-        const char* label = tr(STR_POKEMON_SUMMARY);
-        if (party) {
-          if (index == 1) label = tr(STR_POKEMON_MOVE);
-          else if (index == 2) label = tr(STR_POKEMON_DEPOSIT);
-          else if (index == 3) label = tr(STR_POKEMON_RENAME);
-          else if (index == 4) label = tr(STR_POKEMON_EVOLUTIONS);
-        } else {
-          if (index == 1) label = tr(STR_POKEMON_WITHDRAW);
-          else if (index == 2) label = tr(STR_POKEMON_RENAME);
-          else if (index == 3) label = tr(STR_POKEMON_EVOLUTIONS);
+        const auto actions =
+            pokemon::collectionActions(actionSource_ == Screen::Party, snapshot_.partyCount);
+        if (index >= actions.count) break;
+        const char* label = nullptr;
+        switch (actions.items[index]) {
+          case pokemon::CollectionAction::Summary:
+            label = tr(STR_POKEMON_SUMMARY);
+            break;
+          case pokemon::CollectionAction::Move:
+            label = tr(STR_POKEMON_MOVE);
+            break;
+          case pokemon::CollectionAction::Deposit:
+            label = tr(STR_POKEMON_DEPOSIT);
+            break;
+          case pokemon::CollectionAction::Withdraw:
+            label = tr(STR_POKEMON_WITHDRAW);
+            break;
+          case pokemon::CollectionAction::Rename:
+            label = tr(STR_POKEMON_RENAME);
+            break;
+          case pokemon::CollectionAction::EvolutionPrompts:
+            label = tr(STR_POKEMON_EVOLUTIONS);
+            break;
         }
         row(local, label);
         break;
@@ -514,7 +539,11 @@ void PokemonActivity::buildRows() {
       case Screen::Pc: {
         if (local == 0) {
           pcCount_ = 0;
-          service_.readPcPage(pcOrder_, start, pcPage_, pcCount_);
+          if (service_.readPcPage(pcOrder_, start, pcPage_, pcCount_) != pokemon::ServiceStatus::Ok) {
+            rowCount_ = 1;
+            row(local, tr(STR_POKEMON_LOAD_ERROR));
+            break;
+          }
           rowCount_ = static_cast<int>(pcCount_);
           if (rowCount_ == 0) break;
         }

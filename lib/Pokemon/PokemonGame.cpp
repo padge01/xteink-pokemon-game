@@ -474,6 +474,26 @@ bool useEvolutionItem(PokemonState& state, PokemonRecord& record, const Evolutio
   return true;
 }
 
+CollectionActionSet collectionActions(const bool party, const uint8_t partyCount) {
+  CollectionActionSet actions{};
+  const auto append = [&actions](const CollectionAction action) {
+    actions.items[actions.count++] = action;
+  };
+
+  append(CollectionAction::Summary);
+  if (party) {
+    if (partyCount > 1) {
+      append(CollectionAction::Move);
+      append(CollectionAction::Deposit);
+    }
+  } else if (partyCount < PARTY_SIZE) {
+    append(CollectionAction::Withdraw);
+  }
+  append(CollectionAction::Rename);
+  append(CollectionAction::EvolutionPrompts);
+  return actions;
+}
+
 }  // namespace pokemon
 
 #endif

@@ -22,6 +22,7 @@
 - Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves encounter then item priority at hourly level-up boundaries.
 - Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
 - Pokémon menus now wrap and page correctly, keep the selected sprite visible, preserve save errors, and return to the nickname choice when nickname entry is cancelled.
+- Pokémon Party and PC menus now hide actions that cannot succeed, distinguish PC read failures from an empty box, and preserve the previous collection if reset is interrupted.
 - Large EPUB images now reject unsafe dimensions before narrowing, keep the reader responsive while decoding, and remain inside the reader viewport.
 - EPUB lines can now wrap after visible hyphens and dashes, while ruby annotations stay grouped during incremental layout.
 - EPUB metadata now loads when books use arbitrary XML namespace prefixes, and `&apos;` renders as an apostrophe.

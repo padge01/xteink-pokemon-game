@@ -418,6 +418,26 @@ TEST(PokemonService, ReadsBoundedPcPagesAndResetsToEmpty) {
   ASSERT_EQ(service.reset(), pokemon::ServiceStatus::Ok);
   pokemon::PokemonSnapshot snapshot{};
   EXPECT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Empty);
+
+  ASSERT_EQ(service.createStarter(1, pokemon::Gender::Male, ""), pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(snapshot.partyCount, 1U);
+  EXPECT_EQ(snapshot.party[0].speciesId, 1U);
+}
+
+TEST(PokemonService, PcReadFailureReturnsStorageErrorInsteadOfAnEmptyPage) {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  seedStarter(store);
+  pokemon::PokemonService service(store, {nullptr, zeroRandom});
+  std::array<pokemon::PokemonRecord, 6> page{};
+  size_t count = 99;
+
+  Storage.setFailRead(true);
+  EXPECT_EQ(service.readPcPage(pokemon::PcOrder::CatchDate, 0, page, count),
+            pokemon::ServiceStatus::StorageError);
+  Storage.setFailRead(false);
+  EXPECT_EQ(count, 0U);
 }
 
 TEST(PokemonService, HourlyItemDropPrefersAnOwnedPokemonsEvolutionNeed) {
