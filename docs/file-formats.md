@@ -73,6 +73,31 @@ marked caught. PC order is derived without a roster allocation: physical order
 is catch order, while Pokédex and alphabetical views rescan through a bounded
 19-byte species bitset.
 
+These V2 snapshots are independent from the earlier experimental Pokémon data.
+Installing the V2 beta starts a new collection unless a valid V2 snapshot is
+already present. Back up both files before beta updates or resets. Choosing
+**Reset Pokémon** in the Pokémon menu deletes both snapshots and returns to
+starter selection; it does not alter books, reading positions, or CrossInk
+reading statistics.
+
+## `/.crosspoint/pokemon/`
+
+The optional private artwork pack is stored separately from firmware state:
+
+```text
+/.crosspoint/pokemon/
+  sprites/001.bmp ... 151.bmp
+  heroes/001.bmp  ... 151.bmp
+  items/moon-stone.bmp, fire-stone.bmp, thunder-stone.bmp,
+        water-stone.bmp, leaf-stone.bmp
+  heroes/items/<the same five names>.bmp
+```
+
+Species icons are 40×30 one-bit BMPs and presentation sprites are 120×90.
+Item icons are 32×32 and item presentation images are 64×64. Missing or invalid
+images fall back to text rather than preventing the Pokémon activity from
+opening. The Link Cable intentionally has no image.
+
 ## `book.bin`
 
 ### Version 9

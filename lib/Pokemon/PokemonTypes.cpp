@@ -1,3 +1,5 @@
+#if defined(CROSSINK_ENABLE_POKEMON)
+
 #include "PokemonTypes.h"
 
 #include "PokemonSpecies.h"
@@ -229,3 +231,5 @@ bool validateState(const PokemonState& state) {
 }
 
 }  // namespace pokemon
+
+#endif

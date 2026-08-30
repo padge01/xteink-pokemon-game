@@ -1,3 +1,5 @@
+#if defined(CROSSINK_ENABLE_POKEMON)
+
 #include "PokemonStoreCodec.h"
 
 #include <cstring>
@@ -140,3 +142,5 @@ bool decodeState(const StateBytes& bytes, PokemonState& output) {
 }
 
 }  // namespace pokemon
+
+#endif

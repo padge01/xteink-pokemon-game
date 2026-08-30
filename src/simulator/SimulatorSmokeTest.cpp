@@ -20,6 +20,11 @@
 #include "components/UIThemeTokens.h"
 #include "components/UiAppHelpers.h"
 #include "simulator/SimulatorHomeKeyInput.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include <Memory.h>
+
+#include "activities/pokemon/PokemonActivity.h"
+#endif
 
 extern ActivityManager activityManager;
 extern GfxRenderer renderer;
@@ -462,6 +467,24 @@ void applySimulatorSmokeTestTheme() {
   LOG_INF("SMOKE", "Using theme index %d", theme);
 }
 
-void runSimulatorSmokeTestTick() { smokeTest.tick(); }
+void runSimulatorSmokeTestTick() {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  static bool pokemonQaStarted = false;
+  if (!pokemonQaStarted && std::getenv("CROSSINK_SIMULATOR_START_POKEMON") != nullptr) {
+    pokemonQaStarted = true;
+    if (std::getenv("CROSSINK_SIMULATOR_POKEMON_LANDSCAPE") != nullptr) {
+      SETTINGS.orientation = CrossPointSettings::LANDSCAPE_CCW;
+      renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
+    }
+    auto activity = makeUniqueNoThrow<PokemonActivity>(renderer, mappedInputManager);
+    if (!activity) {
+      LOG_ERR("SMOKE", "Could not allocate Pokemon QA activity");
+      std::_Exit(2);
+    }
+    activityManager.replaceActivity(std::move(activity));
+  }
+#endif
+  smokeTest.tick();
+}
 
 #endif

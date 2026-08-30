@@ -1,3 +1,5 @@
+#if defined(CROSSINK_ENABLE_POKEMON)
+
 #include "PokemonTracker.h"
 
 #include <algorithm>
@@ -96,3 +98,5 @@ bool PokemonTracker::flushOnExit(const uint32_t nowMs) {
 }
 
 }  // namespace pokemon
+
+#endif

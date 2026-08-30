@@ -35,6 +35,9 @@ target_compile_options(crosspoint_test_common INTERFACE
   -Wextra
   -pedantic
 )
+target_compile_definitions(crosspoint_test_common INTERFACE
+  CROSSINK_ENABLE_POKEMON=1
+)
 
 enable_testing()
 include(GoogleTest)
@@ -77,3 +80,6 @@ add_subdirectory(pokemon_game)
 add_subdirectory(pokemon_store)
 add_subdirectory(pokemon_tracker)
 add_subdirectory(pokemon_service)
+add_subdirectory(pokemon_art_path)
+add_subdirectory(pokemon_art_pack)
+add_subdirectory(pokemon_dashboard_layout)

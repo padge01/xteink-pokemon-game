@@ -17,6 +17,7 @@ build
 /.worktrees/
 *.local*
 fs_/
+/qa-artifacts/
 /site/node_modules/
 /site/dist/
 /site/.astro/

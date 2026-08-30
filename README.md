@@ -51,6 +51,12 @@ My goal with this fork was to maintain the core Crosspoint firmware while integr
 - Added ability to view Recent Books as a 3x3 grid view.
 - To view a more detailed list for each version, visit the [releases](https://github.com/uxjulia/CrossInk/releases) page to read release notes.
 
+### Private Pokémon companion beta
+
+The optional `pokemon-x3` build adds a deliberately lightweight reading companion for private demonstration use. Verified manual page turns train the lead Pokémon and can produce encounters or evolution items; the firmware provides starter selection, a six-member Party, a PC Box, a Bag, and the original 151 Pokédex. It does not add battles, moves, combat statistics, or automatic page-turn credit.
+
+This feature is compiled out of normal CrossInk releases. It also requires a separately generated SD-card artwork pack. See [Pokémon companion V2 beta](./docs/pokemon-v2-beta.md) for its scope, installation, reset, and hardware-test procedure, and [Third-party assets](./docs/third-party-assets.md) for artwork provenance.
+
 ---
 
 ### Reader Fonts
@@ -127,6 +133,7 @@ See [Installation](./docs/installation.md) for step-by-step flashing and revert 
 - [Dictionary](./docs/dictionary.md)
 - [Controls](./docs/controls.md)
 - [Simulator](./docs/simulator.md)
+- [Pokémon companion V2 beta](./docs/pokemon-v2-beta.md)
 - [Data Cache](./docs/data-cache.md)
 - [Web server usage](./docs/webserver.md)
 - [Web server endpoints](./docs/webserver-endpoints.md)

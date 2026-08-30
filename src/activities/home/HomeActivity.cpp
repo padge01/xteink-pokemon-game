@@ -37,6 +37,11 @@
 #include "components/themes/lyra/LyraCarouselTheme.h"
 #include "components/themes/minimal/MinimalTheme.h"
 #include "fontIds.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include "activities/pokemon/PokemonActivity.h"
+#include "components/pokemon/PokemonHomeAccessory.h"
+#include "Memory.h"
+#endif
 
 namespace {
 constexpr uint32_t CAROUSEL_CACHE_MAGIC = 0x43434152;  // "CCAR"
@@ -59,6 +64,9 @@ enum class HomeMenuAction {
   Bookmarks,
   FileTransfer,
   Settings,
+#if defined(CROSSINK_ENABLE_POKEMON)
+  Pokemon,
+#endif
 };
 
 struct HomeMenuEntry {
@@ -68,7 +76,11 @@ struct HomeMenuEntry {
 };
 
 struct HomeMenuEntries {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  static constexpr int kCapacity = 9;
+#else
   static constexpr int kCapacity = 8;
+#endif
   std::array<HomeMenuEntry, kCapacity> entries{};
   int count = 0;
 
@@ -275,6 +287,9 @@ void appendHomeMenuItems(HomeMenuEntries& items, bool hasOpdsServers, bool hasRe
   }
 
   items.push({tr(STR_FILE_TRANSFER), Transfer, HomeMenuAction::FileTransfer});
+#if defined(CROSSINK_ENABLE_POKEMON)
+  items.push({tr(STR_POKEMON), Book, HomeMenuAction::Pokemon});
+#endif
   items.push({tr(STR_SETTINGS_TITLE), Settings, HomeMenuAction::Settings});
 }
 
@@ -299,6 +314,9 @@ HomeMenuEntries buildMinimalMenuItems(bool hasOpdsServers, bool hasReadingStats,
   }
 
   items.push({tr(STR_FILE_TRANSFER), Transfer, HomeMenuAction::FileTransfer});
+#if defined(CROSSINK_ENABLE_POKEMON)
+  items.push({tr(STR_POKEMON), Book, HomeMenuAction::Pokemon});
+#endif
   return items;
 }
 
@@ -848,6 +866,13 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 
 void HomeActivity::onEnter() {
   Activity::onEnter();
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemonDashboard_ = {};
+  if (pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme)) {
+    pokemon::devicePokemonService().loadDashboardSnapshot(pokemonDashboard_);
+  }
+#endif
 
   hasOpdsServers = OPDS_STORE.hasServers();
   const bool isCarouselTheme =
@@ -1448,6 +1473,11 @@ void HomeActivity::loop() {
           case HomeMenuAction::FileTransfer:
             onFileTransferOpen();
             break;
+#if defined(CROSSINK_ENABLE_POKEMON)
+          case HomeMenuAction::Pokemon:
+            onPokemonOpen();
+            break;
+#endif
           case HomeMenuAction::ContinueReading:
           case HomeMenuAction::Settings:
             break;
@@ -1661,6 +1691,11 @@ void HomeActivity::loop() {
       case HomeMenuAction::Settings:
         onSettingsOpen();
         break;
+#if defined(CROSSINK_ENABLE_POKEMON)
+      case HomeMenuAction::Pokemon:
+        onPokemonOpen();
+        break;
+#endif
     }
   };
 
@@ -1927,6 +1962,15 @@ void HomeActivity::render(RenderLock&&) {
                           recentBooks.empty() ? "" : tr(STR_READ));
     }
 
+#if defined(CROSSINK_ENABLE_POKEMON)
+    if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::DASHBOARD) {
+      constexpr int bandHeight = 68;
+      pokemon::drawPokemonHomeAccessory(
+          renderer, pokemonDashboard_,
+          Rect{0, pageHeight - metrics.buttonHintsHeight - bandHeight, pageWidth, bandHeight});
+    }
+#endif
+
     displayHomeBuffer();
 
     if (!firstRenderDone) {
@@ -2030,7 +2074,15 @@ void HomeActivity::render(RenderLock&&) {
                           std::bind(&HomeActivity::storeCoverBuffer, this),
                           hasAnyBookStats(currentBookStats) ? &currentBookStats : nullptr, currentBookProgressPercent);
 
-  const int menuStartY = metrics.homeTopPadding + homeCoverTileHeight + metrics.homeMenuTopOffset;
+  int menuStartY = metrics.homeTopPadding + homeCoverTileHeight + metrics.homeMenuTopOffset;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  if (pokemonDashboard_.leader.recordId != 0 && pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme)) {
+    constexpr int bandHeight = 68;
+    const int bandY = metrics.homeTopPadding + homeCoverTileHeight + 2;
+    pokemon::drawPokemonHomeAccessory(renderer, pokemonDashboard_, Rect{0, bandY, pageWidth, bandHeight});
+    menuStartY += bandHeight + 4;
+  }
+#endif
   const int menuEndY = pageHeight - metrics.buttonHintsHeight;
   const int menuHeight = std::max(0, menuEndY - menuStartY);
 
@@ -2114,6 +2166,20 @@ void HomeActivity::onContinueReading() {
 void HomeActivity::onRecentsOpen() { activityManager.goToRecentBooks(); }
 
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+void HomeActivity::onPokemonOpen() {
+  auto pokemon = makeUniqueNoThrow<PokemonActivity>(renderer, mappedInput);
+  if (!pokemon) {
+    LOG_ERR("HOME", "Could not allocate Pokemon activity");
+    return;
+  }
+  startActivityForResult(std::move(pokemon), [this](const ActivityResult&) {
+    pokemonDashboard_ = {};
+    pokemon::devicePokemonService().loadDashboardSnapshot(pokemonDashboard_);
+  });
+}
+#endif
 
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 

@@ -4,6 +4,9 @@
 
 - Private Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
 - Private Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
+- Private Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
+- Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff themes can show the lead Pokémon in a compact, borderless status band.
+- A verified private-demo packager now bundles the X3/X4 firmware with exactly 151 wide Pokémon icons, presentation sprites, five evolution-stone images, attribution, and SHA-256 checksums.
 
 ### Changed
 
@@ -14,9 +17,11 @@
 - Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
 - The private firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
 - Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
+- Standard CrossInk builds now compile the private Pokémon core out completely and no longer require generated species data.
 - Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.
 - Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves encounter then item priority at hourly level-up boundaries.
 - Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
+- Pokémon menus now wrap and page correctly, keep the selected sprite visible, preserve save errors, and return to the nickname choice when nickname entry is cancelled.
 - Large EPUB images now reject unsafe dimensions before narrowing, keep the reader responsive while decoding, and remain inside the reader viewport.
 - EPUB lines can now wrap after visible hyphens and dashes, while ruby annotations stay grouped during incremental layout.
 - EPUB metadata now loads when books use arbitrary XML namespace prefixes, and `&apos;` renders as an apostrophe.

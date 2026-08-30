@@ -1,3 +1,5 @@
+#if defined(CROSSINK_ENABLE_POKEMON)
+
 #include "PokemonSpecies.h"
 
 #include "PokemonSpecies.generated.h"
@@ -16,3 +18,5 @@ std::span<const EvolutionRule> evolutionsFor(const uint16_t speciesId) {
 }
 
 }  // namespace pokemon
+
+#endif

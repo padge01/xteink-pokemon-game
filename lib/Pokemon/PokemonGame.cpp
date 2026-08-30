@@ -1,3 +1,5 @@
+#if defined(CROSSINK_ENABLE_POKEMON)
+
 #include "PokemonGame.h"
 
 #include <array>
@@ -473,3 +475,5 @@ bool useEvolutionItem(PokemonState& state, PokemonRecord& record, const Evolutio
 }
 
 }  // namespace pokemon
+
+#endif
