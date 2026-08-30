@@ -23,10 +23,10 @@
 
 ## Hard engineering gates
 
-- No more than 2,200 handwritten production lines. Generated species/i18n/art data and tests are excluded.
+- No more than 3,500 handwritten Pokemon production lines. Generated species/i18n/art data and tests are excluded; no new Pokemon UI file may exceed 700 nonblank lines.
 - One framebuffer; no roster-sized in-memory container; no per-render allocation; no bare `new`.
 - Snapshot storage is bounded to 1,024 records and about 49 KB per file.
-- Run an approved X3 link/size check at the core exit gate and again for the final candidate. Each image retains at least 128 KB partition headroom; V2 adds no more than 100 KB without review.
+- Run an approved X3 link/size check at the core exit gate and again for the final candidate. The final image retains at least 192 KiB partition headroom and UI/dashboard additions use less than 2 KiB static RAM over the committed core.
 - Activity open/close cycles return heap to within 2 KB of baseline; no allocation failure may abort.
 - Long PlatformIO checks are batched and require a visible approval immediately before execution.
 

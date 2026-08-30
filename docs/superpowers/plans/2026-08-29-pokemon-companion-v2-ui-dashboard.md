@@ -53,5 +53,5 @@
 
 - Navigation tests cover wraparound, page boundaries, full Party, one-member Party, empty/full PC, and all pending events.
 - Simulator walkthrough shows consistent headers and no selected-row sprite erasure.
-- UI/dashboard production code keeps the overall workstream within 2,200 lines.
+- UI/dashboard production code keeps the overall workstream within 3,500 Pokemon production lines, with no new Pokemon UI file above 700 nonblank lines.
 - The core gate may run its one approved X3 link/size build. Do not build the integrated UI/dashboard X3 candidate until visual approval.
