@@ -26,6 +26,7 @@ class PokemonStore {
  public:
   StoreBeginResult begin();
   bool isReady() const { return ready_; }
+  uint32_t recordCount() const { return ready_ ? activeHeader_.recordCount : 0; }
   bool loadState(PokemonState& output) const;
   bool readRecord(uint32_t recordId, PokemonRecord& output) const;
   bool loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const;
