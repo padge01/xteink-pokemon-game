@@ -50,6 +50,18 @@ TEST(PokemonDashboardLayoutTest, PortraitUsesTwoRowsAndLandscapeUsesOne) {
   EXPECT_TRUE(pokemon::pokemonDashboardLayout(800, 68).singleRow);
 }
 
+TEST(PokemonDashboardLayoutTest, OmitsGenderAndKeepsUsefulColumnsWide) {
+  for (const int width : {480, 800}) {
+    const auto layout = pokemon::pokemonDashboardLayout(width, 68);
+    ASSERT_TRUE(layout.valid);
+    EXPECT_EQ(layout.gender.width, 0);
+    EXPECT_GE(layout.identity.width, 160);
+    EXPECT_GE(layout.level.width, 80);
+    EXPECT_GE(layout.xp.width, 80);
+    EXPECT_GE(layout.notice.width, 100);
+  }
+}
+
 TEST(PokemonDashboardLayoutTest, RejectsTooSmallBounds) {
   EXPECT_FALSE(pokemon::pokemonDashboardLayout(239, 68).valid);
   EXPECT_FALSE(pokemon::pokemonDashboardLayout(480, 59).valid);

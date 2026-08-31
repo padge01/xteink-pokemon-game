@@ -170,6 +170,28 @@ void xpBoundariesStartAtZeroAndClampAtLevelOneHundred() {
   }
 }
 
+void levelProgressIsRelativeToTheCurrentLevel() {
+  const pokemon::LevelXpProgress freshStarter = pokemon::levelXpProgress(52);
+  CHECK(freshStarter.level == 5);
+  CHECK(freshStarter.earned == 0);
+  CHECK(freshStarter.required == 16);
+
+  const pokemon::LevelXpProgress oneMinute = pokemon::levelXpProgress(53);
+  CHECK(oneMinute.level == 5);
+  CHECK(oneMinute.earned == 1);
+  CHECK(oneMinute.required == 16);
+
+  const pokemon::LevelXpProgress levelSix = pokemon::levelXpProgress(68);
+  CHECK(levelSix.level == 6);
+  CHECK(levelSix.earned == 0);
+  CHECK(levelSix.required == 19);
+
+  const pokemon::LevelXpProgress maximum = pokemon::levelXpProgress(pokemon::MAXIMUM_TOTAL_XP);
+  CHECK(maximum.level == 100);
+  CHECK(maximum.earned == 0);
+  CHECK(maximum.required == 0);
+}
+
 PokemonState validState() {
   PokemonState state{};
   state.partyRecordIds = {1, 2, 0, 0, 0, 0};
@@ -437,6 +459,7 @@ int main() {
   invalidRecordsDoNotMutateOutputs();
   recordValidationRejectsImpossibleLevelAndGender();
   xpBoundariesStartAtZeroAndClampAtLevelOneHundred();
+  levelProgressIsRelativeToTheCurrentLevel();
   stateValidationRejectsPartyAndPokedexCorruption();
   pendingEventValidationFollowsItsTag();
   speciesTableCoversKantoAndPinnedMetadata();

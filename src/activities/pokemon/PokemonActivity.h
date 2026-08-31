@@ -37,6 +37,7 @@ class PokemonActivity final : public Activity {
     Bag,
     ItemTarget,
     Pokedex,
+    PokedexDetail,
     Event,
     ResetFirst,
     ResetFinal,
@@ -78,6 +79,7 @@ class PokemonActivity final : public Activity {
   int selected_ = 0;
   int rowCount_ = 0;
   uint16_t starterSpecies_ = 1;
+  uint16_t pokedexSpecies_ = 1;
   pokemon::Gender starterGender_ = pokemon::Gender::Male;
   uint32_t focusedRecordId_ = 0;
   uint32_t nicknameRecordId_ = 0;

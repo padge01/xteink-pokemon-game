@@ -48,6 +48,12 @@ bool drawPokemonSpeciesArt(const GfxRenderer& renderer, const uint16_t speciesId
   return drawPath(renderer, pokemonSpeciesArtPath(speciesId, hero, path, sizeof(path)), bounds, fallback);
 }
 
+bool drawPokemonPokedexArt(const GfxRenderer& renderer, const uint16_t speciesId, const char* speciesName,
+                           const Rect bounds, const bool fallback) {
+  char path[64]{};
+  return drawPath(renderer, pokemonPokedexArtPath(speciesId, speciesName, path, sizeof(path)), bounds, fallback);
+}
+
 bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, const bool hero,
                         const Rect bounds, const bool fallback) {
   char path[80]{};

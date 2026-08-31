@@ -71,6 +71,12 @@ struct PokemonRecord {
   bool operator==(const PokemonRecord&) const = default;
 };
 
+struct LevelXpProgress {
+  uint8_t level = 1;
+  uint32_t earned = 0;
+  uint32_t required = 0;
+};
+
 using RecordBytes = std::array<uint8_t, POKEMON_RECORD_BYTES>;
 
 struct PendingEvent {
@@ -109,6 +115,7 @@ bool encodeRecord(const PokemonRecord& record, RecordBytes& output);
 bool decodeRecord(const RecordBytes& bytes, PokemonRecord& output);
 uint32_t xpRequired(uint8_t level);
 uint8_t levelForXp(uint32_t totalXp);
+LevelXpProgress levelXpProgress(uint32_t totalXp);
 bool markSpecies(PokedexBits& bits, uint16_t speciesId);
 bool isSpeciesMarked(const PokedexBits& bits, uint16_t speciesId);
 bool validateState(const PokemonState& state);

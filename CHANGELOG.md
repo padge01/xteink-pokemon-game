@@ -16,6 +16,7 @@
 
 - Opening the EPUB reader menu on fragmented or low X3/X4 memory now fails safely instead of restarting the device.
 - Pokémon onboarding, collection rows, summaries, and Dashboard bands now use readable presentation sprites and non-overlapping level, gender, and experience fields in portrait and landscape.
+- Pokémon dashboards now show larger lead artwork with compact in-level EXP, summaries show useful progression and evolution details, and seen Pokédex entries open the existing full-size SD-card Pokédex covers.
 - EPUBs with padding after `</html>` now finish parsing normally, and ZIP read errors can no longer underflow into unsafe buffer lengths.
 - KOReader authentication and sync now keep Wi-Fi awake for the transaction and skip a redundant NTP wait.
 - Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
@@ -25,7 +26,7 @@
 - Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.
 - Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves encounter then item priority at hourly level-up boundaries.
 - Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
-- Pokémon menus now wrap and page correctly, keep the selected sprite visible, preserve save errors, and return to the nickname choice when nickname entry is cancelled.
+- Pokémon menus now wrap and page correctly, respond to the X3 front navigation rocker on press, keep selected artwork visible with a classic cursor, keep header rules clear of their titles, preserve save errors, and return to the nickname choice when nickname entry is cancelled.
 - Pokémon Party and PC menus now hide actions that cannot succeed, distinguish PC read failures from an empty box, and preserve the previous collection if reset is interrupted.
 - Large EPUB images now reject unsafe dimensions before narrowing, keep the reader responsive while decoding, and remain inside the reader viewport.
 - EPUB lines can now wrap after visible hyphens and dashes, while ruby annotations stay grouped during incremental layout.

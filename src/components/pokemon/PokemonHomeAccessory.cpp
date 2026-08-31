@@ -7,6 +7,7 @@
 #include <PokemonSpecies.h>
 #include <Utf8.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -28,12 +29,6 @@ const char* noticeText(const DashboardNotice notice) {
     default:
       return "";
   }
-}
-
-const char* genderText(const Gender gender) {
-  if (gender == Gender::Male) return tr(STR_POKEMON_MALE);
-  if (gender == Gender::Female) return tr(STR_POKEMON_FEMALE);
-  return "";
 }
 
 template <size_t Size>
@@ -63,57 +58,44 @@ void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboar
   const DashboardLayout layout = pokemonDashboardLayout(bounds.width, bounds.height);
   if (snapshot.leader.recordId == 0 || !layout.valid) return;
   renderer.fillRect(bounds.x, bounds.y, bounds.width, bounds.height, false);
+  const int spriteWidth = std::min(layout.sprite.width, layout.sprite.height * 4 / 3);
+  const int spriteX = layout.sprite.x + (layout.sprite.width - spriteWidth) / 2;
   drawPokemonSpeciesArt(renderer, snapshot.leader.speciesId, true,
-                        Rect{bounds.x + layout.sprite.x, bounds.y + layout.sprite.y, layout.sprite.width,
+                        Rect{bounds.x + spriteX, bounds.y + layout.sprite.y, spriteWidth,
                              layout.sprite.height});
 
   const SpeciesData* species = speciesData(snapshot.leader.speciesId);
-  const char* identity = snapshot.leader.nickname[0] == '\0'
-                             ? (species == nullptr ? "???" : species->name)
-                             : snapshot.leader.nickname.data();
-  const uint8_t level = levelForXp(snapshot.leader.totalXp);
-  const uint32_t nextXp = level >= 100 ? MAXIMUM_TOTAL_XP : xpRequired(level + 1);
+  const char* speciesLabel = species == nullptr ? "???" : species->name;
+  const LevelXpProgress progress = levelXpProgress(snapshot.leader.totalXp);
   char levelText[24];
   char xpText[40];
-  snprintf(levelText, sizeof(levelText), "%s %u", tr(STR_POKEMON_LEVEL), level);
-  snprintf(xpText, sizeof(xpText), "%s %lu / %lu", tr(STR_POKEMON_EXP_POINTS),
-           static_cast<unsigned long>(snapshot.leader.totalXp), static_cast<unsigned long>(nextXp));
-
-  const char* notice = noticeText(snapshot.notice);
-  const char* gender = genderText(snapshot.leader.gender);
-  if (layout.singleRow) {
-    const int y = bounds.y + (bounds.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
-    char identityFit[40], levelFit[24], genderFit[16], xpFit[40], noticeFit[32];
-    renderer.drawText(UI_12_FONT_ID, bounds.x + layout.identity.x, y,
-                      fit(renderer, UI_12_FONT_ID, identity, layout.identity.width, identityFit,
-                          EpdFontFamily::BOLD),
-                      true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.level.x, y,
-                      fit(renderer, UI_10_FONT_ID, levelText, layout.level.width, levelFit));
-    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.gender.x, y,
-                      fit(renderer, UI_10_FONT_ID, gender, layout.gender.width, genderFit));
-    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.xp.x, y,
-                      fit(renderer, UI_10_FONT_ID, xpText, layout.xp.width, xpFit));
-    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.notice.x, y,
-                      fit(renderer, UI_10_FONT_ID, notice, layout.notice.width, noticeFit), true,
-                      EpdFontFamily::BOLD);
-    return;
+  snprintf(levelText, sizeof(levelText), "%s %u", tr(STR_POKEMON_LEVEL), progress.level);
+  if (progress.required == 0) {
+    snprintf(xpText, sizeof(xpText), "%s %s", tr(STR_POKEMON_EXP_SHORT), tr(STR_POKEMON_MAX));
+  } else {
+    snprintf(xpText, sizeof(xpText), "%s %lu / %lu", tr(STR_POKEMON_EXP_SHORT),
+             static_cast<unsigned long>(progress.earned), static_cast<unsigned long>(progress.required));
   }
 
-  const int top = bounds.y + layout.identity.y + 8;
-  const int bottom = bounds.y + layout.xp.y + 1;
-  char identityFit[40], levelFit[24], genderFit[16], xpFit[40], noticeFit[32];
+  const char* notice = noticeText(snapshot.notice);
+  const int top = bounds.y + 5;
+  const int bottom = bounds.y + bounds.height / 2 + 1;
+  char speciesFit[40], nicknameFit[40], levelFit[24], xpFit[40], noticeFit[32];
   renderer.drawText(UI_12_FONT_ID, bounds.x + layout.identity.x, top,
-                    fit(renderer, UI_12_FONT_ID, identity, layout.identity.width, identityFit,
+                    fit(renderer, UI_12_FONT_ID, speciesLabel, layout.identity.width, speciesFit,
                         EpdFontFamily::BOLD),
                     true, EpdFontFamily::BOLD);
+  if (snapshot.leader.nickname[0] != '\0') {
+    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.identity.x, bottom,
+                      fit(renderer, UI_10_FONT_ID, snapshot.leader.nickname.data(), layout.identity.width,
+                          nicknameFit));
+  }
   renderer.drawText(UI_10_FONT_ID, bounds.x + layout.level.x, top,
                     fit(renderer, UI_10_FONT_ID, levelText, layout.level.width, levelFit));
-  renderer.drawText(UI_10_FONT_ID, bounds.x + layout.gender.x, top,
-                    fit(renderer, UI_10_FONT_ID, gender, layout.gender.width, genderFit));
   renderer.drawText(UI_10_FONT_ID, bounds.x + layout.xp.x, bottom,
                     fit(renderer, UI_10_FONT_ID, xpText, layout.xp.width, xpFit));
-  renderer.drawText(UI_10_FONT_ID, bounds.x + layout.notice.x, bottom,
+  const int noticeY = bounds.y + (bounds.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+  renderer.drawText(UI_10_FONT_ID, bounds.x + layout.notice.x, noticeY,
                     fit(renderer, UI_10_FONT_ID, notice, layout.notice.width, noticeFit), true,
                     EpdFontFamily::BOLD);
 }

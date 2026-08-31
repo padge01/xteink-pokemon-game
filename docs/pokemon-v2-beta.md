@@ -12,7 +12,8 @@ game. Normal CrossInk builds compile it out completely.
   supported Home dashboards and receives reading EXP.
 - Move Party members, deposit them in the PC Box, withdraw them, rename them,
   and sort the PC by catch date, Pokédex number, or name.
-- Browse a complete original-151 Pokédex. Seen and caught entries are tracked.
+- Browse a complete original-151 Pokédex. Seen and caught entries are tracked,
+  and selecting a seen entry opens its full-size card from `/sleep`.
 - Find wild Pokémon and rare evolution items through verified reading. A pending
   event waits in the Pokémon menu until the reader chooses what to do.
 - Evolve by level, an applicable stone, or the Link Cable item. Evolution prompts
@@ -41,16 +42,19 @@ while uncommon species and evolution items remain rarer outcomes.
 
 The verified release archive contains:
 
-- `firmware-x3-x4.bin`
+- `update.bin` (the exact filename consumed by the on-device updater)
 - `.crosspoint/pokemon/` with the required artwork
 - `POKEMON_ASSET_LICENSES.md`
 - `SHA256SUMS.txt`
 - `.crosspoint/pokemon/manifest.json`
 
 Before installing, back up the SD card and keep the last known-good firmware.
-Copy `firmware-x3-x4.bin` to the SD-card root and merge the supplied
+Copy `update.bin` to the SD-card root and merge the supplied
 `.crosspoint` folder into the SD-card root. Do not rename or flatten the artwork
-folders. Flash the firmware using the device's normal on-device update flow.
+folders. The original-151 Pokédex cards must remain in `/sleep`, with filenames
+such as `/sleep/001-bulbasaur.bmp`; the detail screen streams these existing
+cards directly rather than keeping a second copy in memory. Flash the firmware
+using the device's normal on-device update flow.
 
 V2 snapshots are `/.crosspoint/pokemon-v2-a.bin` and
 `/.crosspoint/pokemon-v2-b.bin`. Back up both to preserve a collection. The

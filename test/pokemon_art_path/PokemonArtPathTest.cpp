@@ -18,6 +18,20 @@ TEST(PokemonArtPath, RejectsSpeciesOutsideTheOriginal151) {
   EXPECT_STREQ(path, "");
 }
 
+TEST(PokemonArtPath, BuildsExistingSleepCoverPokedexPaths) {
+  char path[64]{};
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(1, "Bulbasaur", path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/sleep/001-bulbasaur.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(29, "Nidoran♀", path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/sleep/029-nidoran-f.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(83, "Farfetch'd", path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/sleep/083-farfetchd.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(122, "Mr. Mime", path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/sleep/122-mr-mime.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(151, "Mew", path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/sleep/151-mew.bmp");
+}
+
 TEST(PokemonArtPath, BuildsStonePathsButLeavesLinkCableBlank) {
   char path[80]{};
   ASSERT_NE(pokemon::pokemonItemArtPath(pokemon::EvolutionItem::ThunderStone, false, path, sizeof(path)), nullptr);

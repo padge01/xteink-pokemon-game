@@ -46,6 +46,8 @@ class PokemonArtPackTest(unittest.TestCase):
 
             self.assertTrue(archive.is_file())
             PACKAGE.verify(output)
+            self.assertEqual((output / "update.bin").read_bytes(), b"firmware")
+            self.assertFalse((output / "firmware-x3-x4.bin").exists())
             self.assertFalse((output / ".crosspoint/pokemon/sprites/152.bmp").exists())
             self.assertFalse((output / ".crosspoint/pokemon/egg.bmp").exists())
 

@@ -455,9 +455,13 @@ class SimulatorSmokeTest {
     inputScript.clear();
     scriptIndex = 0;
 
+    // Exercise the X3 front navigation rocker on its press edge. Side-button
+    // Down is a separate hardware path and cannot validate the front controls.
+    inputScript.push_back(press(MappedInputManager::Button::Right));
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Gender", 4));
     inputScript.push_back(assertActivity("Pokemon"));
+    inputScript.push_back(release(MappedInputManager::Button::Right));
 
     addTap(MappedInputManager::Button::Down);
     inputScript.push_back(render("Pokemon Gender Female", 3));
@@ -487,7 +491,11 @@ class SimulatorSmokeTest {
     for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Pokedex", 4));
-    for (int i = 0; i < 6; ++i) addTap(MappedInputManager::Button::Down);
+    for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Pokedex Detail", 4));
+    addTap(MappedInputManager::Button::Back);
+    for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
     inputScript.push_back(render("Pokemon Pokedex Second Page", 4));
     inputScript.push_back(assertActivity("Pokemon"));
 
@@ -505,7 +513,7 @@ class SimulatorSmokeTest {
     if (pokemon::devicePokemonService().loadSnapshot(snapshot) != pokemon::ServiceStatus::Ok) {
       fail("Pokemon smoke-test save could not be loaded");
     }
-    if (snapshot.ownedCount != 1 || snapshot.partyCount != 1 || snapshot.party[0].speciesId != 1 ||
+    if (snapshot.ownedCount != 1 || snapshot.partyCount != 1 || snapshot.party[0].speciesId != 4 ||
         snapshot.party[0].gender != pokemon::Gender::Female) {
       fail("Pokemon smoke-test onboarding state was not persisted as expected");
     }

@@ -34,6 +34,51 @@ const char* speciesName(const uint16_t id) {
 const char* genderText(const pokemon::Gender gender) {
   if (gender == pokemon::Gender::Male) return tr(STR_POKEMON_MALE);
   if (gender == pokemon::Gender::Female) return tr(STR_POKEMON_FEMALE);
+  if (gender == pokemon::Gender::Genderless) return tr(STR_POKEMON_GENDERLESS);
+  return "";
+}
+
+const char* typeName(const pokemon::PokemonType type) {
+  switch (type) {
+    case pokemon::PokemonType::Normal:
+      return tr(STR_POKEMON_TYPE_NORMAL);
+    case pokemon::PokemonType::Fire:
+      return tr(STR_POKEMON_TYPE_FIRE);
+    case pokemon::PokemonType::Water:
+      return tr(STR_POKEMON_TYPE_WATER);
+    case pokemon::PokemonType::Electric:
+      return tr(STR_POKEMON_TYPE_ELECTRIC);
+    case pokemon::PokemonType::Grass:
+      return tr(STR_POKEMON_TYPE_GRASS);
+    case pokemon::PokemonType::Ice:
+      return tr(STR_POKEMON_TYPE_ICE);
+    case pokemon::PokemonType::Fighting:
+      return tr(STR_POKEMON_TYPE_FIGHTING);
+    case pokemon::PokemonType::Poison:
+      return tr(STR_POKEMON_TYPE_POISON);
+    case pokemon::PokemonType::Ground:
+      return tr(STR_POKEMON_TYPE_GROUND);
+    case pokemon::PokemonType::Flying:
+      return tr(STR_POKEMON_TYPE_FLYING);
+    case pokemon::PokemonType::Psychic:
+      return tr(STR_POKEMON_TYPE_PSYCHIC);
+    case pokemon::PokemonType::Bug:
+      return tr(STR_POKEMON_TYPE_BUG);
+    case pokemon::PokemonType::Rock:
+      return tr(STR_POKEMON_TYPE_ROCK);
+    case pokemon::PokemonType::Ghost:
+      return tr(STR_POKEMON_TYPE_GHOST);
+    case pokemon::PokemonType::Dragon:
+      return tr(STR_POKEMON_TYPE_DRAGON);
+    case pokemon::PokemonType::Dark:
+      return tr(STR_POKEMON_TYPE_DARK);
+    case pokemon::PokemonType::Steel:
+      return tr(STR_POKEMON_TYPE_STEEL);
+    case pokemon::PokemonType::Fairy:
+      return tr(STR_POKEMON_TYPE_FAIRY);
+    case pokemon::PokemonType::None:
+      return "";
+  }
   return "";
 }
 
@@ -111,7 +156,7 @@ void PokemonActivity::setScreen(const Screen screen, const int selected) {
 }
 
 bool PokemonActivity::isListScreen() const {
-  return screen_ != Screen::Summary && screen_ != Screen::Message;
+  return screen_ != Screen::Summary && screen_ != Screen::PokedexDetail && screen_ != Screen::Message;
 }
 
 int PokemonActivity::logicalCount() const {
@@ -146,6 +191,7 @@ int PokemonActivity::logicalCount() const {
     case Screen::Event:
       return snapshot_.state.pending.kind == pokemon::PendingEventKind::Item ? 1 : 2;
     case Screen::Summary:
+    case Screen::PokedexDetail:
     case Screen::Message:
       return 0;
   }
@@ -328,6 +374,12 @@ void PokemonActivity::activate() {
       return;
     }
     case Screen::Pokedex:
+      pokedexSpecies_ = static_cast<uint16_t>(selected_ + 1);
+      if (pokemon::isSpeciesMarked(snapshot_.state.seenSpecies, pokedexSpecies_)) {
+        setScreen(Screen::PokedexDetail);
+      }
+      return;
+    case Screen::PokedexDetail:
       return;
     case Screen::Event: {
       const pokemon::PendingEvent pending = snapshot_.state.pending;
@@ -403,6 +455,9 @@ void PokemonActivity::goBack() {
     case Screen::ItemTarget:
       setScreen(Screen::Bag);
       return;
+    case Screen::PokedexDetail:
+      setScreen(Screen::Pokedex, static_cast<int>(pokedexSpecies_ - 1U));
+      return;
     case Screen::Message:
       setScreen(returnScreen_);
       return;
@@ -436,10 +491,8 @@ void PokemonActivity::loop() {
     selected_ = next;
     requestUpdate();
   };
-  navigator_.onNextRelease([this, count, &move] { move(ButtonNavigator::nextIndex(selected_, count)); });
-  navigator_.onPreviousRelease([this, count, &move] { move(ButtonNavigator::previousIndex(selected_, count)); });
-  navigator_.onNextContinuous([this, count, &move] { move(ButtonNavigator::nextPageIndex(selected_, count, 5)); });
-  navigator_.onPreviousContinuous([this, count, &move] { move(ButtonNavigator::previousPageIndex(selected_, count, 5)); });
+  navigator_.onNext([this, count, &move] { move(ButtonNavigator::nextIndex(selected_, count)); });
+  navigator_.onPrevious([this, count, &move] { move(ButtonNavigator::previousIndex(selected_, count)); });
 }
 
 void PokemonActivity::screenBuilder(UiApp::ScreenType& screen, void* user) {
@@ -582,6 +635,7 @@ void PokemonActivity::buildRows() {
         } else row(local, tr(STR_OK));
         break;
       case Screen::Summary:
+      case Screen::PokedexDetail:
       case Screen::Message:
         break;
     }
@@ -591,6 +645,9 @@ void PokemonActivity::buildRows() {
 void PokemonActivity::buildList(UiApp::ScreenType& screen) {
   buildRows();
   const auto& metrics = UITheme::getInstance().getMetrics();
+  const bool artRows = screen_ == Screen::Starter || screen_ == Screen::Party || screen_ == Screen::Move ||
+                       screen_ == Screen::Pc || screen_ == Screen::Bag || screen_ == Screen::ItemTarget ||
+                       screen_ == Screen::Pokedex;
   int top = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) + metrics.verticalSpacing;
   rowHeight_ = 64;
   if (screen_ == Screen::Starter || screen_ == Screen::ResetFirst || screen_ == Screen::ResetFinal) top += 72;
@@ -608,11 +665,14 @@ void PokemonActivity::buildList(UiApp::ScreenType& screen) {
   props.inputMask = fui::InputTouch;
   props.rowHeight = static_cast<int16_t>(rowHeight_);
   props.rowGap = 0;
-  props.sidePadding = (screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::Pc ||
-                       screen_ == Screen::Bag || screen_ == Screen::ItemTarget || screen_ == Screen::Pokedex ||
-                       screen_ == Screen::Starter)
-                          ? 94
-                          : 16;
+  props.sidePadding = artRows ? 104 : 16;
+  if (artRows) {
+    // A Game Boy-style cursor keeps monochrome artwork on white paper. An
+    // inverted row makes the SD-backed black sprite disappear into the fill.
+    props.rowStyles = fui::selectedPlainListRowStyles();
+    props.selectionMarker = fui::SelectionMarker::Triangle;
+    props.markerInset = 86;
+  }
   props.valueInset = 8;
   screen.list(props);
 }
@@ -623,6 +683,28 @@ void PokemonActivity::buildUi(UiApp::ScreenType& screen) {
 
 void PokemonActivity::renderFocused() {
   const auto& metrics = UITheme::getInstance().getMetrics();
+  if (screen_ == Screen::PokedexDetail) {
+    int marginTop = 0, marginRight = 0, marginBottom = 0, marginLeft = 0;
+    renderer.getOrientedViewableTRBL(&marginTop, &marginRight, &marginBottom, &marginLeft);
+    const int availableWidth = renderer.getScreenWidth() - marginLeft - marginRight - 8;
+    const int availableHeight =
+        renderer.getScreenHeight() - marginTop - marginBottom - metrics.buttonHintsHeight - 8;
+    int cardWidth = std::min(availableWidth, availableHeight * 2 / 3);
+    int cardHeight = cardWidth * 3 / 2;
+    if (cardHeight > availableHeight) {
+      cardHeight = availableHeight;
+      cardWidth = cardHeight * 2 / 3;
+    }
+    const Rect cardBounds{marginLeft + (availableWidth - cardWidth) / 2 + 4,
+                          marginTop + (availableHeight - cardHeight) / 2 + 4, cardWidth, cardHeight};
+    const char* name = speciesName(pokedexSpecies_);
+    if (!pokemon::drawPokemonPokedexArt(renderer, pokedexSpecies_, name, cardBounds, false)) {
+      pokemon::drawPokemonSpeciesArt(renderer, pokedexSpecies_, true,
+                                     Rect{(renderer.getScreenWidth() - 120) / 2, marginTop + 80, 120, 90});
+      centered(renderer, UI_12_FONT_ID, marginTop + 190, tr(STR_POKEMON_LOAD_ERROR), EpdFontFamily::BOLD);
+    }
+    return;
+  }
   const int contentTop = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) + 14;
   if (screen_ == Screen::Message) {
     centered(renderer, UI_12_FONT_ID, contentTop + 100, message_, EpdFontFamily::BOLD);
@@ -656,37 +738,74 @@ void PokemonActivity::renderFocused() {
   if (screen_ == Screen::Summary) {
     pokemon::PokemonRecord record{};
     if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) return;
+    const pokemon::SpeciesData* species = pokemon::speciesData(record.speciesId);
+    if (species == nullptr) return;
     const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
     const int artX = landscape ? 28 : (renderer.getScreenWidth() - 120) / 2;
     const int artY = contentTop + 8;
     pokemon::drawPokemonSpeciesArt(renderer, record.speciesId, true, Rect{artX, artY, 120, 90});
     const int textX = landscape ? 178 : 28;
-    int y = landscape ? contentTop + 8 : artY + 112;
+    int y = landscape ? contentTop + 8 : artY + 106;
     renderer.drawText(UI_12_FONT_ID, textX, y, speciesName(record.speciesId), true, EpdFontFamily::BOLD);
-    y += 28;
-    renderer.drawText(UI_10_FONT_ID, textX, y, record.nickname.data());
-    y += 30;
+    y += 25;
+    renderer.drawText(UI_10_FONT_ID, textX, y, record.nickname[0] == '\0' ? "" : record.nickname.data());
+    y += 27;
     char line[96];
     snprintf(line, sizeof(line), "%s %03u    %s %u    %s", tr(STR_POKEMON_NUMBER_SHORT), record.speciesId,
              tr(STR_POKEMON_LEVEL),
              pokemon::levelForXp(record.totalXp), genderText(record.gender));
     renderer.drawText(UI_10_FONT_ID, textX, y, line);
     y += 26;
-    snprintf(line, sizeof(line), "%s    %lu", tr(STR_POKEMON_EXP_POINTS), static_cast<unsigned long>(record.totalXp));
-    renderer.drawText(UI_10_FONT_ID, textX, y, line);
+    const int valueX = textX + (landscape ? 170 : 155);
+    char types[48]{};
+    if (species->secondaryType == pokemon::PokemonType::None) {
+      snprintf(types, sizeof(types), "%s", typeName(species->primaryType));
+    } else {
+      snprintf(types, sizeof(types), "%s / %s", typeName(species->primaryType), typeName(species->secondaryType));
+    }
+    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_TYPE), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, valueX, y, types);
     y += 26;
-    snprintf(line, sizeof(line), "%s    %s %u", tr(STR_POKEMON_MET), tr(STR_POKEMON_LEVEL), record.caughtLevel);
-    renderer.drawText(UI_10_FONT_ID, textX, y, line);
+    const pokemon::LevelXpProgress progress = pokemon::levelXpProgress(record.totalXp);
+    if (progress.required == 0) {
+      snprintf(line, sizeof(line), "%s", tr(STR_POKEMON_MAX));
+    } else {
+      snprintf(line, sizeof(line), "%lu / %lu", static_cast<unsigned long>(progress.earned),
+               static_cast<unsigned long>(progress.required));
+    }
+    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EXP_SHORT), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, valueX, y, line);
     y += 26;
-    const uint8_t level = pokemon::levelForXp(record.totalXp);
-    const uint32_t next = level >= 100 ? pokemon::MAXIMUM_TOTAL_XP : pokemon::xpRequired(level + 1);
-    snprintf(line, sizeof(line), "%s    %lu / %lu", tr(STR_POKEMON_EXP_POINTS), static_cast<unsigned long>(record.totalXp),
-             static_cast<unsigned long>(next));
-    renderer.drawText(UI_10_FONT_ID, textX, y, line, true, EpdFontFamily::BOLD);
+    snprintf(line, sizeof(line), "%s %u", tr(STR_POKEMON_LEVEL), record.caughtLevel);
+    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_MET), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, valueX, y, line);
     y += 26;
+    const auto evolutions = pokemon::evolutionsFor(record.speciesId);
+    if (evolutions.empty()) {
+      renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTION), true, EpdFontFamily::BOLD);
+      renderer.drawText(UI_10_FONT_ID, valueX, y, tr(STR_POKEMON_NO_EVOLUTION));
+      y += 26;
+    } else {
+      bool first = true;
+      for (const pokemon::EvolutionRule& rule : evolutions) {
+        if (rule.trigger == pokemon::EvolutionTrigger::Level) {
+          snprintf(line, sizeof(line), tr(STR_POKEMON_EVOLVES_LEVEL), rule.minimumLevel,
+                   speciesName(rule.targetSpeciesId));
+        } else {
+          snprintf(line, sizeof(line), tr(STR_POKEMON_EVOLVES_ITEM), itemName(rule.item),
+                   speciesName(rule.targetSpeciesId));
+        }
+        if (first) {
+          renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTION), true, EpdFontFamily::BOLD);
+          first = false;
+        }
+        renderer.drawText(UI_10_FONT_ID, valueX, y, line);
+        y += 26;
+      }
+    }
     const bool prompts = (record.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0;
-    snprintf(line, sizeof(line), "%s    %s", tr(STR_POKEMON_EVOLUTIONS), prompts ? tr(STR_POKEMON_ON) : tr(STR_POKEMON_OFF));
-    renderer.drawText(UI_10_FONT_ID, textX, y, line);
+    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTIONS), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, valueX, y, prompts ? tr(STR_POKEMON_ON) : tr(STR_POKEMON_OFF));
     return;
   }
   if (screen_ != Screen::Event) return;
@@ -722,7 +841,6 @@ void PokemonActivity::renderRowArt() {
   const int start = pageStart();
   for (int local = 0; local < rowCount_; ++local) {
     const int y = listBounds_.y + local * rowHeight_ + 2;
-    renderer.fillRect(listBounds_.x, y, 90, 60, false);
     uint16_t speciesId = 0;
     if (screen_ == Screen::Starter) speciesId = STARTERS[start + local];
     else if ((screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget) &&
@@ -747,15 +865,28 @@ void PokemonActivity::renderRowArt() {
 
 void PokemonActivity::renderHeaderAndHints() {
   const auto& metrics = UITheme::getInstance().getMetrics();
+  if (screen_ == Screen::PokedexDetail) {
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+    return;
+  }
   const char* title = tr(STR_POKEMON);
   if (screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget) title = tr(STR_POKEMON_PARTY);
   else if (screen_ == Screen::Pc || screen_ == Screen::PcOrder) title = tr(STR_POKEMON_PC_BOX);
   else if (screen_ == Screen::Bag) title = tr(STR_POKEMON_BAG);
   else if (screen_ == Screen::Pokedex) title = tr(STR_POKEDEX);
   else if (screen_ == Screen::Summary || screen_ == Screen::Actions) title = tr(STR_POKEMON_SUMMARY);
-  const Rect header{0, metrics.topPadding, renderer.getScreenWidth(), TouchHeaderBackButton::height(metrics, mappedInput)};
+  const Rect header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
   if (mappedInput.hasTouchHardware()) TouchHeaderBackButton::draw(renderer, uiTarget_, header, title, false);
-  else GUI.drawHeader(renderer, header, title);
+  else {
+    // Let the theme draw its rule and battery, then place the title ourselves.
+    // Some X3 font builds extend below their reported line cell; the standard
+    // bottom-aligned title can therefore collide with the header rule.
+    GUI.drawHeader(renderer, header, "");
+    constexpr int titleRuleGap = 18;
+    const int titleY = header.y + std::max(0, header.height - renderer.getLineHeight(UI_12_FONT_ID) - titleRuleGap);
+    renderer.drawText(UI_12_FONT_ID, header.x + metrics.headerSidePadding, titleY, title, true, EpdFontFamily::BOLD);
+  }
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 }

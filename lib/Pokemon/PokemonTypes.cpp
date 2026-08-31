@@ -175,6 +175,14 @@ uint8_t levelForXp(const uint32_t totalXp) {
   return low;
 }
 
+LevelXpProgress levelXpProgress(const uint32_t totalXp) {
+  const uint8_t level = levelForXp(totalXp);
+  if (level >= 100) return LevelXpProgress{100, 0, 0};
+  const uint32_t levelStart = xpRequired(level);
+  const uint32_t nextLevel = xpRequired(static_cast<uint8_t>(level + 1U));
+  return LevelXpProgress{level, totalXp - levelStart, nextLevel - levelStart};
+}
+
 bool markSpecies(PokedexBits& bits, const uint16_t speciesId) {
   if (speciesId == 0 || speciesId > KANTO_SPECIES_COUNT) return false;
   const uint16_t zeroBased = static_cast<uint16_t>(speciesId - 1U);

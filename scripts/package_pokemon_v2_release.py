@@ -74,7 +74,7 @@ def build(source: Path, firmware: Path, notice: Path, output: Path) -> Path:
         destination = art_output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source / relative, destination)
-    firmware_output = output / "firmware-x3-x4.bin"
+    firmware_output = output / "update.bin"
     shutil.copy2(firmware, firmware_output)
     shutil.copy2(notice, output / "POKEMON_ASSET_LICENSES.md")
     manifest = {"format": 1, "scope": "original-151", "assets": assets}
@@ -95,7 +95,7 @@ def build(source: Path, firmware: Path, notice: Path, output: Path) -> Path:
 
 def verify(output: Path) -> None:
     validate_art(output / ".crosspoint/pokemon")
-    required = (output / "firmware-x3-x4.bin", output / "POKEMON_ASSET_LICENSES.md",
+    required = (output / "update.bin", output / "POKEMON_ASSET_LICENSES.md",
                 output / "SHA256SUMS.txt", output / ".crosspoint/pokemon/manifest.json")
     if any(not path.is_file() for path in required):
         raise ValueError("release package is incomplete")

@@ -12,28 +12,15 @@ DashboardLayout pokemonDashboardLayout(const int width, const int height) {
   constexpr int textX = 112;
   const int textWidth = width - textX - 6;
   layout.singleRow = width >= 620;
-  if (layout.singleRow) {
-    const int identityWidth = textWidth * 25 / 100;
-    const int levelWidth = textWidth * 15 / 100;
-    const int genderWidth = textWidth * 15 / 100;
-    const int xpWidth = textWidth * 25 / 100;
-    layout.identity = {textX, 0, identityWidth, height};
-    layout.level = {textX + identityWidth, 0, levelWidth, height};
-    layout.gender = {layout.level.x + levelWidth, 0, genderWidth, height};
-    layout.xp = {layout.gender.x + genderWidth, 0, xpWidth, height};
-    layout.notice = {layout.xp.x + xpWidth, 0,
-                     textWidth - identityWidth - levelWidth - genderWidth - xpWidth, height};
-  } else {
-    const int topHeight = height / 2;
-    const int identityWidth = textWidth * 45 / 100;
-    const int levelWidth = textWidth * 25 / 100;
-    const int xpWidth = textWidth * 55 / 100;
-    layout.identity = {textX, 0, identityWidth, topHeight};
-    layout.level = {layout.identity.x + identityWidth, 0, levelWidth, topHeight};
-    layout.gender = {layout.level.x + levelWidth, 0, textWidth - identityWidth - levelWidth, topHeight};
-    layout.xp = {textX, topHeight, xpWidth, height - topHeight};
-    layout.notice = {layout.xp.x + xpWidth, topHeight, textWidth - xpWidth, height - topHeight};
-  }
+  const int identityWidth = textWidth * 45 / 100;
+  const int statsWidth = textWidth * 25 / 100;
+  const int statsX = textX + identityWidth;
+  const int halfHeight = height / 2;
+  layout.identity = {textX, 0, identityWidth, height};
+  layout.level = {statsX, 0, statsWidth, halfHeight};
+  layout.gender = {width, 0, 0, 0};
+  layout.xp = {statsX, halfHeight, statsWidth, height - halfHeight};
+  layout.notice = {statsX + statsWidth, 0, textWidth - identityWidth - statsWidth, height};
   layout.valid = true;
   return layout;
 }
