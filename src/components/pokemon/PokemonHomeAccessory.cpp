@@ -31,9 +31,8 @@ const char* noticeText(const DashboardNotice notice) {
 }
 
 const char* genderText(const Gender gender) {
-  if (gender == Gender::Male) return "♂";
-  if (gender == Gender::Female) return "♀";
-  if (gender == Gender::Genderless) return "—";
+  if (gender == Gender::Male) return tr(STR_POKEMON_MALE);
+  if (gender == Gender::Female) return tr(STR_POKEMON_FEMALE);
   return "";
 }
 
@@ -74,22 +73,25 @@ void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboar
                              : snapshot.leader.nickname.data();
   const uint8_t level = levelForXp(snapshot.leader.totalXp);
   const uint32_t nextXp = level >= 100 ? MAXIMUM_TOTAL_XP : xpRequired(level + 1);
-  char levelText[32];
+  char levelText[24];
   char xpText[40];
-  snprintf(levelText, sizeof(levelText), "%s %u  %s", tr(STR_POKEMON_LEVEL), level, genderText(snapshot.leader.gender));
+  snprintf(levelText, sizeof(levelText), "%s %u", tr(STR_POKEMON_LEVEL), level);
   snprintf(xpText, sizeof(xpText), "%s %lu / %lu", tr(STR_POKEMON_EXP_POINTS),
            static_cast<unsigned long>(snapshot.leader.totalXp), static_cast<unsigned long>(nextXp));
 
   const char* notice = noticeText(snapshot.notice);
+  const char* gender = genderText(snapshot.leader.gender);
   if (layout.singleRow) {
     const int y = bounds.y + (bounds.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
-    char identityFit[40], levelFit[32], xpFit[40], noticeFit[32];
+    char identityFit[40], levelFit[24], genderFit[16], xpFit[40], noticeFit[32];
     renderer.drawText(UI_12_FONT_ID, bounds.x + layout.identity.x, y,
                       fit(renderer, UI_12_FONT_ID, identity, layout.identity.width, identityFit,
                           EpdFontFamily::BOLD),
                       true, EpdFontFamily::BOLD);
     renderer.drawText(UI_10_FONT_ID, bounds.x + layout.level.x, y,
                       fit(renderer, UI_10_FONT_ID, levelText, layout.level.width, levelFit));
+    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.gender.x, y,
+                      fit(renderer, UI_10_FONT_ID, gender, layout.gender.width, genderFit));
     renderer.drawText(UI_10_FONT_ID, bounds.x + layout.xp.x, y,
                       fit(renderer, UI_10_FONT_ID, xpText, layout.xp.width, xpFit));
     renderer.drawText(UI_10_FONT_ID, bounds.x + layout.notice.x, y,
@@ -100,13 +102,15 @@ void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboar
 
   const int top = bounds.y + layout.identity.y + 8;
   const int bottom = bounds.y + layout.xp.y + 1;
-  char identityFit[40], levelFit[32], xpFit[40], noticeFit[32];
+  char identityFit[40], levelFit[24], genderFit[16], xpFit[40], noticeFit[32];
   renderer.drawText(UI_12_FONT_ID, bounds.x + layout.identity.x, top,
                     fit(renderer, UI_12_FONT_ID, identity, layout.identity.width, identityFit,
                         EpdFontFamily::BOLD),
                     true, EpdFontFamily::BOLD);
   renderer.drawText(UI_10_FONT_ID, bounds.x + layout.level.x, top,
                     fit(renderer, UI_10_FONT_ID, levelText, layout.level.width, levelFit));
+  renderer.drawText(UI_10_FONT_ID, bounds.x + layout.gender.x, top,
+                    fit(renderer, UI_10_FONT_ID, gender, layout.gender.width, genderFit));
   renderer.drawText(UI_10_FONT_ID, bounds.x + layout.xp.x, bottom,
                     fit(renderer, UI_10_FONT_ID, xpText, layout.xp.width, xpFit));
   renderer.drawText(UI_10_FONT_ID, bounds.x + layout.notice.x, bottom,

@@ -32,9 +32,8 @@ const char* speciesName(const uint16_t id) {
 }
 
 const char* genderText(const pokemon::Gender gender) {
-  if (gender == pokemon::Gender::Male) return "♂";
-  if (gender == pokemon::Gender::Female) return "♀";
-  if (gender == pokemon::Gender::Genderless) return "—";
+  if (gender == pokemon::Gender::Male) return tr(STR_POKEMON_MALE);
+  if (gender == pokemon::Gender::Female) return tr(STR_POKEMON_FEMALE);
   return "";
 }
 
@@ -594,8 +593,9 @@ void PokemonActivity::buildList(UiApp::ScreenType& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   int top = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) + metrics.verticalSpacing;
   rowHeight_ = 64;
-  if (screen_ == Screen::Starter || screen_ == Screen::Gender || screen_ == Screen::NicknameQuestion ||
-      screen_ == Screen::ResetFirst || screen_ == Screen::ResetFinal) top += 72;
+  if (screen_ == Screen::Starter || screen_ == Screen::ResetFirst || screen_ == Screen::ResetFinal) top += 72;
+  if (screen_ == Screen::Gender) top += 180;
+  if (screen_ == Screen::NicknameQuestion) top += 210;
   if (screen_ == Screen::Event) top = renderer.getScreenHeight() - metrics.buttonHintsHeight - rowCount_ * rowHeight_ - 8;
   listBounds_ = Rect{8, top, renderer.getScreenWidth() - 16, rowCount_ * rowHeight_};
   screen.setContentMargin(fui::Insets{static_cast<int16_t>(listBounds_.y), 8,
@@ -628,10 +628,14 @@ void PokemonActivity::renderFocused() {
     centered(renderer, UI_12_FONT_ID, contentTop + 100, message_, EpdFontFamily::BOLD);
     return;
   }
-  if (screen_ == Screen::Starter || screen_ == Screen::Gender) {
-    centered(renderer, UI_12_FONT_ID, contentTop + 18,
-             screen_ == Screen::Starter ? tr(STR_POKEMON_CHOOSE_PARTNER) : tr(STR_POKEMON_CHOOSE_GENDER),
-             EpdFontFamily::BOLD);
+  if (screen_ == Screen::Starter) {
+    centered(renderer, UI_12_FONT_ID, contentTop + 18, tr(STR_POKEMON_CHOOSE_PARTNER), EpdFontFamily::BOLD);
+    return;
+  }
+  if (screen_ == Screen::Gender) {
+    centered(renderer, UI_12_FONT_ID, contentTop + 18, tr(STR_POKEMON_CHOOSE_GENDER), EpdFontFamily::BOLD);
+    pokemon::drawPokemonSpeciesArt(renderer, starterSpecies_, true,
+                                   Rect{(renderer.getScreenWidth() - 120) / 2, contentTop + 54, 120, 90});
     return;
   }
   if (screen_ == Screen::Pc && logicalCount() == 0) {
@@ -643,6 +647,10 @@ void PokemonActivity::renderFocused() {
                              ? message_
                              : screen_ == Screen::ResetFirst ? tr(STR_POKEMON_RESET_QUESTION) : tr(STR_POKEMON_RESET_CONFIRM);
     centered(renderer, UI_12_FONT_ID, contentTop + 18, prompt, EpdFontFamily::BOLD);
+    if (screen_ == Screen::NicknameQuestion) {
+      pokemon::drawPokemonSpeciesArt(renderer, starterSpecies_, true,
+                                     Rect{(renderer.getScreenWidth() - 120) / 2, contentTop + 82, 120, 90});
+    }
     return;
   }
   if (screen_ == Screen::Summary) {
@@ -728,7 +736,11 @@ void PokemonActivity::renderRowArt() {
       pokemon::drawPokemonItemArt(renderer, static_cast<pokemon::EvolutionItem>(start + local + 1), false,
                                   Rect{listBounds_.x + 5, y, 80, 60}, false);
     } else if (speciesId != 0) {
-      pokemon::drawPokemonSpeciesArt(renderer, speciesId, false, Rect{listBounds_.x + 5, y, 80, 60});
+      // The 40x30 menu files are intentionally native-sized and GfxRenderer
+      // does not upscale. Use the same approved icon's 120x90 presentation
+      // copy so it can be reduced cleanly into the row instead of appearing
+      // as a tiny 40x30 mark on the X3 panel.
+      pokemon::drawPokemonSpeciesArt(renderer, speciesId, true, Rect{listBounds_.x + 5, y, 80, 60});
     }
   }
 }

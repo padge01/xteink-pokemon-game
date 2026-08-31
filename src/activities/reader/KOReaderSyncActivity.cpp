@@ -14,7 +14,6 @@
 #include "CrossPointSettings.h"
 #include "Epub/Section.h"
 #include "EpubReaderUtils.h"
-#include "HalClock.h"
 #include "KOReaderCredentialStore.h"
 #include "KOReaderDocumentId.h"
 #include "MappedInputManager.h"
@@ -74,14 +73,6 @@ DocumentMatchMethod alternateMatchMethod(const DocumentMatchMethod method) {
 
 const char* matchMethodName(const DocumentMatchMethod method) {
   return method == DocumentMatchMethod::FILENAME ? "filename" : "binary";
-}
-
-void syncTimeWithNTP() {
-#ifndef SIMULATOR
-  if (!halClock.syncSystemTimeFromNTP()) {
-    LOG_DBG("KOSync", "NTP sync unavailable, using fallback");
-  }
-#endif
 }
 
 void wifiOff() {
@@ -194,6 +185,11 @@ void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
     return;
   }
 
+  // The Wi-Fi flow already synchronized the clock. Keep the radio awake for
+  // this short transaction so modem sleep cannot surface as an HTTP timeout.
+  WiFi.setSleep(false);
+  LOG_DBG("KOSync", "WiFi sleep disabled for sync");
+
   sdFontSystem.releaseForNetwork(renderer);
 
   {
@@ -202,9 +198,6 @@ void KOReaderSyncActivity::onWifiSelectionComplete(const bool success) {
     statusMessage = tr(STR_SYNCING_TIME);
   }
   requestUpdate(true);
-
-  // Sync time with NTP before making API requests
-  syncTimeWithNTP();
 
   {
     RenderLock lock(*this);

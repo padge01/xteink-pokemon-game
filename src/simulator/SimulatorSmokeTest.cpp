@@ -15,6 +15,7 @@
 #include "MappedInputManager.h"
 #include "activities/ActivityManager.h"
 #include "activities/reader/EpubReaderMenuActivity.h"
+#include "activities/reader/ReaderMenuItems.h"
 #include "activities/reader/ReaderOptionsActivity.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
@@ -42,9 +43,25 @@ enum class SmokeStep : uint8_t {
   ReaderMenu,
   Sleep,
   Reader,
-  ReaderInput,
+  Pokemon,
+  InputScript,
   Done,
 };
+
+#if defined(CROSSINK_ENABLE_POKEMON)
+void startPokemonActivity() {
+  if (std::getenv("CROSSINK_SIMULATOR_POKEMON_LANDSCAPE") != nullptr) {
+    SETTINGS.orientation = CrossPointSettings::LANDSCAPE_CCW;
+    renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
+  }
+  auto activity = makeUniqueNoThrow<PokemonActivity>(renderer, mappedInputManager);
+  if (!activity) {
+    LOG_ERR("SMOKE", "Could not allocate Pokemon simulator activity");
+    std::_Exit(2);
+  }
+  activityManager.replaceActivity(std::move(activity));
+}
+#endif
 
 class SimulatorSmokeTest {
  public:
@@ -92,6 +109,8 @@ class SimulatorSmokeTest {
   size_t scriptIndex = 0;
 
   static bool enabled() { return std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") != nullptr; }
+
+  static bool pokemonMode() { return std::getenv("CROSSINK_SIMULATOR_START_POKEMON") != nullptr; }
 
   static int pageTurnCount() {
     const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS");
@@ -150,6 +169,15 @@ class SimulatorSmokeTest {
         if (!SimulatorHomeKeyInput::verifyTimingContract()) {
           fail("Simulator Home key timing contract failed");
         }
+#if defined(CROSSINK_ENABLE_POKEMON)
+        if (pokemonMode()) {
+          startPokemonActivity();
+          queueStep("Pokemon Starter", SmokeStep::Pokemon, 4);
+          break;
+        }
+#else
+        if (pokemonMode()) fail("Pokemon smoke test requested without CROSSINK_ENABLE_POKEMON");
+#endif
         activityManager.goHome();
         queueStep("Home", SmokeStep::Home);
         break;
@@ -203,11 +231,20 @@ class SimulatorSmokeTest {
 
       case SmokeStep::Reader:
         buildReaderInputScript();
-        step = SmokeStep::ReaderInput;
+        step = SmokeStep::InputScript;
         break;
 
-      case SmokeStep::ReaderInput:
-        runReaderInputScript();
+      case SmokeStep::Pokemon:
+#if defined(CROSSINK_ENABLE_POKEMON)
+        buildPokemonInputScript();
+        step = SmokeStep::InputScript;
+#else
+        fail("Pokemon smoke-test step is unavailable");
+#endif
+        break;
+
+      case SmokeStep::InputScript:
+        runInputScript();
         break;
 
       case SmokeStep::Done:
@@ -258,10 +295,11 @@ class SimulatorSmokeTest {
   static ScriptAction touchRelease(const int x, const int y) {
     return {ScriptActionType::TouchRelease, MappedInputManager::Button::Back, nullptr, 0, x, y};
   }
+#endif
+
   static ScriptAction assertActivity(const char* name) {
     return {ScriptActionType::AssertActivity, MappedInputManager::Button::Back, name, 0, 0, 0};
   }
-#endif
 
   void addTap(MappedInputManager::Button button) {
     inputScript.push_back(press(button));
@@ -368,12 +406,24 @@ class SimulatorSmokeTest {
 
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Reader Menu opened from EPUB", 4));
+    inputScript.push_back(assertActivity("EpubReaderMenu"));
 
-    addTap(MappedInputManager::Button::Down);
+    const ReaderMenuTabs menuItems = buildReaderMenuItems({});
+    const int readerOptionsIndex = menuItems.main.indexOf(ReaderMenuAction::READER_OPTIONS);
+    if (readerOptionsIndex < 0) {
+      LOG_ERR("SMOKE", "Reader Options is missing from the reader menu model");
+      std::_Exit(2);
+    }
+    // The menu opens with its tab strip focused. One Down enters row zero;
+    // the remaining presses follow the shared menu model to Reader Options.
+    for (int index = 0; index <= readerOptionsIndex; ++index) {
+      addTap(MappedInputManager::Button::Down);
+    }
     inputScript.push_back(render("Reader Menu Reader Options selection", 3));
 
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Reader Options opened from Reader Menu", 4));
+    inputScript.push_back(assertActivity("ReaderOptions"));
 
     addTap(MappedInputManager::Button::Down);
     inputScript.push_back(render("Reader Options after navigation", 3));
@@ -382,16 +432,92 @@ class SimulatorSmokeTest {
     inputScript.push_back(render("Reader Options after toggle", 3));
 
     addTap(MappedInputManager::Button::Back);
+    inputScript.push_back(render("Reader Options after closing option submenu", 4));
+    inputScript.push_back(assertActivity("ReaderOptions"));
+
+    addTap(MappedInputManager::Button::Back);
     inputScript.push_back(render("Reader Menu after closing Reader Options", 4));
+    inputScript.push_back(assertActivity("EpubReaderMenu"));
+
+    addTap(MappedInputManager::Button::Back);
+    inputScript.push_back(render("Reader Menu tab focus restored", 4));
+    inputScript.push_back(assertActivity("EpubReaderMenu"));
 
     addTap(MappedInputManager::Button::Back);
     inputScript.push_back(render("Reader after closing Reader Menu", 4));
+    inputScript.push_back(assertActivity("EpubReader"));
 
     LOG_INF("SMOKE", "Running reader input script with %d page turn(s)", turns);
   }
 
-  void runReaderInputScript() {
+#if defined(CROSSINK_ENABLE_POKEMON)
+  void buildPokemonInputScript() {
+    inputScript.clear();
+    scriptIndex = 0;
+
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Gender", 4));
+    inputScript.push_back(assertActivity("Pokemon"));
+
+    addTap(MappedInputManager::Button::Down);
+    inputScript.push_back(render("Pokemon Gender Female", 3));
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Nickname Question", 4));
+    inputScript.push_back(assertActivity("Pokemon"));
+
+    addTap(MappedInputManager::Button::Down);
+    inputScript.push_back(render("Pokemon Nickname No", 3));
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Menu", 4));
+    inputScript.push_back(assertActivity("Pokemon"));
+
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Party", 4));
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Summary", 4));
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Actions", 4));
+    inputScript.push_back(assertActivity("Pokemon"));
+
+    addTap(MappedInputManager::Button::Back);
+    inputScript.push_back(render("Pokemon Party Restored", 4));
+    addTap(MappedInputManager::Button::Back);
+    inputScript.push_back(render("Pokemon Menu Restored", 4));
+
+    for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Pokedex", 4));
+    for (int i = 0; i < 6; ++i) addTap(MappedInputManager::Button::Down);
+    inputScript.push_back(render("Pokemon Pokedex Second Page", 4));
+    inputScript.push_back(assertActivity("Pokemon"));
+
+    addTap(MappedInputManager::Button::Back);
+    addTap(MappedInputManager::Button::Down);
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Empty PC", 4));
+    inputScript.push_back(assertActivity("Pokemon"));
+
+    LOG_INF("SMOKE", "Running Pokemon input script");
+  }
+
+  static void verifyPokemonSmokeState() {
+    pokemon::PokemonSnapshot snapshot{};
+    if (pokemon::devicePokemonService().loadSnapshot(snapshot) != pokemon::ServiceStatus::Ok) {
+      fail("Pokemon smoke-test save could not be loaded");
+    }
+    if (snapshot.ownedCount != 1 || snapshot.partyCount != 1 || snapshot.party[0].speciesId != 1 ||
+        snapshot.party[0].gender != pokemon::Gender::Female) {
+      fail("Pokemon smoke-test onboarding state was not persisted as expected");
+    }
+    LOG_INF("SMOKE", "Pokemon onboarding state verified");
+  }
+#endif
+
+  void runInputScript() {
     if (scriptIndex >= inputScript.size()) {
+#if defined(CROSSINK_ENABLE_POKEMON)
+      if (pokemonMode()) verifyPokemonSmokeState();
+#endif
       step = SmokeStep::Done;
       return;
     }
@@ -441,7 +567,7 @@ class SimulatorSmokeTest {
         if (!activityManager.isCurrentActivityNamed(action.label)) fail("Expected current activity: %s", action.label);
         break;
       case ScriptActionType::Render:
-        queueStep(action.label, SmokeStep::ReaderInput, action.settleFrames);
+        queueStep(action.label, SmokeStep::InputScript, action.settleFrames);
         break;
     }
   }
@@ -469,19 +595,11 @@ void applySimulatorSmokeTestTheme() {
 
 void runSimulatorSmokeTestTick() {
 #if defined(CROSSINK_ENABLE_POKEMON)
-  static bool pokemonQaStarted = false;
-  if (!pokemonQaStarted && std::getenv("CROSSINK_SIMULATOR_START_POKEMON") != nullptr) {
-    pokemonQaStarted = true;
-    if (std::getenv("CROSSINK_SIMULATOR_POKEMON_LANDSCAPE") != nullptr) {
-      SETTINGS.orientation = CrossPointSettings::LANDSCAPE_CCW;
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
-    }
-    auto activity = makeUniqueNoThrow<PokemonActivity>(renderer, mappedInputManager);
-    if (!activity) {
-      LOG_ERR("SMOKE", "Could not allocate Pokemon QA activity");
-      std::_Exit(2);
-    }
-    activityManager.replaceActivity(std::move(activity));
+  static bool manualPokemonStarted = false;
+  if (!manualPokemonStarted && std::getenv("CROSSINK_SIMULATOR_SMOKE_TEST") == nullptr &&
+      std::getenv("CROSSINK_SIMULATOR_START_POKEMON") != nullptr) {
+    manualPokemonStarted = true;
+    startPokemonActivity();
   }
 #endif
   smokeTest.tick();

@@ -13,6 +13,7 @@ struct DashboardLayout {
   DashboardBox sprite{};
   DashboardBox identity{};
   DashboardBox level{};
+  DashboardBox gender{};
   DashboardBox xp{};
   DashboardBox notice{};
   bool singleRow = false;

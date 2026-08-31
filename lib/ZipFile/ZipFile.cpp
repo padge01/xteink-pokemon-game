@@ -8,6 +8,8 @@
 
 #include <algorithm>
 
+#include "ZipReadResult.h"
+
 struct ZipInflateCtx {
   HalFile* file = nullptr;
   size_t fileRemaining = 0;
@@ -47,8 +49,12 @@ size_t zipFillCallback(void* vctx, const uint8_t** data) {
   if (ctx->fileRemaining == 0) return 0;
 
   const size_t toRead = ctx->fileRemaining < ctx->readBufSize ? ctx->fileRemaining : ctx->readBufSize;
-  const size_t bytesRead = ctx->file->read(ctx->readBuf, toRead);
-  ctx->fileRemaining -= bytesRead;
+  const int result = ctx->file->read(ctx->readBuf, toRead);
+  size_t bytesRead = 0;
+  if (!consumeZipReadResult(result, ctx->fileRemaining, bytesRead)) {
+    LOG_ERR("ZIP", "Failed to read compressed data: %d", result);
+    return 0;
+  }
 
   *data = ctx->readBuf;
   return bytesRead;
@@ -59,8 +65,12 @@ size_t zipStreamFillCallback(void* vctx, const uint8_t** data) {
   if (!ctx->file || ctx->fileRemaining == 0) return 0;
 
   const size_t toRead = ctx->fileRemaining < ctx->readBufSize ? ctx->fileRemaining : ctx->readBufSize;
-  const size_t bytesRead = ctx->file->read(ctx->readBuf, toRead);
-  ctx->fileRemaining -= bytesRead;
+  const int result = ctx->file->read(ctx->readBuf, toRead);
+  size_t bytesRead = 0;
+  if (!consumeZipReadResult(result, ctx->fileRemaining, bytesRead)) {
+    LOG_ERR("ZIP", "Failed to stream compressed data: %d", result);
+    return 0;
+  }
 
   *data = ctx->readBuf;
   return bytesRead;

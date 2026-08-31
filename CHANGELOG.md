@@ -14,6 +14,10 @@
 
 ### Fixed
 
+- Opening the EPUB reader menu on fragmented or low X3/X4 memory now fails safely instead of restarting the device.
+- Pokémon onboarding, collection rows, summaries, and Dashboard bands now use readable presentation sprites and non-overlapping level, gender, and experience fields in portrait and landscape.
+- EPUBs with padding after `</html>` now finish parsing normally, and ZIP read errors can no longer underflow into unsafe buffer lengths.
+- KOReader authentication and sync now keep Wi-Fi awake for the transaction and skip a redundant NTP wait.
 - Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
 - The private firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
 - Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.

@@ -7,9 +7,9 @@
 #include <array>
 #include <atomic>
 #include <string>
-#include <vector>
 
 #include "ControlsOptionsActivity.h"
+#include "ReaderMenuItems.h"
 #include "ReaderOptionsActivity.h"
 #include "activities/Activity.h"
 #include "components/OptionPopup.h"
@@ -19,35 +19,7 @@ struct Rect;
 
 class EpubReaderMenuActivity final : public Activity {
  public:
-  // Menu actions available from the reader menu.
-  enum class MenuAction {
-    SELECT_CHAPTER,
-    FOOTNOTES,
-    GO_TO_PERCENT,
-    AUTO_PAGE_TURN,
-    ROTATE_SCREEN,
-    SCREENSHOT,
-    DISPLAY_QR,
-    GO_HOME,
-    SYNC,
-    NEARBY_POSITION_SYNC,
-    SEND_NEARBY_BOOK,
-    DELETE_STATS,
-    DELETE_CACHE,
-    RESET_READING_PACE,
-    READING_STATS,
-    TOGGLE_COMPLETED,
-    READER_OPTIONS,
-    CONTROLS_OPTIONS,
-    BOOKMARK_TOGGLE,
-    VIEW_BOOKMARKS,
-    DELETE_BOOKMARKS,
-    SAVE_CLIPPING,
-    VIEW_CLIPPINGS,
-    LOOKUP,
-    LOOKUP_HISTORY,
-    SET_BOOK_DICTIONARY
-  };
+  using MenuAction = ReaderMenuAction;
 
   explicit EpubReaderMenuActivity(
       GfxRenderer& renderer, MappedInputManager& mappedInput, const std::string& title, const int currentPage,
@@ -77,11 +49,6 @@ class EpubReaderMenuActivity final : public Activity {
   bool allowGlobalHomeGesture() const override { return false; }
 
  private:
-  struct MenuItem {
-    MenuAction action;
-    StrId labelId;
-  };
-
   enum class MenuTab : uint8_t { Main = 0, Bookmarks = 1, Settings = 2 };
   static constexpr size_t MAIN_TAB_INDEX = 0;
   static constexpr size_t BOOKMARKS_TAB_INDEX = 1;
@@ -90,12 +57,7 @@ class EpubReaderMenuActivity final : public Activity {
   static constexpr size_t TOUCH_LOCK_ICON_INDEX = MENU_TAB_COUNT;
   static constexpr size_t TOUCH_HOME_ICON_INDEX = MENU_TAB_COUNT + 1;
   static constexpr size_t TOUCH_ICON_COUNT = MENU_TAB_COUNT + 1;
-  using TabMenuItems = std::array<std::vector<MenuItem>, MENU_TAB_COUNT>;
-
-  static TabMenuItems buildMenuItems(bool hasFootnotes, bool hasBookmarks, bool hasClippings,
-                                     bool isCurrentPageBookmarked, bool isBookCompleted, bool showReadingPaceReset,
-                                     bool hasDictionary);
-  [[nodiscard]] const std::vector<MenuItem>& activeMenuItems() const;
+  [[nodiscard]] const ReaderMenuItemList& activeMenuItems() const;
   [[nodiscard]] size_t activeTabIndex() const { return static_cast<size_t>(activeTab); }
   void cycleActiveTab();
   void moveActiveTab(bool forward);
@@ -116,7 +78,9 @@ class EpubReaderMenuActivity final : public Activity {
   void buildMenuScreen(UiApp::ScreenType& screen);
 
   // Fixed menu layout, except for rows tied to toggles inside this menu.
-  TabMenuItems menuItems;
+  ReaderMenuTabs menuItems;
+  std::array<freeink::ui::ListItem, READER_MENU_MAX_ITEMS> uiListItems{};
+  char autoTurnValue[12]{};
 
   int selectedIndex = -1;
   MenuTab activeTab = MenuTab::Main;
@@ -125,8 +89,12 @@ class EpubReaderMenuActivity final : public Activity {
   OptionPopup optionPopup;
   std::string title = "Reader Menu";
   uint8_t pendingOrientation = 0;
-  const std::vector<StrId> orientationLabels = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_INVERTED,
-                                                StrId::STR_LANDSCAPE_CCW};
+  inline static constexpr std::array<StrId, 4> orientationLabels = {
+      StrId::STR_PORTRAIT,
+      StrId::STR_LANDSCAPE_CW,
+      StrId::STR_INVERTED,
+      StrId::STR_LANDSCAPE_CCW,
+  };
   int currentPage = 0;
   int totalPages = 0;
   int bookProgressPercent = 0;

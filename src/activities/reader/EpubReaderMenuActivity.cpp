@@ -1,10 +1,13 @@
 #include "EpubReaderMenuActivity.h"
 
+#include <Arduino.h>
 #include <FreeInkUIIcon.h>
 #include <GfxRenderer.h>
 #include <I18n.h>
+#include <Memory.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 
 #include "ClippingStore.h"
@@ -174,8 +177,15 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
     ReaderOptionsActivity::DictionaryFontChangedCallback dictionaryFontChangedCallback,
     void* dictionaryFontChangedContext)
     : Activity("EpubReaderMenu", renderer, mappedInput),
-      menuItems(buildMenuItems(hasFootnotes, hasBookmarks, hasClippings, isCurrentPageBookmarked, isBookCompleted,
-                               showReadingPaceReset, hasDictionary)),
+      menuItems(buildReaderMenuItems({
+          .hasFootnotes = hasFootnotes,
+          .hasDictionary = hasDictionary,
+          .hasBookmarks = hasBookmarks,
+          .hasClippings = hasClippings,
+          .isCurrentPageBookmarked = isCurrentPageBookmarked,
+          .isBookCompleted = isBookCompleted,
+          .showReadingPaceReset = showReadingPaceReset,
+      })),
       title(title),
       pendingOrientation(currentOrientation),
       currentPage(currentPage),
@@ -203,58 +213,6 @@ EpubReaderMenuActivity::EpubReaderMenuActivity(
   }
 }
 
-EpubReaderMenuActivity::TabMenuItems EpubReaderMenuActivity::buildMenuItems(
-    bool hasFootnotes, bool hasBookmarks, bool hasClippings, bool isCurrentPageBookmarked, bool isBookCompleted,
-    bool showReadingPaceReset, bool hasDictionary) {
-  TabMenuItems items;
-  auto& mainItems = items[MAIN_TAB_INDEX];
-  auto& bookmarkItems = items[BOOKMARKS_TAB_INDEX];
-  auto& settingsItems = items[SETTINGS_TAB_INDEX];
-
-  mainItems.reserve(9 + (hasFootnotes ? 1u : 0u) + (hasDictionary ? 2u : 0u));
-  bookmarkItems.reserve(9 + (hasBookmarks ? 2u : 0u) + (hasClippings ? 1u : 0u));
-  settingsItems.reserve(3 + (showReadingPaceReset ? 1u : 0u));
-
-  if (hasFootnotes) {
-    mainItems.push_back({MenuAction::FOOTNOTES, StrId::STR_FOOTNOTES});
-  }
-  if (hasDictionary) {
-    mainItems.push_back({MenuAction::LOOKUP, StrId::STR_LOOKUP});
-    mainItems.push_back({MenuAction::LOOKUP_HISTORY, StrId::STR_LOOKUP_HISTORY});
-  }
-  mainItems.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
-  mainItems.push_back({MenuAction::READER_OPTIONS, StrId::STR_READER_OPTIONS});
-  mainItems.push_back({MenuAction::CONTROLS_OPTIONS, StrId::STR_CAT_CONTROLS});
-  mainItems.push_back({MenuAction::GO_TO_PERCENT, StrId::STR_GO_TO_PERCENT});
-  mainItems.push_back({MenuAction::AUTO_PAGE_TURN, StrId::STR_AUTO_TURN_INTERVAL_SECONDS});
-  mainItems.push_back({MenuAction::READING_STATS, StrId::STR_READING_STATS});
-  mainItems.push_back(
-      {MenuAction::TOGGLE_COMPLETED, isBookCompleted ? StrId::STR_MARK_UNFINISHED : StrId::STR_MARK_FINISHED});
-  bookmarkItems.push_back({MenuAction::SAVE_CLIPPING, StrId::STR_SAVE_CLIPPING});
-  if (hasClippings) {
-    bookmarkItems.push_back({MenuAction::VIEW_CLIPPINGS, StrId::STR_VIEW_CLIPPINGS});
-  }
-  bookmarkItems.push_back(
-      {MenuAction::BOOKMARK_TOGGLE, isCurrentPageBookmarked ? StrId::STR_REMOVE_BOOKMARK : StrId::STR_ADD_BOOKMARK});
-  if (hasBookmarks) {
-    bookmarkItems.push_back({MenuAction::VIEW_BOOKMARKS, StrId::STR_VIEW_BOOKMARKS});
-    bookmarkItems.push_back({MenuAction::DELETE_BOOKMARKS, StrId::STR_DELETE_BOOKMARKS});
-  }
-  bookmarkItems.push_back({MenuAction::SYNC, StrId::STR_SYNC_PROGRESS});
-  bookmarkItems.push_back({MenuAction::NEARBY_POSITION_SYNC, StrId::STR_NEARBY_POSITION_SYNC});
-  bookmarkItems.push_back({MenuAction::SEND_NEARBY_BOOK, StrId::STR_SEND_NEARBY_BOOK});
-  bookmarkItems.push_back({MenuAction::SCREENSHOT, StrId::STR_SCREENSHOT_BUTTON});
-  bookmarkItems.push_back({MenuAction::DISPLAY_QR, StrId::STR_DISPLAY_QR});
-
-  settingsItems.push_back({MenuAction::DELETE_STATS, StrId::STR_DELETE_BOOK_STATS});
-  settingsItems.push_back({MenuAction::DELETE_CACHE, StrId::STR_DELETE_CACHE});
-  settingsItems.push_back({MenuAction::SET_BOOK_DICTIONARY, StrId::STR_BOOK_DICTIONARY});
-  if (showReadingPaceReset) {
-    settingsItems.push_back({MenuAction::RESET_READING_PACE, StrId::STR_RESET_READING_PACE});
-  }
-  return items;
-}
-
 void EpubReaderMenuActivity::dictionaryFontChangedForMenu(void* ctx, const char* familyName, const uint8_t pointSize) {
   auto* self = static_cast<EpubReaderMenuActivity*>(ctx);
   if (!self) return;
@@ -280,8 +238,16 @@ void EpubReaderMenuActivity::dictionaryFontChangedForMenu(void* ctx, const char*
   }
 }
 
-const std::vector<EpubReaderMenuActivity::MenuItem>& EpubReaderMenuActivity::activeMenuItems() const {
-  return menuItems[activeTabIndex()];
+const ReaderMenuItemList& EpubReaderMenuActivity::activeMenuItems() const {
+  switch (activeTab) {
+    case MenuTab::Main:
+      return menuItems.main;
+    case MenuTab::Bookmarks:
+      return menuItems.bookmarks;
+    case MenuTab::Settings:
+      return menuItems.settings;
+  }
+  return menuItems.main;
 }
 
 void EpubReaderMenuActivity::focusTabRow() {
@@ -314,7 +280,7 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
   }
 
   const auto& items = activeMenuItems();
-  if (selectedIndex >= static_cast<int>(items.size())) {
+  if (selectedIndex >= static_cast<int>(items.count)) {
     focusTabRow();
     requestUpdate();
     return true;
@@ -337,12 +303,22 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
 
   if (selectedAction == MenuAction::READER_OPTIONS) {
     const auto before = captureReaderLayoutSettings();
-    startActivityForResult(std::make_unique<ReaderOptionsActivity>(
-                               renderer, mappedInput, saveReaderSettingsCallback, saveReaderSettingsContext,
-                               saveGlobalSettingsCallback, saveGlobalSettingsContext, beginGlobalSettingsEditCallback,
-                               beginGlobalSettingsEditContext, endGlobalSettingsEditCallback,
-                               endGlobalSettingsEditContext, stablePageNumbersAvailable, dictionaryFontFamilyName,
-                               dictionaryFontPointSize, hasDictionaryFontOverride, dictionaryFontChangedForMenu, this),
+    auto readerOptions = makeUniqueNoThrow<ReaderOptionsActivity>(
+        renderer, mappedInput, saveReaderSettingsCallback, saveReaderSettingsContext, saveGlobalSettingsCallback,
+        saveGlobalSettingsContext, beginGlobalSettingsEditCallback, beginGlobalSettingsEditContext,
+        endGlobalSettingsEditCallback, endGlobalSettingsEditContext, stablePageNumbersAvailable,
+        dictionaryFontFamilyName, dictionaryFontPointSize, hasDictionaryFontOverride, dictionaryFontChangedForMenu,
+        this);
+    if (!readerOptions) {
+      LOG_ERR("RMENU", "OOM: ReaderOptionsActivity (size=%u free=%u maxAlloc=%u)",
+              static_cast<unsigned>(sizeof(ReaderOptionsActivity)), ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+      GUI.drawPopup(renderer, tr(STR_MEMORY_ERROR));
+      renderer.displayBuffer();
+      delay(1000);
+      requestUpdate();
+      return true;
+    }
+    startActivityForResult(std::move(readerOptions),
                            [this, before](const ActivityResult& result) {
                              settingsChanged = settingsChanged || haveReaderLayoutSettingsChanged(before);
                              pendingOrientation = SETTINGS.orientation;  // sync in case orientation changed
@@ -356,7 +332,17 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
   }
 
   if (selectedAction == MenuAction::CONTROLS_OPTIONS) {
-    startActivityForResult(std::make_unique<ControlsOptionsActivity>(renderer, mappedInput),
+    auto controlsOptions = makeUniqueNoThrow<ControlsOptionsActivity>(renderer, mappedInput);
+    if (!controlsOptions) {
+      LOG_ERR("RMENU", "OOM: ControlsOptionsActivity (size=%u free=%u maxAlloc=%u)",
+              static_cast<unsigned>(sizeof(ControlsOptionsActivity)), ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+      GUI.drawPopup(renderer, tr(STR_MEMORY_ERROR));
+      renderer.displayBuffer();
+      delay(1000);
+      requestUpdate();
+      return true;
+    }
+    startActivityForResult(std::move(controlsOptions),
                            [this](const ActivityResult&) {
                              ActivityResult result;
                              result.isCancelled = true;
@@ -368,7 +354,18 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
   }
 
   if (selectedAction == MenuAction::VIEW_CLIPPINGS) {
-    startActivityForResult(std::make_unique<EpubReaderClippingListActivity>(renderer, mappedInput),
+    auto clippingList = makeUniqueNoThrow<EpubReaderClippingListActivity>(renderer, mappedInput);
+    if (!clippingList) {
+      LOG_ERR("RMENU", "OOM: EpubReaderClippingListActivity (size=%u free=%u maxAlloc=%u)",
+              static_cast<unsigned>(sizeof(EpubReaderClippingListActivity)), ESP.getFreeHeap(),
+              ESP.getMaxAllocHeap());
+      GUI.drawPopup(renderer, tr(STR_MEMORY_ERROR));
+      renderer.displayBuffer();
+      delay(1000);
+      requestUpdate();
+      return true;
+    }
+    startActivityForResult(std::move(clippingList),
                            [this](const ActivityResult& result) {
                              if (result.isCancelled) {
                                requestUpdate();
@@ -422,7 +419,7 @@ bool EpubReaderMenuActivity::handleTouchInput() {
 void EpubReaderMenuActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
   auto* self = static_cast<EpubReaderMenuActivity*>(user);
   const auto& items = self->activeMenuItems();
-  if (self->optionPopup.isActive() || event.value < 0 || event.value >= static_cast<int16_t>(items.size())) return;
+  if (self->optionPopup.isActive() || event.value < 0 || event.value >= static_cast<int16_t>(items.count)) return;
   self->selectedIndex = event.value;
   self->app.clearTapFlash();
   self->activateSelectedItem();
@@ -485,6 +482,7 @@ void EpubReaderMenuActivity::onEnter() {
   app.on(ACTION_ROW, &EpubReaderMenuActivity::onRowEvent, this);
   app.setScreen(&EpubReaderMenuActivity::menuScreen, this);
   requestUpdate();
+  LOG_DBG("RMENU", "Entered reader menu: free=%u maxAlloc=%u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 }
 
 void EpubReaderMenuActivity::onExit() {
@@ -536,7 +534,7 @@ void EpubReaderMenuActivity::loop() {
 
   // Swipes scroll the viewport; the selection stays put (it may scroll
   // off-screen) and button navigation pulls the view back to it.
-  const int menuCount = static_cast<int>(activeMenuItems().size());
+  const int menuCount = static_cast<int>(activeMenuItems().count);
   const auto swipe = mappedInput.wasSwipe();
   if (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down) {
     const int delta = swipe == MappedInputManager::SwipeDir::Up ? visibleRows : -visibleRows;
@@ -595,27 +593,28 @@ void EpubReaderMenuActivity::buildMenuScreen(UiApp::ScreenType& screen) {
                                       static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
                                       static_cast<int16_t>(contentBottom), static_cast<int16_t>(safe.x)});
 
-  const auto& activeItems = activeMenuItems();
-  std::vector<std::string> values(activeItems.size());
-  std::vector<fui::ListItem> items;
-  items.reserve(activeItems.size());
-  for (size_t i = 0; i < activeItems.size(); i++) {
+  const ReaderMenuItemList& activeItems = activeMenuItems();
+  autoTurnValue[0] = '\0';
+  for (uint8_t i = 0; i < activeItems.count; ++i) {
     const auto& menuItem = activeItems[i];
-    fui::ListItem item;
+    fui::ListItem& item = uiListItems[i];
+    item = {};
     item.label = I18N.get(menuItem.labelId);
     if (menuItem.action == MenuAction::ROTATE_SCREEN) {
       item.value = I18N.get(orientationLabels[pendingOrientation]);
     } else if (menuItem.action == MenuAction::AUTO_PAGE_TURN) {
-      if (autoPageTurnActive) values[i] = std::to_string(autoPageTurnIntervalSeconds);
-      item.value = values[i].empty() ? nullptr : values[i].c_str();
+      if (autoPageTurnActive) {
+        std::snprintf(autoTurnValue, sizeof(autoTurnValue), "%u",
+                      static_cast<unsigned>(autoPageTurnIntervalSeconds));
+        item.value = autoTurnValue;
+      }
     }
-    item.actionValue = static_cast<int16_t>(items.size());
-    items.push_back(item);
+    item.actionValue = static_cast<int16_t>(i);
   }
 
   fui::ListProps props;
-  props.items = items.data();
-  props.count = static_cast<uint16_t>(items.size());
+  props.items = uiListItems.data();
+  props.count = activeItems.count;
   props.selectedIndex = static_cast<int16_t>(selectedIndex);
   props.action = ACTION_ROW;
   props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
@@ -624,7 +623,7 @@ void EpubReaderMenuActivity::buildMenuScreen(UiApp::ScreenType& screen) {
   props.labelText.maxLines = 2;
   const auto rows = configureUiList(props, screen.theme(), screen.body());
   visibleRows = rows > 0 ? rows : 1;
-  topIndex = scrollListBy(topIndex, 0, visibleRows, static_cast<int>(activeItems.size()));  // clamp to range
+  topIndex = scrollListBy(topIndex, 0, visibleRows, static_cast<int>(activeItems.count));  // clamp to range
   props.topIndex = static_cast<uint16_t>(topIndex);
   screen.list(props);
 }
@@ -656,16 +655,17 @@ void EpubReaderMenuActivity::render(RenderLock&&) {
   }
 
   // Progress summary
-  std::string progressLine;
+  char progressLine[96]{};
   if (totalPages > 0) {
-    progressLine = std::string(tr(STR_CHAPTER_PREFIX)) + std::to_string(currentPage) + "/" +
-                   std::to_string(totalPages) + std::string(tr(STR_PAGES_SEPARATOR));
+    std::snprintf(progressLine, sizeof(progressLine), "%s%d/%d%s%s%d%%", tr(STR_CHAPTER_PREFIX), currentPage,
+                  totalPages, tr(STR_PAGES_SEPARATOR), tr(STR_BOOK_PREFIX), bookProgressPercent);
+  } else {
+    std::snprintf(progressLine, sizeof(progressLine), "%s%d%%", tr(STR_BOOK_PREFIX), bookProgressPercent);
   }
-  progressLine += std::string(tr(STR_BOOK_PREFIX)) + std::to_string(bookProgressPercent) + "%";
   GUI.drawSubHeader(renderer,
                     Rect{screen.x, screen.y + metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput),
                          screen.width, metrics.tabBarHeight},
-                    progressLine.c_str());
+                    progressLine);
 
   const int tabBarY = tabsAtBottom ? screen.y + screen.height - tabBarHeight
                                    : screen.y + metrics.topPadding +

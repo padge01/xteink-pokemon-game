@@ -2228,19 +2228,31 @@ void EpubReaderActivity::openReaderMenu() {
 
   pauseReadingPaceTimer("reader_menu");
   const BookReaderSettingsData bookSettings = loadBookReaderSettingsFile(epub->getCachePath());
+  LOG_DBG("EPUB", "Reader menu heap before open: free=%u maxAlloc=%u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+  // The menu outlives this stack frame and may be requested while EPUB layout
+  // has fragmented C3 heap, so this owned allocation must be fallible.
+  auto menu = makeUniqueNoThrow<EpubReaderMenuActivity>(
+      renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent, SETTINGS.orientation,
+      !previewActive && !currentPageFootnotes.empty(),
+      !previewActive && epub && Dictionary::exists(epub->getCachePath().c_str()), !BOOKMARKS.getBookmarks().empty(),
+      CLIPPINGS.hasClippings(),
+      !previewActive && BOOKMARKS.hasBookmarkForPage(bmSpine, bmProgress, bookmarkPageCount), isBookCompleted,
+      automaticPageTurnActive, getAutoPageTurnIntervalSeconds(),
+      SETTINGS.statusBarTimeLeft != CrossPointSettings::STATUS_BAR_TIME_LEFT::TIME_LEFT_HIDE,
+      saveReaderOptionsForBook, this, saveGlobalSettingsForBookReader, this, beginGlobalSettingsEditForBookReader, this,
+      !previewActive && epub && epub->hasStablePageNumbers(), endGlobalSettingsEditForBookReader, this,
+      bookSettings.dictionarySdFontFamilyName, bookSettings.dictionaryFontPointSize,
+      bookSettings.hasDictionaryFontOverride, saveDictionaryFontForBookReader, this);
+  if (!menu) {
+    LOG_ERR("EPUB", "Reader menu allocation failed: free=%u maxAlloc=%u", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
+    resumeReadingPaceTimer("reader_menu_alloc_failed");
+    RenderLock lock(*this);
+    GUI.drawPopup(renderer, tr(STR_MEMORY_ERROR));
+    renderer.displayBuffer();
+    return;
+  }
   startActivityForResult(
-      std::make_unique<EpubReaderMenuActivity>(
-          renderer, mappedInput, epub->getTitle(), currentPage, totalPages, bookProgressPercent, SETTINGS.orientation,
-          !previewActive && !currentPageFootnotes.empty(),
-          !previewActive && epub && Dictionary::exists(epub->getCachePath().c_str()), !BOOKMARKS.getBookmarks().empty(),
-          CLIPPINGS.hasClippings(),
-          !previewActive && BOOKMARKS.hasBookmarkForPage(bmSpine, bmProgress, bookmarkPageCount), isBookCompleted,
-          automaticPageTurnActive, getAutoPageTurnIntervalSeconds(),
-          SETTINGS.statusBarTimeLeft != CrossPointSettings::STATUS_BAR_TIME_LEFT::TIME_LEFT_HIDE,
-          saveReaderOptionsForBook, this, saveGlobalSettingsForBookReader, this, beginGlobalSettingsEditForBookReader,
-          this, !previewActive && epub && epub->hasStablePageNumbers(), endGlobalSettingsEditForBookReader, this,
-          bookSettings.dictionarySdFontFamilyName, bookSettings.dictionaryFontPointSize,
-          bookSettings.hasDictionaryFontOverride, saveDictionaryFontForBookReader, this),
+      std::move(menu),
       [this](const ActivityResult& result) {
         if (const auto* clipping = std::get_if<ClippingJumpResult>(&result.data)) {
           applyOrientation(clipping->orientation);

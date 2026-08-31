@@ -14,6 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BOOK = ROOT / "test" / "epubs" / "test_reader_rendering_matrix.epub"
+POKEMON_ASSETS = ROOT / "fs_" / ".crosspoint" / "pokemon"
 CRASH_PATTERNS = (
     "std::bad_alloc",
     "terminating due to uncaught exception",
@@ -58,6 +59,32 @@ def prepare_fs(temp_root: Path, book: Path) -> str:
     return f"/books/{book.name}"
 
 
+def prepare_pokemon_assets(temp_root: Path) -> None:
+    if not POKEMON_ASSETS.is_dir():
+        raise FileNotFoundError(f"Pokemon assets not found: {POKEMON_ASSETS}")
+    target = temp_root / "fs_" / ".crosspoint" / "pokemon"
+    shutil.copytree(POKEMON_ASSETS, target)
+
+
+def build_smoke_environment(
+    base_env: dict[str, str], args: argparse.Namespace, storage_root: Path, simulator_book_path: str
+) -> dict[str, str]:
+    env = base_env.copy()
+    env["CROSSPOINT_SIM_SD"] = str(storage_root)
+    env["CROSSINK_SIMULATOR_SMOKE_TEST"] = "1"
+    env["CROSSINK_SIMULATOR_SMOKE_BOOK"] = simulator_book_path
+    env["CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS"] = str(args.page_turns)
+    if args.pokemon:
+        env["CROSSINK_SIMULATOR_START_POKEMON"] = "1"
+    if args.landscape:
+        env["CROSSINK_SIMULATOR_POKEMON_LANDSCAPE"] = "1"
+    if args.theme:
+        env["CROSSINK_SIMULATOR_SMOKE_THEME"] = str(THEMES[args.theme])
+    if args.headless:
+        env.setdefault("SDL_VIDEODRIVER", "dummy")
+    return env
+
+
 def run_smoke(args: argparse.Namespace) -> int:
     book = Path(args.book).resolve()
     if not book.exists():
@@ -76,15 +103,10 @@ def run_smoke(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="crossink-sim-smoke-") as temp_dir_name:
         temp_root = Path(temp_dir_name)
         simulator_book_path = prepare_fs(temp_root, book)
+        if args.pokemon:
+            prepare_pokemon_assets(temp_root)
 
-        env = os.environ.copy()
-        env["CROSSINK_SIMULATOR_SMOKE_TEST"] = "1"
-        env["CROSSINK_SIMULATOR_SMOKE_BOOK"] = simulator_book_path
-        env["CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS"] = str(args.page_turns)
-        if args.theme:
-            env["CROSSINK_SIMULATOR_SMOKE_THEME"] = str(THEMES[args.theme])
-        if args.headless:
-            env.setdefault("SDL_VIDEODRIVER", "dummy")
+        env = build_smoke_environment(os.environ, args, temp_root / "fs_", simulator_book_path)
 
         print(f"Running simulator smoke test with isolated fs_: {temp_root / 'fs_'}", flush=True)
         proc = subprocess.run(
@@ -108,6 +130,10 @@ def run_smoke(args: argparse.Namespace) -> int:
             print(f"Simulator smoke test output contained crash pattern: {pattern}", file=sys.stderr)
             return 2
 
+    if args.pokemon and "[PKART] Missing Pokemon art" in proc.stdout:
+        print("Pokemon smoke test reported missing artwork", file=sys.stderr)
+        return 2
+
     if "Simulator smoke test passed" not in proc.stdout:
         print("Simulator smoke test did not print its success marker", file=sys.stderr)
         return 2
@@ -118,15 +144,22 @@ def run_smoke(args: argparse.Namespace) -> int:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--book", default=str(DEFAULT_BOOK), help="EPUB fixture to copy into the isolated simulator fs_")
-    parser.add_argument("--env", choices=("simulator", "sticky-simulator", "x4-pro-simulator"), default="simulator",
+    parser.add_argument("--env", choices=("simulator", "sticky-simulator", "x4-pro-simulator", "pokemon-simulator-X3"), default="simulator",
                         help="PlatformIO simulator environment to build and run")
     parser.add_argument("--timeout", type=int, default=45, help="Seconds before the simulator run is treated as hung")
     parser.add_argument("--page-turns", type=int, default=2, help="Number of EPUB page-forward taps to run")
     parser.add_argument("--theme", choices=sorted(THEMES), help="UI theme to use during the smoke test")
+    parser.add_argument("--pokemon", action="store_true", help="Run the Pokemon onboarding and collection smoke route")
+    parser.add_argument("--landscape", action="store_true", help="Run the Pokemon route in landscape orientation")
     parser.add_argument("--no-build", dest="build", action="store_false", help="Run the existing simulator binary")
     parser.add_argument("--window", dest="headless", action="store_false", help="Show the SDL window instead of using dummy video")
     parser.set_defaults(build=True, headless=True)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.landscape and not args.pokemon:
+        parser.error("--landscape requires --pokemon")
+    if args.pokemon and args.env != "pokemon-simulator-X3":
+        parser.error("--pokemon requires --env pokemon-simulator-X3")
+    return args
 
 
 def main() -> int:
