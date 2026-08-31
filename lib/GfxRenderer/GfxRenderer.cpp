@@ -1958,13 +1958,12 @@ void GfxRenderer::drawIconInverted(const uint8_t bitmap[], const int x, const in
   }
 }
 
-void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, const int maxWidth, const int maxHeight,
-                             const float cropX, const float cropY) const {
-  if (fontCacheManager_ && fontCacheManager_->isScanning()) return;
+bool GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, const int maxWidth, const int maxHeight,
+                             const float cropX, const float cropY, const BitmapBwPolicy bwPolicy) const {
+  if (fontCacheManager_ && fontCacheManager_->isScanning()) return false;
   // For 1-bit bitmaps, use optimized 1-bit rendering path (no crop support for 1-bit)
   if (bitmap.is1Bit() && cropX == 0.0f && cropY == 0.0f) {
-    drawBitmap1Bit(bitmap, x, y, maxWidth, maxHeight);
-    return;
+    return drawBitmap1Bit(bitmap, x, y, maxWidth, maxHeight);
   }
 
   float scale = 1.0f;
@@ -1994,16 +1993,18 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
   }
 
   BitmapScratchLock scratchLock(*this);
-  if (!scratchLock.isLocked()) return;
+  if (!scratchLock.isLocked()) return false;
 
   // Calculate output row size (2 bits per pixel, packed into bytes)
   // IMPORTANT: Use int, not uint8_t, to avoid overflow for images > 1020 pixels wide
   const int outputRowSize = (bitmap.getWidth() + 3) / 4;
   if (!ensureBitmapScratchBuffers(outputRowSize, bitmap.getRowBytes())) {
-    return;
+    return false;
   }
   auto* outputRow = bitmapScratchOutputRow_;
   auto* rowBytes = bitmapScratchRowBytes_;
+  const bool useBwDither = renderMode == BW && bwPolicy == BitmapBwPolicy::DitherNativeGray;
+  int lastDitherScreenY = -1;
 
   for (int bmpY = 0; bmpY < (bitmap.getHeight() - cropPixY); bmpY++) {
     // The BMP's (0, 0) is the bottom-left corner (if the height is positive, top-left if negative).
@@ -2019,7 +2020,7 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
     if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
       LOG_ERR("GFX", "Failed to read row %d from bitmap", bmpY);
-      return;
+      return false;
     }
 
     if (screenY < 0) {
@@ -2030,6 +2031,14 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       // Skip the row if it's outside the crop area
       continue;
     }
+
+    // Downscaling can map several source rows to the same display row. For
+    // dithered 1-bit output, sampling it once avoids accumulating every dark
+    // source pixel into an artificially black destination pixel.
+    if (useBwDither && screenY == lastDitherScreenY) continue;
+    if (useBwDither) lastDitherScreenY = screenY;
+
+    int lastDitherScreenX = -1;
 
     for (int bmpX = cropPixX; bmpX < bitmap.getWidth() - cropPixX; bmpX++) {
       int screenX = bmpX - cropPixX;
@@ -2043,11 +2052,15 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       if (screenX < 0) {
         continue;
       }
+      if (useBwDither && screenX == lastDitherScreenX) continue;
+      if (useBwDither) lastDitherScreenX = screenX;
 
       const uint8_t val = outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8)) & 0x3;
 
-      if (renderMode == BW && val < 3) {
-        drawPixel(screenX, screenY);
+      if (renderMode == BW) {
+        const bool drawBlack =
+            useBwDither ? ditherNativeGrayTo1Bit(val, screenX, screenY) == 0 : val < 3;
+        if (drawBlack) drawPixel(screenX, screenY);
       } else if (renderMode == GRAYSCALE_MSB && (val == 1 || val == 2)) {
         drawPixel(screenX, screenY, false);
       } else if (renderMode == GRAYSCALE_LSB && val == 1) {
@@ -2055,9 +2068,10 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       }
     }
   }
+  return true;
 }
 
-void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
+bool GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
                                  const int maxHeight) const {
   float scale = 1.0f;
   bool isScaled = false;
@@ -2071,12 +2085,12 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
   }
 
   BitmapScratchLock scratchLock(*this);
-  if (!scratchLock.isLocked()) return;
+  if (!scratchLock.isLocked()) return false;
 
   // For 1-bit BMP, output is still 2-bit packed (for consistency with readNextRow)
   const int outputRowSize = (bitmap.getWidth() + 3) / 4;
   if (!ensureBitmapScratchBuffers(outputRowSize, bitmap.getRowBytes())) {
-    return;
+    return false;
   }
   auto* outputRow = bitmapScratchOutputRow_;
   auto* rowBytes = bitmapScratchRowBytes_;
@@ -2085,7 +2099,7 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
     // Read rows sequentially using readNextRow
     if (bitmap.readNextRow(outputRow, rowBytes) != BmpReaderError::Ok) {
       LOG_ERR("GFX", "Failed to read row %d from 1-bit bitmap", bmpY);
-      return;
+      return false;
     }
 
     // Calculate screen Y based on whether BMP is top-down or bottom-up
@@ -2118,6 +2132,7 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
       // White pixels (val == 3) are not drawn (leave background)
     }
   }
+  return true;
 }
 
 void GfxRenderer::drawPerspectiveBitmap(const Bitmap& bitmap, const int x, const int y, const int w, const int hL,

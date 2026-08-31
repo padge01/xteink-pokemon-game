@@ -20,7 +20,8 @@ void drawFallback(const GfxRenderer& renderer, const Rect bounds) {
                     bounds.y + (bounds.height - height) / 2, mark);
 }
 
-bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, const bool fallback) {
+bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, const bool fallback,
+              const GfxRenderer::BitmapBwPolicy bwPolicy) {
   if (path == nullptr || bounds.width <= 0 || bounds.height <= 0) return false;
   FsFile file;
   if (!Storage.openFileForRead("PKART", path, file)) {
@@ -29,15 +30,22 @@ bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, 
     return false;
   }
   Bitmap bitmap(file);
-  const bool valid = bitmap.parseHeaders() == BmpReaderError::Ok;
-  if (valid) {
-    renderer.drawBitmap(bitmap, bounds.x, bounds.y, bounds.width, bounds.height);
-  } else {
+  const BmpReaderError parseResult = bitmap.parseHeaders();
+  if (parseResult != BmpReaderError::Ok) {
     LOG_ERR("PKART", "Invalid Pokemon art: %s", path);
+    if (fallback) drawFallback(renderer, bounds);
+    file.close();
+    return false;
+  }
+
+  const bool rendered = renderer.drawBitmap(bitmap, bounds.x, bounds.y, bounds.width, bounds.height, 0.0f, 0.0f,
+                                            bwPolicy);
+  if (!rendered) {
+    LOG_ERR("PKART", "Could not render Pokemon art: %s", path);
     if (fallback) drawFallback(renderer, bounds);
   }
   file.close();
-  return valid;
+  return rendered;
 }
 
 }  // namespace
@@ -45,13 +53,15 @@ bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, 
 bool drawPokemonSpeciesArt(const GfxRenderer& renderer, const uint16_t speciesId, const bool hero,
                            const Rect bounds, const bool fallback) {
   char path[64]{};
-  return drawPath(renderer, pokemonSpeciesArtPath(speciesId, hero, path, sizeof(path)), bounds, fallback);
+  return drawPath(renderer, pokemonSpeciesArtPath(speciesId, hero, path, sizeof(path)), bounds, fallback,
+                  GfxRenderer::BitmapBwPolicy::ExistingThreshold);
 }
 
 bool drawPokemonPokedexArt(const GfxRenderer& renderer, const uint16_t speciesId, const char* speciesName,
                            const Rect bounds, const bool fallback) {
   char path[64]{};
-  return drawPath(renderer, pokemonPokedexArtPath(speciesId, speciesName, path, sizeof(path)), bounds, fallback);
+  return drawPath(renderer, pokemonPokedexArtPath(speciesId, speciesName, path, sizeof(path)), bounds, fallback,
+                  GfxRenderer::BitmapBwPolicy::DitherNativeGray);
 }
 
 bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, const bool hero,
@@ -59,7 +69,7 @@ bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, c
   char path[80]{};
   const char* pathValue = pokemonItemArtPath(item, hero, path, sizeof(path));
   if (pathValue == nullptr && item == EvolutionItem::LinkCable) return false;
-  return drawPath(renderer, pathValue, bounds, fallback);
+  return drawPath(renderer, pathValue, bounds, fallback, GfxRenderer::BitmapBwPolicy::ExistingThreshold);
 }
 
 }  // namespace pokemon

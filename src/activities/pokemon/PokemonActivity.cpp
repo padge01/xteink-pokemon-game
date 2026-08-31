@@ -227,17 +227,17 @@ void PokemonActivity::finishStarter(const char* nickname) {
   setScreen(Screen::Menu);
 }
 
-void PokemonActivity::openNickname(const uint32_t recordId, const bool starter) {
+void PokemonActivity::openNickname(const uint32_t recordId, const bool starter, const Screen cancelScreen) {
   auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_POKEMON_NICKNAME), "", 32,
                                                             InputType::Text);
   if (!keyboard) {
     LOG_ERR("PokemonActivity", "Could not allocate nickname keyboard");
-    showMessage(tr(STR_POKEMON_SAVE_ERROR), starter ? Screen::Starter : Screen::Menu);
+    showMessage(tr(STR_POKEMON_SAVE_ERROR), cancelScreen);
     return;
   }
-  startActivityForResult(std::move(keyboard), [this, recordId, starter](const ActivityResult& result) {
+  startActivityForResult(std::move(keyboard), [this, recordId, starter, cancelScreen](const ActivityResult& result) {
     if (result.isCancelled) {
-      setScreen(starter || recordId == nicknameRecordId_ ? Screen::NicknameQuestion : Screen::Actions);
+      setScreen(cancelScreen);
       return;
     }
     const auto* keyboardResult = std::get_if<KeyboardResult>(&result.data);
@@ -246,7 +246,7 @@ void PokemonActivity::openNickname(const uint32_t recordId, const bool starter) 
       finishStarter(keyboardResult->text.c_str());
     } else if (service_.renamePokemon(recordId, keyboardResult->text) == pokemon::ServiceStatus::Ok) {
       if (!refreshSnapshot()) return;
-      nicknameRecordId_ = 0;
+      nicknamePrompt_ = {};
       setScreen(Screen::Menu);
     } else {
       showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Menu);
@@ -262,15 +262,17 @@ void PokemonActivity::activate() {
       return;
     case Screen::Gender:
       starterGender_ = selected_ == 0 ? pokemon::Gender::Male : pokemon::Gender::Female;
-      nicknameRecordId_ = 0;
+      nicknamePrompt_ = pokemon::PokemonPromptContext::forStarter(starterSpecies_);
       snprintf(message_, sizeof(message_), tr(STR_POKEMON_NICKNAME_QUESTION), speciesName(starterSpecies_));
       setScreen(Screen::NicknameQuestion);
       return;
     case Screen::NicknameQuestion:
-      if (selected_ == 0) openNickname(nicknameRecordId_, nicknameRecordId_ == 0);
-      else if (nicknameRecordId_ == 0) finishStarter("");
+      if (selected_ == 0) {
+        openNickname(nicknamePrompt_.recordId, nicknamePrompt_.isStarter(), Screen::NicknameQuestion);
+      }
+      else if (nicknamePrompt_.isStarter()) finishStarter("");
       else {
-        nicknameRecordId_ = 0;
+        nicknamePrompt_ = {};
         setScreen(Screen::Menu);
       }
       return;
@@ -325,7 +327,7 @@ void PokemonActivity::activate() {
           return;
         }
         case pokemon::CollectionAction::Rename:
-          openNickname(focusedRecordId_, false);
+          openNickname(focusedRecordId_, false, Screen::Actions);
           return;
         case pokemon::CollectionAction::EvolutionPrompts: {
           pokemon::PokemonRecord record{};
@@ -392,7 +394,7 @@ void PokemonActivity::activate() {
         }
         if (!refreshSnapshot()) return;
         if (caught != 0) {
-          nicknameRecordId_ = caught;
+          nicknamePrompt_ = pokemon::PokemonPromptContext::forCaught(pending.speciesId, caught);
           snprintf(message_, sizeof(message_), tr(STR_POKEMON_NICKNAME_QUESTION), speciesName(pending.speciesId));
           setScreen(Screen::NicknameQuestion);
         } else setScreen(Screen::Menu);
@@ -439,8 +441,11 @@ void PokemonActivity::goBack() {
       setScreen(Screen::Starter);
       return;
     case Screen::NicknameQuestion:
-      if (nicknameRecordId_ == 0) setScreen(Screen::Gender);
-      else setScreen(Screen::Menu);
+      if (nicknamePrompt_.isStarter()) setScreen(Screen::Gender);
+      else {
+        nicknamePrompt_ = {};
+        setScreen(Screen::Menu);
+      }
       return;
     case Screen::Summary:
     case Screen::Actions:
@@ -698,11 +703,17 @@ void PokemonActivity::renderFocused() {
     const Rect cardBounds{marginLeft + (availableWidth - cardWidth) / 2 + 4,
                           marginTop + (availableHeight - cardHeight) / 2 + 4, cardWidth, cardHeight};
     const char* name = speciesName(pokedexSpecies_);
-    if (!pokemon::drawPokemonPokedexArt(renderer, pokedexSpecies_, name, cardBounds, false)) {
+    const bool rendered = pokemon::drawPokemonPokedexArt(renderer, pokedexSpecies_, name, cardBounds, false);
+    if (!rendered) {
       pokemon::drawPokemonSpeciesArt(renderer, pokedexSpecies_, true,
                                      Rect{(renderer.getScreenWidth() - 120) / 2, marginTop + 80, 120, 90});
       centered(renderer, UI_12_FONT_ID, marginTop + 190, tr(STR_POKEMON_LOAD_ERROR), EpdFontFamily::BOLD);
     }
+#if defined(SIMULATOR)
+    else {
+      LOG_INF("SMOKE", "Pokemon Pokedex detail card rendered");
+    }
+#endif
     return;
   }
   const int contentTop = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) + 14;
@@ -730,16 +741,26 @@ void PokemonActivity::renderFocused() {
                              : screen_ == Screen::ResetFirst ? tr(STR_POKEMON_RESET_QUESTION) : tr(STR_POKEMON_RESET_CONFIRM);
     centered(renderer, UI_12_FONT_ID, contentTop + 18, prompt, EpdFontFamily::BOLD);
     if (screen_ == Screen::NicknameQuestion) {
-      pokemon::drawPokemonSpeciesArt(renderer, starterSpecies_, true,
+      pokemon::drawPokemonSpeciesArt(renderer, nicknamePrompt_.speciesId, true,
                                      Rect{(renderer.getScreenWidth() - 120) / 2, contentTop + 82, 120, 90});
     }
     return;
   }
   if (screen_ == Screen::Summary) {
     pokemon::PokemonRecord record{};
-    if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) return;
+    if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) {
+      LOG_ERR("PokemonActivity", "Failed to load summary record %lu",
+              static_cast<unsigned long>(focusedRecordId_));
+      centered(renderer, UI_12_FONT_ID, contentTop + 100, tr(STR_POKEMON_LOAD_ERROR), EpdFontFamily::BOLD);
+      return;
+    }
     const pokemon::SpeciesData* species = pokemon::speciesData(record.speciesId);
-    if (species == nullptr) return;
+    if (species == nullptr) {
+      LOG_ERR("PokemonActivity", "Summary record %lu has invalid species %u",
+              static_cast<unsigned long>(focusedRecordId_), record.speciesId);
+      centered(renderer, UI_12_FONT_ID, contentTop + 100, tr(STR_POKEMON_LOAD_ERROR), EpdFontFamily::BOLD);
+      return;
+    }
     const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
     const int artX = landscape ? 28 : (renderer.getScreenWidth() - 120) / 2;
     const int artY = contentTop + 8;

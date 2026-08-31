@@ -11,6 +11,18 @@ uint8_t quantizeSimple(int gray);
 uint8_t quantize1bit(int gray, int x, int y);
 int adjustPixel(int gray);
 
+// Converts Bitmap::readNextRow's native 2-bit grayscale value to a stable
+// 1-bit e-ink pixel without allocating an error-diffusion buffer.
+inline uint8_t ditherNativeGrayTo1Bit(const uint8_t nativeGray, const int x, const int y) {
+  if (nativeGray == 0) return 0;
+  if (nativeGray >= 3) return 1;
+
+  uint32_t hash = static_cast<uint32_t>(x) * 374761393u + static_cast<uint32_t>(y) * 668265263u;
+  hash = (hash ^ (hash >> 13)) * 1274126177u;
+  const int threshold = 64 + static_cast<int>((hash >> 24) / 2);  // 64-191
+  return static_cast<int>(nativeGray) * 85 >= threshold ? 1 : 0;
+}
+
 enum class BmpRowOrder { BottomUp, TopDown };
 
 // Populates a 1-bit BMP header in the provided memory.

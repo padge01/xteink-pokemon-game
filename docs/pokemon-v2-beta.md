@@ -66,24 +66,38 @@ books or reading statistics.
 The artwork is for private demonstration only and is not part of public source
 or ordinary firmware releases. See [Third-party assets](third-party-assets.md).
 
+Pokédex detail cards are streamed one row at a time from `/sleep` and converted
+from their existing grayscale palette to the X3's 1-bit display with a stable,
+allocation-free dither. This preserves midtone detail without loading a second
+framebuffer or changing the small menu and dashboard sprites.
+
 ## X3 release checklist
 
 Software builds and simulator checks cannot prove the firmware is safe on the
 physical ESP32-C3. Before treating a package as install-ready:
 
+The simulator injects logical front and side button actions. It does not test
+the X3's raw GPIO mapping, physical switch behavior, or actual e-ink pixels.
+
 1. Boot with the artwork installed and complete starter, gender, and nickname
-   choices using both the side buttons and front buttons.
+   choices using both the side buttons and front buttons. Confirm the Pokémon
+   title is fully below the header rule and a selected row does not erase its
+   sprite.
 2. Open and close Pokémon repeatedly from Home, including immediately after
    leaving a book. Confirm no crash report is created.
 3. With one Party member, confirm Move and Deposit are absent. After adding a
    second member, confirm Move reorders only occupied slots and Deposit cannot
    empty the Party.
 4. Verify list wrapping, Pokédex paging beyond the first screen, PC sorting, and
-   the two-step reset.
+   the two-step reset. Open a seen Pokédex entry and confirm its `/sleep` card
+   is detailed rather than solid black; Nidoran♀ and Nidoran♂ should resolve to
+   their `-f` and `-m` filenames.
 5. Turn real pages for at least one five-minute checkpoint, exit the book, and
    reboot. Confirm EXP and collection state survive.
 6. Review Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff in portrait and
-   landscape. Other themes intentionally omit the companion band.
+   landscape. Confirm the companion band clears the dashboard controls and its
+   sprite and EXP text remain distinct. Other themes intentionally omit the
+   companion band.
 7. Inspect `crash_report.txt` and serial logs if any restart occurs; preserve both
    Pokémon snapshots before reproducing a storage problem.
 

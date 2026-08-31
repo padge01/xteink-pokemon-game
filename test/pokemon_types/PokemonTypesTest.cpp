@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include "Pokemon/PokemonSpecies.h"
+#include "Pokemon/PokemonPromptContext.h"
 #include "Pokemon/PokemonTypes.h"
 
 namespace {
@@ -74,6 +75,18 @@ void nicknameValidationEnforcesTheStoredBoundary() {
   CHECK(!pokemon::setNickname(record, std::string_view(embeddedNull, sizeof(embeddedNull))));
   const char malformedUtf8[] = {static_cast<char>(0xC3), static_cast<char>(0x28)};
   CHECK(!pokemon::setNickname(record, std::string_view(malformedUtf8, sizeof(malformedUtf8))));
+}
+
+void nicknamePromptContextTracksThePokemonBeingNamed() {
+  constexpr auto starter = pokemon::PokemonPromptContext::forStarter(1);
+  static_assert(starter.speciesId == 1);
+  static_assert(starter.recordId == 0);
+  static_assert(starter.isStarter());
+
+  constexpr auto caught = pokemon::PokemonPromptContext::forCaught(133, 42);
+  static_assert(caught.speciesId == 133);
+  static_assert(caught.recordId == 42);
+  static_assert(!caught.isStarter());
 }
 
 void invalidRecordsDoNotMutateOutputs() {
@@ -456,6 +469,7 @@ void everyKantoEvolutionMatchesTheCanonicalList() {
 int main() {
   recordEncodingIsExplicitAndRoundTrips();
   nicknameValidationEnforcesTheStoredBoundary();
+  nicknamePromptContextTracksThePokemonBeingNamed();
   invalidRecordsDoNotMutateOutputs();
   recordValidationRejectsImpossibleLevelAndGender();
   xpBoundariesStartAtZeroAndClampAtLevelOneHundred();

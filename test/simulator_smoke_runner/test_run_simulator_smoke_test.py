@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import importlib.util
+import struct
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,6 +37,34 @@ class SimulatorSmokeRunnerTest(unittest.TestCase):
         self.assertEqual(env["CROSSINK_SIMULATOR_START_POKEMON"], "1")
         self.assertEqual(env["SDL_VIDEODRIVER"], "dummy")
         self.assertEqual(env["PRESERVE_ME"], "yes")
+
+    def test_pokedex_fixture_uses_production_card_dimensions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            card = Path(temp_dir) / "004-charmander.bmp"
+            RUNNER.prepare_pokedex_card_fixture(card)
+            content = card.read_bytes()
+
+        self.assertEqual(content[:2], b"BM")
+        self.assertEqual(struct.unpack_from("<ii", content, 18), (528, 792))
+        self.assertGreater(len(content), 400_000)
+
+    def test_pokemon_output_requires_a_rendered_detail_card(self) -> None:
+        self.assertEqual(
+            RUNNER.pokemon_smoke_output_error("Simulator smoke test passed"),
+            "Pokédex detail card was not rendered",
+        )
+        self.assertIsNone(
+            RUNNER.pokemon_smoke_output_error(
+                f"{RUNNER.POKEMON_DETAIL_SUCCESS_MARKER}\nSimulator smoke test passed"
+            )
+        )
+
+    def test_pokemon_output_rejects_artwork_errors(self) -> None:
+        output = f"{RUNNER.POKEMON_DETAIL_SUCCESS_MARKER}\n[PKART] Could not render Pokemon art"
+        self.assertEqual(
+            RUNNER.pokemon_smoke_output_error(output),
+            "artwork failure: [PKART] Could not render Pokemon art",
+        )
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@
 
 #include <FreeInkApp.h>
 #include <FreeInkUIGfxRenderer.h>
+#include <PokemonPromptContext.h>
 #include "pokemon/PokemonService.h"
 
 #include <array>
@@ -52,7 +53,7 @@ class PokemonActivity final : public Activity {
   bool refreshSnapshot();
   void activate();
   void goBack();
-  void openNickname(uint32_t recordId, bool starter);
+  void openNickname(uint32_t recordId, bool starter, Screen cancelScreen);
   void finishStarter(const char* nickname);
   void showMessage(const char* message, Screen returnScreen);
   void buildUi(freeink::ui::FreeInkApp<24, 8>::ScreenType& screen);
@@ -82,7 +83,7 @@ class PokemonActivity final : public Activity {
   uint16_t pokedexSpecies_ = 1;
   pokemon::Gender starterGender_ = pokemon::Gender::Male;
   uint32_t focusedRecordId_ = 0;
-  uint32_t nicknameRecordId_ = 0;
+  pokemon::PokemonPromptContext nicknamePrompt_{};
   pokemon::EvolutionItem selectedItem_ = pokemon::EvolutionItem::None;
   char message_[96]{};
   std::array<freeink::ui::ListItem, ROW_CAPACITY> rows_{};

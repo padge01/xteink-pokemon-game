@@ -24,6 +24,8 @@ TEST(PokemonArtPath, BuildsExistingSleepCoverPokedexPaths) {
   EXPECT_STREQ(path, "/sleep/001-bulbasaur.bmp");
   ASSERT_NE(pokemon::pokemonPokedexArtPath(29, "Nidoran♀", path, sizeof(path)), nullptr);
   EXPECT_STREQ(path, "/sleep/029-nidoran-f.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(32, "Nidoran♂", path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/sleep/032-nidoran-m.bmp");
   ASSERT_NE(pokemon::pokemonPokedexArtPath(83, "Farfetch'd", path, sizeof(path)), nullptr);
   EXPECT_STREQ(path, "/sleep/083-farfetchd.bmp");
   ASSERT_NE(pokemon::pokemonPokedexArtPath(122, "Mr. Mime", path, sizeof(path)), nullptr);

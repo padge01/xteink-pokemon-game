@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -23,6 +24,13 @@ CRASH_PATTERNS = (
     "AddressSanitizer",
     "UndefinedBehaviorSanitizer",
 )
+POKEMON_ART_ERROR_PATTERNS = (
+    "[PKART] Missing Pokemon art",
+    "[PKART] Invalid Pokemon art",
+    "[PKART] Could not render Pokemon art",
+    "[GFX] Failed to read row",
+)
+POKEMON_DETAIL_SUCCESS_MARKER = "Pokemon Pokedex detail card rendered"
 THEMES = {
     "classic": 0,
     "lyra": 1,
@@ -64,6 +72,36 @@ def prepare_pokemon_assets(temp_root: Path) -> None:
         raise FileNotFoundError(f"Pokemon assets not found: {POKEMON_ASSETS}")
     target = temp_root / "fs_" / ".crosspoint" / "pokemon"
     shutil.copytree(POKEMON_ASSETS, target)
+    prepare_pokedex_card_fixture(temp_root / "fs_" / "sleep" / "004-charmander.bmp")
+
+
+def prepare_pokedex_card_fixture(target: Path) -> None:
+    """Write a production-size 8-bit grayscale card that exercises /sleep downscaling."""
+    width = 528
+    height = 792
+    row_stride = (width + 3) & ~3
+    palette = b"".join(bytes((value, value, value, 0)) for value in range(256))
+    pixels = bytearray()
+    for y in range(height):
+        row = bytes(((x * 3 + y * 5) & 0xFF) for x in range(width))
+        pixels.extend(row)
+        pixels.extend(b"\0" * (row_stride - width))
+
+    pixel_offset = 14 + 40 + len(palette)
+    file_size = pixel_offset + len(pixels)
+    header = struct.pack("<2sIHHI", b"BM", file_size, 0, 0, pixel_offset)
+    dib = struct.pack("<IiiHHIIiiII", 40, width, height, 1, 8, 0, len(pixels), 2835, 2835, 256, 256)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(header + dib + palette + pixels)
+
+
+def pokemon_smoke_output_error(output: str) -> str | None:
+    for pattern in POKEMON_ART_ERROR_PATTERNS:
+        if pattern in output:
+            return f"artwork failure: {pattern}"
+    if POKEMON_DETAIL_SUCCESS_MARKER not in output:
+        return "Pokédex detail card was not rendered"
+    return None
 
 
 def build_smoke_environment(
@@ -130,9 +168,11 @@ def run_smoke(args: argparse.Namespace) -> int:
             print(f"Simulator smoke test output contained crash pattern: {pattern}", file=sys.stderr)
             return 2
 
-    if args.pokemon and "[PKART] Missing Pokemon art" in proc.stdout:
-        print("Pokemon smoke test reported missing artwork", file=sys.stderr)
-        return 2
+    if args.pokemon:
+        pokemon_error = pokemon_smoke_output_error(proc.stdout)
+        if pokemon_error is not None:
+            print(f"Pokemon smoke test failed: {pokemon_error}", file=sys.stderr)
+            return 2
 
     if "Simulator smoke test passed" not in proc.stdout:
         print("Simulator smoke test did not print its success marker", file=sys.stderr)

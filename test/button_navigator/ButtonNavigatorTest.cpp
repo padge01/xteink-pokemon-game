@@ -51,6 +51,34 @@ bool nextReleaseDoesNotAllocateForItsButtonList() {
   return allocationCount.load() == allocationsBefore;
 }
 
+bool pressNavigationAcceptsDirectionalAndFrontButtons() {
+  for (const auto button : {MappedInputManager::Button::Down, MappedInputManager::Button::Right}) {
+    MappedInputManager input;
+    ButtonNavigator navigator;
+    callbackCount = 0;
+    ButtonNavigator::setMappedInputManager(input);
+    input.setPressed(button, true);
+    navigator.onNextPress(countCallback);
+    if (callbackCount != 1) return false;
+  }
+
+  for (const auto button : {MappedInputManager::Button::Up, MappedInputManager::Button::Left}) {
+    MappedInputManager input;
+    ButtonNavigator navigator;
+    callbackCount = 0;
+    ButtonNavigator::setMappedInputManager(input);
+    input.setPressed(button, true);
+    navigator.onPreviousPress(countCallback);
+    if (callbackCount != 1) return false;
+  }
+  return true;
+}
+
+bool indexNavigationWrapsTheFullPokedex() {
+  return ButtonNavigator::nextIndex(150, 151) == 0 && ButtonNavigator::previousIndex(0, 151) == 150 &&
+         ButtonNavigator::nextIndex(4, 151) == 5;
+}
+
 }  // namespace
 
 uint32_t millis() { return currentTimeMs; }
@@ -84,6 +112,14 @@ int main() {
   if (!nextReleaseDoesNotAllocateForItsButtonList()) {
     std::fputs("next release allocated its button list\n", stderr);
     return 3;
+  }
+  if (!pressNavigationAcceptsDirectionalAndFrontButtons()) {
+    std::fputs("press navigation did not accept both directional button pairs\n", stderr);
+    return 4;
+  }
+  if (!indexNavigationWrapsTheFullPokedex()) {
+    std::fputs("index navigation did not traverse and wrap the full Pokedex\n", stderr);
+    return 5;
   }
   return 0;
 }
