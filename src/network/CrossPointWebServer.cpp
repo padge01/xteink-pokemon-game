@@ -502,8 +502,7 @@ void CrossPointWebServer::handleRoot() const { sendHtmlContent(server.get(), Hom
 
 void CrossPointWebServer::handleJszip() const {
   server->sendHeader("Content-Encoding", "gzip");
-  server->send_P(200, "application/javascript", reinterpret_cast<const char*>(jszip_minJs),
-                 jszip_minJsCompressedSize);
+  server->send_P(200, "application/javascript", reinterpret_cast<const char*>(jszip_minJs), jszip_minJsCompressedSize);
 }
 
 // Shared stylesheet and logo are referenced with a content-hashed ?v= query,
