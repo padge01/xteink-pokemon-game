@@ -478,8 +478,8 @@ void XtcReaderActivity::loop() {
   } else if (needsUpdate) {
 #if defined(CROSSINK_ENABLE_POKEMON)
     if (currentPage != previousPage) {
-      pokemonTurnVerifier.request(static_cast<uint8_t>(
-          std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f)));
+      pokemonTurnVerifier.request(
+          static_cast<uint8_t>(std::clamp(getCurrentBookProgressPercent() + 0.5f, 0.0f, 100.0f)));
     }
 #endif
     requestUpdate();
@@ -871,9 +871,10 @@ XtcReaderActivity::StatusBarInfo XtcReaderActivity::getStatusBarInfo(const uint3
   }
 
   const auto chapters = xtc->getChapters();
-  const auto chapterIt = std::find_if(chapters.begin(), chapters.end(), [pageToRender](const xtc::ChapterInfo& chapter) {
-    return pageToRender >= chapter.startPage && pageToRender <= chapter.endPage;
-  });
+  const auto chapterIt =
+      std::find_if(chapters.begin(), chapters.end(), [pageToRender](const xtc::ChapterInfo& chapter) {
+        return pageToRender >= chapter.startPage && pageToRender <= chapter.endPage;
+      });
 
   if (chapterIt == chapters.end() || chapterIt->endPage < chapterIt->startPage) {
     return StatusBarInfo{bookPage, bookPageCount, std::move(title)};
