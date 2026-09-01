@@ -7,7 +7,7 @@ fixed-size char buffer.
 
 ## `/.crosspoint/pokemon-v2-{a,b}.bin`
 
-### Version 1
+### Version 2
 
 The `pokemon-x3` build alternates complete snapshots between
 `pokemon-v2-a.bin` and `pokemon-v2-b.bin`. Startup validates both files and uses
@@ -32,37 +32,46 @@ written. The file is:
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 4 | Magic `PKV2` |
-| 4 | 2 | Format version (`1`) |
+| 4 | 2 | Format version (`2`) |
 | 6 | 2 | Header size (`24`) |
 | 8 | 4 | Non-zero snapshot sequence |
-| 12 | 2 | State size (`96`) |
+| 12 | 2 | State size (`116`) |
 | 14 | 2 | Record size (`48`) |
 | 16 | 4 | Record count |
-| 20 | 4 | Payload size (`96 + recordCount * 48`) |
-| 24 | 96 | Encoded `PokemonState` |
-| 120 | `recordCount * 48` | Records in ascending record/capture ID order |
+| 20 | 4 | Payload size (`116 + recordCount * 48`) |
+| 24 | 116 | Encoded `PokemonState` |
+| 140 | `recordCount * 48` | Records in ascending record/capture ID order |
 | end - 4 | 4 | Standard CRC-32 over header, state, and records |
 
-The 96-byte state payload is:
+The 116-byte state payload is:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 24 | Six Party record IDs (`u32` each; packed from slot 1) |
-| 24 | 4 | Pending-event record ID |
-| 28 | 2 | Pending-event species ID |
-| 30 | 1 | Pending-event level |
-| 31 | 1 | Pending-event gender |
-| 32 | 1 | Pending-event item |
-| 33 | 1 | Pending-event kind |
-| 34 | 12 | Six evolution-item counts (`u16` each) |
-| 46 | 19 | Seen Pokédex bitset, species 1-151 |
-| 65 | 19 | Caught Pokédex bitset, species 1-151 |
-| 84 | 4 | Lifetime verified-reading minutes |
-| 88 | 4 | Snapshot sequence (must match the header) |
-| 92 | 1 | Reading-minute remainder (`0-59`) |
-| 93 | 1 | Encounter misses (`0-5`) |
-| 94 | 1 | Item misses (`0-19`) |
-| 95 | 1 | Dashboard notice |
+| 24 | 30 | Three compacted pending events (`10` bytes each) |
+| 54 | 12 | Six evolution-item counts (`u16` each) |
+| 66 | 19 | Seen Pokédex bitset, species 1-151 |
+| 85 | 19 | Caught Pokédex bitset, species 1-151 |
+| 104 | 4 | Lifetime verified-reading minutes |
+| 108 | 4 | Snapshot sequence (must match the header) |
+| 112 | 1 | Reading-minute remainder (`0-59`) |
+| 113 | 1 | Encounter misses (`0-5`; current guarantee threshold is `3`) |
+| 114 | 1 | Item misses (`0-19`) |
+| 115 | 1 | Dashboard notice for the first queued event |
+
+Each 10-byte pending event contains record ID at offset 0, species ID at 4,
+level at 6, gender at 7, item at 8, and kind at 9. Empty entries follow all
+populated entries. Index zero is the event currently shown to the user.
+
+### Legacy version 1
+
+Version 1 uses a 96-byte state payload and stores one pending event at offsets
+24-33. Its remaining fields begin at offset 34, with the snapshot sequence at
+88 and dashboard notice at 95. The loader accepts version 1 and version 2 in
+either alternating slot, selects the newest valid sequence, and places the
+legacy event at queue index zero. The next successful save writes version 2;
+Pokémon, XP, Party order, items, Pokédex state, pity counters, and reading
+progress are preserved.
 
 Each 48-byte record contains record ID at offset 0, total XP at 4, species ID
 at 8, caught level at 10, gender at 11, origin at 12, flags at 13, a canonical
@@ -73,9 +82,9 @@ marked caught. PC order is derived without a roster allocation: physical order
 is catch order, while Pokédex and alphabetical views rescan through a bounded
 19-byte species bitset.
 
-These V2 snapshots are independent from the earlier experimental Pokémon data.
-Installing the V2 beta starts a new collection unless a valid V2 snapshot is
-already present. Back up both files before beta updates or resets. Choosing
+These snapshots are independent from the earlier experimental Pokémon data.
+Installing this build starts a new collection unless a valid supported snapshot
+is already present. Back up both files before updates or resets. Choosing
 **Reset Pokémon** in the Pokémon menu deletes both snapshots and returns to
 starter selection; it does not alter books, reading positions, or CrossInk
 reading statistics.

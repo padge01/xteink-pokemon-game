@@ -6,6 +6,16 @@ Real page turns train your lead Pokémon, trigger encounters and item finds, and
 
 [Download the full X3 install](https://padge01.github.io/xteink-pokemon-game/install.html)
 
+## Interface preview
+
+| Pokémon menu | Wild encounter |
+| --- | --- |
+| ![Pokémon menu](docs/screenshots/pokemon-menu.jpg) | ![Wild Pokémon encounter](docs/screenshots/wild-encounter.jpg) |
+| Party | PC Box |
+| ![Pokémon Party](docs/screenshots/party.jpg) | ![Pokémon PC Box](docs/screenshots/pc-box.jpg) |
+| Pokémon summary | Pokédex |
+| ![Pokémon summary](docs/screenshots/pokemon-summary.jpg) | ![Pokédex](docs/screenshots/pokedex.jpg) |
+
 ## Requirements
 
 - Xteink X3

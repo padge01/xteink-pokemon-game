@@ -10,6 +10,7 @@
 - The release packager now bundles the X3 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
 - Complete X3 installation archives now include the tested firmware and all required Pokémon artwork in one SD-card ZIP.
 - Added a public rights and attribution request process for artwork removal, replacement, or corrected credit.
+- Up to three encounters, item finds, and evolution prompts can now wait in order while reading continues; existing Pokémon saves migrate automatically.
 
 ### Changed
 
