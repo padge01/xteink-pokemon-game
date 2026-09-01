@@ -15,9 +15,21 @@ int failures = 0;
     }                                                                                   \
   } while (false)
 
-uint32_t read32(const pokemon::StateBytes& bytes, const size_t offset) {
+uint32_t read32(const uint8_t* bytes, const size_t offset) {
   return static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
          (static_cast<uint32_t>(bytes[offset + 2]) << 16U) | (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
+}
+
+void write16(uint8_t* bytes, const size_t offset, const uint16_t value) {
+  bytes[offset] = static_cast<uint8_t>(value);
+  bytes[offset + 1] = static_cast<uint8_t>(value >> 8U);
+}
+
+void write32(uint8_t* bytes, const size_t offset, const uint32_t value) {
+  bytes[offset] = static_cast<uint8_t>(value);
+  bytes[offset + 1] = static_cast<uint8_t>(value >> 8U);
+  bytes[offset + 2] = static_cast<uint8_t>(value >> 16U);
+  bytes[offset + 3] = static_cast<uint8_t>(value >> 24U);
 }
 
 uint16_t readHeader16(const pokemon::HeaderBytes& bytes, const size_t offset) {
@@ -36,13 +48,18 @@ void writeHeader32(pokemon::HeaderBytes& bytes, const size_t offset, const uint3
   bytes[offset + 3] = static_cast<uint8_t>(value >> 24U);
 }
 
-void stateCodecUsesTheCanonical96ByteLayout() {
-  static_assert(pokemon::POKEMON_STATE_BYTES == 96);
+void stateCodecUsesTheCanonical116ByteLayout() {
+  static_assert(pokemon::POKEMON_STATE_BYTES == 116);
+  static_assert(pokemon::POKEMON_STATE_V1_BYTES == 96);
   pokemon::PokemonState state{};
   state.partyRecordIds[0] = 7;
   state.partyRecordIds[1] = 9;
-  state.pending.kind = pokemon::PendingEventKind::Item;
-  state.pending.item = pokemon::EvolutionItem::LinkCable;
+  state.pendingEvents[0] = {0, 25, 5, pokemon::Gender::Female, pokemon::EvolutionItem::None,
+                            pokemon::PendingEventKind::Encounter};
+  state.pendingEvents[1] = {0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::LinkCable,
+                            pokemon::PendingEventKind::Item};
+  state.pendingEvents[2] = {7, 26, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None,
+                            pokemon::PendingEventKind::Evolution};
   state.itemCounts = {1, 2, 3, 4, 5, 6};
   state.seenSpecies[0] = 0x05;
   state.caughtSpecies[0] = 0x01;
@@ -55,23 +72,48 @@ void stateCodecUsesTheCanonical96ByteLayout() {
 
   pokemon::StateBytes bytes{};
   CHECK(pokemon::encodeState(state, bytes));
-  CHECK(read32(bytes, 0) == 7);
-  CHECK(read32(bytes, 4) == 9);
-  CHECK(bytes[32] == static_cast<uint8_t>(pokemon::EvolutionItem::LinkCable));
-  CHECK(bytes[33] == static_cast<uint8_t>(pokemon::PendingEventKind::Item));
-  CHECK(bytes[34] == 1 && bytes[35] == 0);
-  CHECK(bytes[46] == 0x05);
-  CHECK(bytes[65] == 0x01);
-  CHECK(read32(bytes, 84) == 0x11223344U);
-  CHECK(read32(bytes, 88) == 0x55667788U);
-  CHECK(bytes[92] == 59);
-  CHECK(bytes[93] == 5);
-  CHECK(bytes[94] == 19);
-  CHECK(bytes[95] == static_cast<uint8_t>(pokemon::DashboardNotice::ItemFound));
+  CHECK(read32(bytes.data(), 0) == 7);
+  CHECK(read32(bytes.data(), 4) == 9);
+  CHECK(bytes[33] == static_cast<uint8_t>(pokemon::PendingEventKind::Encounter));
+  CHECK(bytes[42] == static_cast<uint8_t>(pokemon::EvolutionItem::LinkCable));
+  CHECK(bytes[43] == static_cast<uint8_t>(pokemon::PendingEventKind::Item));
+  CHECK(bytes[53] == static_cast<uint8_t>(pokemon::PendingEventKind::Evolution));
+  CHECK(bytes[54] == 1 && bytes[55] == 0);
+  CHECK(bytes[66] == 0x05);
+  CHECK(bytes[85] == 0x01);
+  CHECK(read32(bytes.data(), 104) == 0x11223344U);
+  CHECK(read32(bytes.data(), 108) == 0x55667788U);
+  CHECK(bytes[112] == 59);
+  CHECK(bytes[113] == 5);
+  CHECK(bytes[114] == 19);
+  CHECK(bytes[115] == static_cast<uint8_t>(pokemon::DashboardNotice::ItemFound));
 
   pokemon::PokemonState decoded{};
-  CHECK(pokemon::decodeState(bytes, decoded));
+  CHECK(pokemon::decodeState(bytes.data(), bytes.size(), pokemon::POKEMON_SNAPSHOT_VERSION, decoded));
   CHECK(decoded == state);
+}
+
+void legacyStateDecodesItsPendingEventIntoTheQueue() {
+  std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES> bytes{};
+  write32(bytes.data(), 0, 7);
+  write16(bytes.data(), 28, 133);
+  bytes[30] = 12;
+  bytes[31] = static_cast<uint8_t>(pokemon::Gender::Female);
+  bytes[33] = static_cast<uint8_t>(pokemon::PendingEventKind::Encounter);
+  bytes[46] = 0x01;
+  bytes[65] = 0x01;
+  write32(bytes.data(), 84, 60);
+  write32(bytes.data(), 88, 9);
+  bytes[95] = static_cast<uint8_t>(pokemon::DashboardNotice::NewPokemon);
+
+  pokemon::PokemonState decoded{};
+  CHECK(pokemon::decodeState(bytes.data(), bytes.size(), pokemon::POKEMON_SNAPSHOT_VERSION_V1, decoded));
+  CHECK(decoded.partyRecordIds[0] == 7);
+  CHECK(decoded.pendingEvents[0].kind == pokemon::PendingEventKind::Encounter);
+  CHECK(decoded.pendingEvents[0].speciesId == 133);
+  CHECK(decoded.pendingEvents[1].kind == pokemon::PendingEventKind::None);
+  CHECK(decoded.pendingEvents[2].kind == pokemon::PendingEventKind::None);
+  CHECK(decoded.sequence == 9);
 }
 
 void invalidStateDoesNotMutateEncodedOutput() {
@@ -89,30 +131,33 @@ void invalidStateBytesDoNotMutateDecodedOutput() {
   pokemon::PokemonState valid{};
   pokemon::StateBytes bytes{};
   CHECK(pokemon::encodeState(valid, bytes));
-  bytes[92] = 60;
+  bytes[112] = 60;
   pokemon::PokemonState output{};
   output.lifetimeMinutes = 77;
   const pokemon::PokemonState before = output;
 
-  CHECK(!pokemon::decodeState(bytes, output));
+  CHECK(!pokemon::decodeState(bytes.data(), bytes.size(), pokemon::POKEMON_SNAPSHOT_VERSION, output));
   CHECK(output == before);
 }
 
 void snapshotHeaderUsesCanonical24ByteLayout() {
   static_assert(pokemon::POKEMON_SNAPSHOT_HEADER_BYTES == 24);
-  const pokemon::SnapshotHeader header{0x01020304U, 3};
+  const pokemon::SnapshotHeader header{pokemon::POKEMON_SNAPSHOT_VERSION, 0x01020304U, 3};
   pokemon::HeaderBytes bytes{};
 
   CHECK(pokemon::encodeSnapshotHeader(header, bytes));
   CHECK(bytes[0] == 'P' && bytes[1] == 'K' && bytes[2] == 'V' && bytes[3] == '2');
-  CHECK(readHeader16(bytes, 4) == 1);
+  CHECK(readHeader16(bytes, 4) == pokemon::POKEMON_SNAPSHOT_VERSION);
   CHECK(readHeader16(bytes, 6) == 24);
   CHECK(readHeader32(bytes, 8) == 0x01020304U);
-  CHECK(readHeader16(bytes, 12) == 96);
+  CHECK(readHeader16(bytes, 12) == 116);
   CHECK(readHeader16(bytes, 14) == 48);
   CHECK(readHeader32(bytes, 16) == 3);
-  CHECK(readHeader32(bytes, 20) == 240);
-  CHECK(pokemon::snapshotFileBytes(header) == 268);
+  CHECK(readHeader32(bytes, 20) == 260);
+  CHECK(pokemon::snapshotFileBytes(header) == 288);
+  CHECK(pokemon::snapshotStateBytes(pokemon::POKEMON_SNAPSHOT_VERSION_V1) == 96);
+  CHECK(pokemon::snapshotStateBytes(pokemon::POKEMON_SNAPSHOT_VERSION) == 116);
+  CHECK(pokemon::snapshotStateBytes(3) == 0);
 
   pokemon::SnapshotHeader decoded{};
   CHECK(pokemon::decodeSnapshotHeader(bytes, decoded) == pokemon::HeaderDecodeResult::Ready);
@@ -121,9 +166,9 @@ void snapshotHeaderUsesCanonical24ByteLayout() {
 
 void unknownSnapshotVersionIsUnsupportedWithoutMutation() {
   pokemon::HeaderBytes bytes{};
-  CHECK(pokemon::encodeSnapshotHeader({1, 0}, bytes));
-  bytes[4] = 2;
-  pokemon::SnapshotHeader output{77, 88};
+  CHECK(pokemon::encodeSnapshotHeader({pokemon::POKEMON_SNAPSHOT_VERSION, 1, 0}, bytes));
+  bytes[4] = 3;
+  pokemon::SnapshotHeader output{pokemon::POKEMON_SNAPSHOT_VERSION, 77, 88};
   const pokemon::SnapshotHeader before = output;
 
   CHECK(pokemon::decodeSnapshotHeader(bytes, output) == pokemon::HeaderDecodeResult::Unsupported);
@@ -132,16 +177,16 @@ void unknownSnapshotVersionIsUnsupportedWithoutMutation() {
 
 void malformedSupportedHeaderIsCorruptWithoutMutation() {
   pokemon::HeaderBytes canonical{};
-  CHECK(pokemon::encodeSnapshotHeader({1, 3}, canonical));
+  CHECK(pokemon::encodeSnapshotHeader({pokemon::POKEMON_SNAPSHOT_VERSION, 1, 3}, canonical));
   for (uint8_t variant = 0; variant < 6; ++variant) {
     pokemon::HeaderBytes bytes = canonical;
     if (variant == 0) bytes[0] = 'X';
     if (variant == 1) writeHeader32(bytes, 8, 0);
     if (variant == 2) bytes[6] = 23;
-    if (variant == 3) bytes[12] = 95;
+    if (variant == 3) bytes[12] = 115;
     if (variant == 4) bytes[14] = 47;
-    if (variant == 5) writeHeader32(bytes, 20, 239);
-    pokemon::SnapshotHeader output{77, 88};
+    if (variant == 5) writeHeader32(bytes, 20, 259);
+    pokemon::SnapshotHeader output{pokemon::POKEMON_SNAPSHOT_VERSION, 77, 88};
     const pokemon::SnapshotHeader before = output;
 
     CHECK(pokemon::decodeSnapshotHeader(bytes, output) == pokemon::HeaderDecodeResult::Corrupt);
@@ -154,9 +199,9 @@ void unencodableHeaderDoesNotMutateOutput() {
   output.fill(0xA5);
   const pokemon::HeaderBytes before = output;
 
-  CHECK(!pokemon::encodeSnapshotHeader({0, 0}, output));
+  CHECK(!pokemon::encodeSnapshotHeader({pokemon::POKEMON_SNAPSHOT_VERSION, 0, 0}, output));
   CHECK(output == before);
-  CHECK(!pokemon::encodeSnapshotHeader({1, UINT32_MAX}, output));
+  CHECK(!pokemon::encodeSnapshotHeader({pokemon::POKEMON_SNAPSHOT_VERSION, 1, UINT32_MAX}, output));
   CHECK(output == before);
 }
 
@@ -175,7 +220,8 @@ void crc32MatchesTheStandardVectorAcrossChunks() {
 }  // namespace
 
 int main() {
-  stateCodecUsesTheCanonical96ByteLayout();
+  stateCodecUsesTheCanonical116ByteLayout();
+  legacyStateDecodesItsPendingEventIntoTheQueue();
   invalidStateDoesNotMutateEncodedOutput();
   invalidStateBytesDoNotMutateDecodedOutput();
   snapshotHeaderUsesCanonical24ByteLayout();
