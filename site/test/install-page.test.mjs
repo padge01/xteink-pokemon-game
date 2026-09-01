@@ -8,6 +8,10 @@ const installerSource = readFileSync(
 );
 
 test('X3 installer offers Wi-Fi and SD-card flows without USB flashing', () => {
+  assert.match(installerSource, /Download full install/i);
+  assert.match(installerSource, /Extract/i);
+  assert.match(installerSource, /\.crosspoint/i);
+  assert.match(installerSource, /Firmware only/i);
   assert.match(installerSource, /Wi-Fi update/i);
   assert.match(installerSource, /SD card reader/i);
   assert.doesNotMatch(installerSource, /Flash over USB/i);

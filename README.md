@@ -2,7 +2,7 @@
 
 Reading-powered Pokémon collection for the Xteink X3.
 
-[Open the install guide](https://padge01.github.io/xteink-pokemon-game/install.html)
+[Download the full X3 install](https://padge01.github.io/xteink-pokemon-game/install.html)
 
 ## Requirements
 
@@ -27,15 +27,18 @@ No battles, moves, breeding, trading, or combat statistics are included.
 
 ## Install
 
-The install guide provides two routes:
+The install guide provides two downloads:
 
-- **Wi-Fi update:** download the firmware, upload it through the X3 File Transfer page, then open **Settings → System → SD Card Firmware Update**.
-- **SD card reader:** download the firmware, copy it to the card root, return the card to the X3, then open **Settings → System → SD Card Firmware Update**.
+- **Full install:** one ZIP containing `update.bin` and the complete
+  `/.crosspoint/pokemon/` artwork folder. Extract it into the SD-card root,
+  return the card to the X3, then run **Settings → System → SD Card Firmware
+  Update → update.bin**.
+- **Firmware only:** for an X3 that already has the artwork folder. Upload the
+  `.bin` through File Transfer or copy it to the SD-card root.
 
-The public firmware release does not contain Pokémon artwork, and the install
-guide does not download it. Keep an existing `/.crosspoint/pokemon/` folder when
-updating. New installations must prepare the local artwork pack described in
-[Artwork setup](docs/artwork-setup.md).
+The full ZIP contains no Pokémon saves, books, or reading data. Merge the
+`.crosspoint` folder; do not delete the existing folder. Back up
+`pokemon-v2-a.bin` and `pokemon-v2-b.bin` before updating.
 
 ## Firmware base
 
@@ -51,7 +54,9 @@ updating. New installations must prepare the local artwork pack described in
 - [PokeAPI Sprites](https://github.com/PokeAPI/sprites): Pokémon sprite source used during browser artwork setup.
 - [Tesserae](https://github.com/dmellok/tesserae) and [u/xDaftTurtle's Pokédex cards](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3): Pokédex-card reference.
 
-Full notices are in [NOTICE.md](NOTICE.md). Project code is covered by the inherited [MIT License](LICENSE).
+Full notices are in [NOTICE.md](NOTICE.md) and
+[Rights and attribution](RIGHTS_AND_ATTRIBUTION.md). Project code is covered by
+the inherited [MIT License](LICENSE).
 
 Pokémon and related names, characters, and artwork belong to their respective rights holders. This is an unofficial, noncommercial project and is not affiliated with or endorsed by Nintendo, Creatures Inc., GAME FREAK Inc., The Pokémon Company, Xteink, CrossInk, or CrossPoint Reader.
 

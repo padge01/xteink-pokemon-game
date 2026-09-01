@@ -3,14 +3,18 @@ const RELEASES_API_URL =
 
 export function selectReleaseAssets(release) {
   const assets = release?.assets ?? [];
-  const firmware = assets.find((asset) => /^xteink-pokemon-x3-v.+\.bin$/.test(asset.name));
-  const checksum = assets.find((asset) => asset.name === 'SHA256SUMS');
+  const fullInstall = assets.find((asset) => /^xteink-pokemon-x3-full-v.+\.zip$/.test(asset.name));
+  const firmware = assets.find((asset) => /^xteink-pokemon-x3-firmware-v.+\.bin$/.test(asset.name))
+    ?? assets.find((asset) => /^xteink-pokemon-x3-v.+\.bin$/.test(asset.name));
+  const checksum = assets.find((asset) => asset.name === 'SHA256SUMS.txt')
+    ?? assets.find((asset) => asset.name === 'SHA256SUMS');
 
   if (!firmware || !checksum) {
     throw new Error('Release is missing the X3 firmware or checksum.');
   }
 
   return {
+    fullInstallUrl: fullInstall?.browser_download_url ?? '',
     firmwareUrl: firmware.browser_download_url,
     checksumUrl: checksum.browser_download_url,
     version: String(release.tag_name ?? '').replace(/^v/, ''),

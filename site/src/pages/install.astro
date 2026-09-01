@@ -18,44 +18,51 @@ import '../styles/installer.css';
       <header>
         <p class="label">Xteink X3 only</p>
         <h1>Pokémon for Xteink X3</h1>
-        <p class="intro">Download the firmware, then copy it to the X3's SD card.</p>
+        <p class="intro">One ZIP contains the firmware and all required artwork.</p>
       </header>
 
       <p class="release-status" id="release-status" role="status">Finding the latest release…</p>
-      <a class="action" id="download-firmware" aria-disabled="true">Download X3 firmware (.bin)</a>
+      <div class="download-actions">
+        <a class="action" id="download-full" aria-disabled="true">Download full install (.zip)</a>
+        <a class="action secondary" id="download-firmware" aria-disabled="true">Firmware only (.bin)</a>
+      </div>
 
-      <section class="install-card primary-route" aria-labelledby="wifi-title">
+      <section class="install-card primary-route" aria-labelledby="reader-title">
         <div>
           <p class="step">Recommended</p>
-          <h2 id="wifi-title">Wi-Fi update</h2>
-        </div>
-        <ol>
-          <li>Leave the SD card inside the X3 and open <strong>File Transfer</strong>.</li>
-          <li>Open the address shown by the X3 and upload the downloaded <strong>.bin</strong> file to the card root.</li>
-          <li>Exit File Transfer.</li>
-          <li>Open <strong>Settings → System → SD Card Firmware Update</strong>.</li>
-          <li>Select the file and confirm.</li>
-        </ol>
-      </section>
-
-      <section class="install-card" aria-labelledby="reader-title">
-        <div>
-          <p class="step">Computer</p>
           <h2 id="reader-title">SD card reader</h2>
         </div>
         <ol>
-          <li>Power off the X3 and put its SD card in the reader.</li>
-          <li>Back up <strong>/.crosspoint/pokemon-v2-a.bin</strong> and <strong>pokemon-v2-b.bin</strong>.</li>
-          <li>Copy the downloaded <strong>.bin</strong> file to the card root.</li>
+          <li>Power off the X3 and put its SD card in a computer.</li>
+          <li>Back up <strong>/.crosspoint/pokemon-v2-a.bin</strong> and <strong>pokemon-v2-b.bin</strong> if present.</li>
+          <li>Extract the full-install ZIP into the SD-card root. Merge <strong>.crosspoint</strong>; do not delete the existing folder.</li>
           <li>Safely eject the card and return it to the X3.</li>
+          <li>Open <strong>Settings → System → SD Card Firmware Update</strong>, select <strong>update.bin</strong>, and confirm.</li>
+        </ol>
+        <p>The ZIP installs artwork but does not contain or replace Pokémon saves, books, or reading data.</p>
+      </section>
+
+      <section class="install-card" aria-labelledby="wifi-title">
+        <div>
+          <p class="step">Existing artwork installation</p>
+          <h2 id="wifi-title">Wi-Fi update</h2>
+        </div>
+        <ol>
+          <li>Download <strong>Firmware only</strong>.</li>
+          <li>Leave the SD card inside the X3 and open <strong>File Transfer</strong>.</li>
+          <li>Open the address shown by the X3 and upload the downloaded <strong>.bin</strong> file to the card root.</li>
+          <li>Exit File Transfer.</li>
           <li>Open <strong>Settings → System → SD Card Firmware Update</strong>, select the file, and confirm.</li>
         </ol>
-        <p>An SD card reader is storage, not a flashing device. The firmware update runs on the X3.</p>
+        <p>This route updates firmware only and keeps the existing <strong>/.crosspoint/pokemon/</strong> artwork folder.</p>
       </section>
 
       <footer>
         <p>Back up the SD card first. This build is for the Xteink X3, not the X4 or X4 Pro.</p>
-        <a href="https://github.com/padge01/xteink-pokemon-game/releases">All releases</a>
+        <div class="footer-links">
+          <a id="download-checksums" href="https://github.com/padge01/xteink-pokemon-game/releases">Checksums</a>
+          <a href="https://github.com/padge01/xteink-pokemon-game/releases">All releases</a>
+        </div>
       </footer>
     </main>
 
@@ -63,7 +70,9 @@ import '../styles/installer.css';
       import { fetchRelease } from '../lib/installer/release-client.mjs';
 
       const status = document.querySelector('#release-status');
-      const download = document.querySelector('#download-firmware');
+      const fullDownload = document.querySelector('#download-full');
+      const firmwareDownload = document.querySelector('#download-firmware');
+      const checksumDownload = document.querySelector('#download-checksums');
       const requestedRelease = new URLSearchParams(location.search).get('release') ?? '';
 
       fetchRelease(requestedRelease)
@@ -71,8 +80,15 @@ import '../styles/installer.css';
           status.textContent = requestedRelease
             ? `Release candidate: ${release.version}`
             : `Latest release: v${release.version}`;
-          download.href = release.firmwareUrl;
-          download.removeAttribute('aria-disabled');
+          firmwareDownload.href = release.firmwareUrl;
+          firmwareDownload.removeAttribute('aria-disabled');
+          checksumDownload.href = release.checksumUrl;
+          if (release.fullInstallUrl) {
+            fullDownload.href = release.fullInstallUrl;
+            fullDownload.removeAttribute('aria-disabled');
+          } else {
+            fullDownload.textContent = 'Full install package is being prepared';
+          }
         })
         .catch((error) => {
           status.textContent = 'The latest release could not be loaded. Use the releases link below.';

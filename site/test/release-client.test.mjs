@@ -9,26 +9,51 @@ import {
 } from '../src/lib/installer/release-client.mjs';
 
 
-test('selectReleaseAssets returns the X3 binary and checksum from a complete release', () => {
+test('selectReleaseAssets returns the full install, firmware, and checksum', () => {
   const result = selectReleaseAssets({
     tag_name: 'v1.0.0',
     assets: [
       {
-        name: 'xteink-pokemon-x3-v1.0.0.bin',
+        name: 'xteink-pokemon-x3-full-v1.0.0.zip',
+        browser_download_url: 'https://example.test/full',
+      },
+      {
+        name: 'xteink-pokemon-x3-firmware-v1.0.0.bin',
         browser_download_url: 'https://example.test/firmware',
       },
-      { name: 'SHA256SUMS', browser_download_url: 'https://example.test/checksums' },
+      { name: 'SHA256SUMS.txt', browser_download_url: 'https://example.test/checksums' },
     ],
   });
 
   assert.deepEqual(result, {
+    fullInstallUrl: 'https://example.test/full',
     firmwareUrl: 'https://example.test/firmware',
     checksumUrl: 'https://example.test/checksums',
     version: '1.0.0',
   });
 });
 
-test('selectReleaseAssets rejects a release without both required files', () => {
+test('selectReleaseAssets keeps a legacy firmware-only release usable during rollout', () => {
+  const result = selectReleaseAssets({
+    tag_name: 'rc-0.1.0-209ad6f',
+    assets: [
+      {
+        name: 'xteink-pokemon-x3-v0.1.0-RC.bin',
+        browser_download_url: 'https://example.test/legacy-firmware',
+      },
+      { name: 'SHA256SUMS', browser_download_url: 'https://example.test/legacy-checksums' },
+    ],
+  });
+
+  assert.deepEqual(result, {
+    fullInstallUrl: '',
+    firmwareUrl: 'https://example.test/legacy-firmware',
+    checksumUrl: 'https://example.test/legacy-checksums',
+    version: 'rc-0.1.0-209ad6f',
+  });
+});
+
+test('selectReleaseAssets rejects a release without firmware and checksum files', () => {
   assert.throws(
     () => selectReleaseAssets({ tag_name: 'v1.0.0', assets: [] }),
     /release is missing the X3 firmware or checksum/i,
@@ -51,10 +76,14 @@ test('fetchRelease loads an explicitly requested release tag', async () => {
         tag_name: 'v0.1.0-rc.1',
         assets: [
           {
-            name: 'xteink-pokemon-x3-v0.1.0-rc.1.bin',
+            name: 'xteink-pokemon-x3-full-v0.1.0-rc.1.zip',
+            browser_download_url: 'https://example.test/full',
+          },
+          {
+            name: 'xteink-pokemon-x3-firmware-v0.1.0-rc.1.bin',
             browser_download_url: 'https://example.test/firmware',
           },
-          { name: 'SHA256SUMS', browser_download_url: 'https://example.test/checksums' },
+          { name: 'SHA256SUMS.txt', browser_download_url: 'https://example.test/checksums' },
         ],
       }),
     };
@@ -72,7 +101,7 @@ test('verifyReleaseChecksum accepts the published SHA-256 and rejects a mismatch
 
   await verifyReleaseChecksum(
     firmware,
-    `${digest}  xteink-pokemon-x3-v1.0.0.bin\n`,
+    `${digest}  xteink-pokemon-x3-firmware-v1.0.0.bin\n`,
   );
 
   await assert.rejects(

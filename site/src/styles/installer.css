@@ -59,6 +59,12 @@ h1 {
   font-size: 0.9rem;
 }
 
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .install-card {
   display: grid;
   gap: 18px;
@@ -139,6 +145,12 @@ footer a {
   font-weight: 800;
 }
 
+.footer-links {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+}
+
 @media (max-width: 560px) {
   .installer {
     padding-top: 28px;
@@ -146,6 +158,10 @@ footer a {
 
   .action {
     width: 100%;
+  }
+
+  .download-actions {
+    display: grid;
   }
 
   footer {
