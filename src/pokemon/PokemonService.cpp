@@ -195,7 +195,8 @@ ServiceStatus PokemonService::loadDashboardSnapshot(PokemonDashboardSnapshot& ou
     output = {};
     return ServiceStatus::StorageError;
   }
-  output.pending = state.pending;
+  const PendingEvent* pending = pendingEventFront(state);
+  output.pending = pending == nullptr ? PendingEvent{} : *pending;
   output.notice = state.dashboardNotice;
   return ServiceStatus::Ok;
 }
@@ -252,11 +253,12 @@ ServiceStatus PokemonService::resolveEvolution(const EvolutionChoice choice) {
   PokemonState state{};
   const ServiceStatus stateStatus = loadReadyState(state);
   if (stateStatus != ServiceStatus::Ok) return stateStatus;
-  if (state.pending.kind != PendingEventKind::Evolution || state.pending.recordId == 0) {
+  const PendingEvent* pending = pendingEventFront(state);
+  if (pending == nullptr || pending->kind != PendingEventKind::Evolution || pending->recordId == 0) {
     return ServiceStatus::NotApplicable;
   }
   PokemonRecord record{};
-  if (!store_.readRecord(state.pending.recordId, record)) return ServiceStatus::StorageError;
+  if (!store_.readRecord(pending->recordId, record)) return ServiceStatus::StorageError;
   RecordMutation mutation{};
   if (!pokemon::resolveEvolution(state, record, choice, mutation)) return ServiceStatus::NotApplicable;
   if (!store_.commit(state, mutation)) {

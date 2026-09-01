@@ -272,10 +272,10 @@ TEST(PokemonService, ResolvesEncounterCatchThenAllowsNickname) {
   seedStarter(store);
   pokemon::PokemonState state{};
   ASSERT_TRUE(store.loadState(state));
-  state.pending.kind = pokemon::PendingEventKind::Encounter;
-  state.pending.speciesId = 133;
-  state.pending.level = 12;
-  state.pending.gender = pokemon::Gender::Female;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Encounter;
+  state.pendingEvents[0].speciesId = 133;
+  state.pendingEvents[0].level = 12;
+  state.pendingEvents[0].gender = pokemon::Gender::Female;
   state.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
   ASSERT_TRUE(store.commit(state));
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
@@ -288,7 +288,7 @@ TEST(PokemonService, ResolvesEncounterCatchThenAllowsNickname) {
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
   ASSERT_EQ(snapshot.partyCount, 2U);
-  EXPECT_EQ(snapshot.state.pending.kind, pokemon::PendingEventKind::None);
+  EXPECT_EQ(snapshot.state.pendingEvents[0].kind, pokemon::PendingEventKind::None);
   EXPECT_EQ(snapshot.state.dashboardNotice, pokemon::DashboardNotice::None);
   EXPECT_EQ(snapshot.party[1].speciesId, 133U);
   EXPECT_STREQ(snapshot.party[1].nickname.data(), "Nova");
@@ -300,10 +300,10 @@ TEST(PokemonService, ResolvesEncounterPassWithoutCreatingARecord) {
   seedStarter(store);
   pokemon::PokemonState state{};
   ASSERT_TRUE(store.loadState(state));
-  state.pending.kind = pokemon::PendingEventKind::Encounter;
-  state.pending.speciesId = 4;
-  state.pending.level = 9;
-  state.pending.gender = pokemon::Gender::Male;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Encounter;
+  state.pendingEvents[0].speciesId = 4;
+  state.pendingEvents[0].level = 9;
+  state.pendingEvents[0].gender = pokemon::Gender::Male;
   state.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
   ASSERT_TRUE(store.commit(state));
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
@@ -314,7 +314,7 @@ TEST(PokemonService, ResolvesEncounterPassWithoutCreatingARecord) {
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
   EXPECT_EQ(snapshot.ownedCount, 1U);
-  EXPECT_EQ(snapshot.state.pending.kind, pokemon::PendingEventKind::None);
+  EXPECT_EQ(snapshot.state.pendingEvents[0].kind, pokemon::PendingEventKind::None);
 }
 
 TEST(PokemonService, AcknowledgesItemAndPublishesBoundedDashboardSnapshot) {
@@ -323,8 +323,12 @@ TEST(PokemonService, AcknowledgesItemAndPublishesBoundedDashboardSnapshot) {
   seedStarter(store);
   pokemon::PokemonState state{};
   ASSERT_TRUE(store.loadState(state));
-  state.pending.kind = pokemon::PendingEventKind::Item;
-  state.pending.item = pokemon::EvolutionItem::ThunderStone;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Item;
+  state.pendingEvents[0].item = pokemon::EvolutionItem::ThunderStone;
+  state.pendingEvents[1].kind = pokemon::PendingEventKind::Encounter;
+  state.pendingEvents[1].speciesId = 4;
+  state.pendingEvents[1].level = 9;
+  state.pendingEvents[1].gender = pokemon::Gender::Male;
   state.itemCounts[2] = 1;
   state.dashboardNotice = pokemon::DashboardNotice::ItemFound;
   ASSERT_TRUE(store.commit(state));
@@ -337,9 +341,14 @@ TEST(PokemonService, AcknowledgesItemAndPublishesBoundedDashboardSnapshot) {
   EXPECT_EQ(dashboard.pending.kind, pokemon::PendingEventKind::Item);
 
   ASSERT_EQ(service.acknowledgeItem(), pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(service.loadDashboardSnapshot(dashboard), pokemon::ServiceStatus::Ok);
+  EXPECT_EQ(dashboard.pending.kind, pokemon::PendingEventKind::Encounter);
+  EXPECT_EQ(dashboard.pending.speciesId, 4U);
+  EXPECT_EQ(dashboard.notice, pokemon::DashboardNotice::NewPokemon);
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
-  EXPECT_EQ(snapshot.state.pending.kind, pokemon::PendingEventKind::None);
+  EXPECT_EQ(snapshot.state.pendingEvents[0].kind, pokemon::PendingEventKind::Encounter);
+  EXPECT_EQ(snapshot.state.pendingEvents[1].kind, pokemon::PendingEventKind::None);
   EXPECT_EQ(snapshot.state.itemCounts[2], 1U);
 }
 
@@ -352,9 +361,9 @@ TEST(PokemonService, EvolvesByLevelAndCanDisableFuturePrompts) {
   bulbasaur.totalXp = pokemon::xpRequired(16);
   pokemon::PokemonState state{};
   state.partyRecordIds[0] = 1;
-  state.pending.kind = pokemon::PendingEventKind::Evolution;
-  state.pending.recordId = 1;
-  state.pending.speciesId = 2;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Evolution;
+  state.pendingEvents[0].recordId = 1;
+  state.pendingEvents[0].speciesId = 2;
   state.dashboardNotice = pokemon::DashboardNotice::WhatsThis;
   ASSERT_TRUE(pokemon::markSpecies(state.seenSpecies, 1));
   ASSERT_TRUE(pokemon::markSpecies(state.caughtSpecies, 1));
@@ -439,8 +448,8 @@ TEST(PokemonService, HourlyItemDropPrefersAnOwnedPokemonsEvolutionNeed) {
 
   pokemon::PokemonState state{};
   ASSERT_TRUE(store.loadState(state));
-  EXPECT_EQ(state.pending.kind, pokemon::PendingEventKind::Item);
-  EXPECT_EQ(state.pending.item, pokemon::EvolutionItem::ThunderStone);
+  EXPECT_EQ(state.pendingEvents[0].kind, pokemon::PendingEventKind::Item);
+  EXPECT_EQ(state.pendingEvents[0].item, pokemon::EvolutionItem::ThunderStone);
   EXPECT_EQ(state.itemCounts[2], 1U);
 }
 

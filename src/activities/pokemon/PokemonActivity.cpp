@@ -136,7 +136,7 @@ void PokemonActivity::loadInitialScreen() {
   } else if (status != pokemon::ServiceStatus::Ok) {
     showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Menu);
   } else {
-    setScreen(snapshot_.state.pending.kind == pokemon::PendingEventKind::None ? Screen::Menu : Screen::Event);
+    setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
   }
 }
 
@@ -191,8 +191,10 @@ int PokemonActivity::logicalCount() const {
       return snapshot_.partyCount;
     case Screen::Pokedex:
       return pokemon::KANTO_SPECIES_COUNT;
-    case Screen::Event:
-      return snapshot_.state.pending.kind == pokemon::PendingEventKind::Item ? 1 : 2;
+    case Screen::Event: {
+      const pokemon::PendingEvent* pending = pokemon::pendingEventFront(snapshot_.state);
+      return pending != nullptr && pending->kind == pokemon::PendingEventKind::Item ? 1 : 2;
+    }
     case Screen::Summary:
     case Screen::PokedexDetail:
     case Screen::Message:
@@ -266,7 +268,7 @@ void PokemonActivity::openNickname(const uint32_t recordId, const bool starter, 
     } else if (service_.renamePokemon(recordId, keyboardResult->text) == pokemon::ServiceStatus::Ok) {
       if (!refreshSnapshot()) return;
       nicknamePrompt_ = {};
-      setScreen(Screen::Menu);
+      setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
     } else {
       showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Menu);
     }
@@ -292,7 +294,7 @@ void PokemonActivity::activate() {
         finishStarter("");
       else {
         nicknamePrompt_ = {};
-        setScreen(Screen::Menu);
+        setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
       }
       return;
     case Screen::Menu:
@@ -413,7 +415,12 @@ void PokemonActivity::activate() {
     case Screen::PokedexDetail:
       return;
     case Screen::Event: {
-      const pokemon::PendingEvent pending = snapshot_.state.pending;
+      const pokemon::PendingEvent* active = pokemon::pendingEventFront(snapshot_.state);
+      if (active == nullptr) {
+        setScreen(Screen::Menu);
+        return;
+      }
+      const pokemon::PendingEvent pending = *active;
       if (pending.kind == pokemon::PendingEventKind::Encounter) {
         uint32_t caught = 0;
         const auto choice = selected_ == 0 ? pokemon::EncounterChoice::Catch : pokemon::EncounterChoice::Pass;
@@ -426,14 +433,15 @@ void PokemonActivity::activate() {
           nicknamePrompt_ = pokemon::PokemonPromptContext::forCaught(pending.speciesId, caught);
           snprintf(message_, sizeof(message_), tr(STR_POKEMON_NICKNAME_QUESTION), speciesName(pending.speciesId));
           setScreen(Screen::NicknameQuestion);
-        } else
-          setScreen(Screen::Menu);
+        } else {
+          setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
+        }
       } else if (pending.kind == pokemon::PendingEventKind::Item) {
         if (service_.acknowledgeItem() != pokemon::ServiceStatus::Ok)
           showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Event);
         else {
           if (!refreshSnapshot()) return;
-          setScreen(Screen::Menu);
+          setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
         }
       } else if (pending.kind == pokemon::PendingEventKind::Evolution) {
         const auto choice = selected_ == 0 ? pokemon::EvolutionChoice::Evolve : pokemon::EvolutionChoice::Cancel;
@@ -441,7 +449,7 @@ void PokemonActivity::activate() {
           showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Event);
         else {
           if (!refreshSnapshot()) return;
-          setScreen(Screen::Menu);
+          setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
         }
       }
       return;
@@ -481,7 +489,7 @@ void PokemonActivity::goBack() {
         setScreen(Screen::Gender);
       else {
         nicknamePrompt_ = {};
-        setScreen(Screen::Menu);
+        setScreen(pokemon::pendingEventFront(snapshot_.state) == nullptr ? Screen::Menu : Screen::Event);
       }
       return;
     case Screen::Summary:
@@ -670,9 +678,10 @@ void PokemonActivity::buildRows() {
         break;
       }
       case Screen::Event:
-        if (snapshot_.state.pending.kind == pokemon::PendingEventKind::Encounter) {
+        if (const pokemon::PendingEvent* pending = pokemon::pendingEventFront(snapshot_.state);
+            pending != nullptr && pending->kind == pokemon::PendingEventKind::Encounter) {
           row(local, index == 0 ? tr(STR_POKEMON_CATCH) : tr(STR_POKEMON_PASS));
-        } else if (snapshot_.state.pending.kind == pokemon::PendingEventKind::Evolution) {
+        } else if (pending != nullptr && pending->kind == pokemon::PendingEventKind::Evolution) {
           row(local, index == 0 ? tr(STR_POKEMON_EVOLVE) : tr(STR_POKEMON_CANCEL));
         } else
           row(local, tr(STR_OK));
@@ -860,7 +869,9 @@ void PokemonActivity::renderFocused() {
     return;
   }
   if (screen_ != Screen::Event) return;
-  const auto& pending = snapshot_.state.pending;
+  const pokemon::PendingEvent* active = pokemon::pendingEventFront(snapshot_.state);
+  if (active == nullptr) return;
+  const pokemon::PendingEvent& pending = *active;
   char line[96];
   if (pending.kind == pokemon::PendingEventKind::Encounter) {
     pokemon::drawPokemonSpeciesArt(renderer, pending.speciesId, true,

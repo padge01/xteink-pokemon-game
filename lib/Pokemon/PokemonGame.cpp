@@ -104,9 +104,29 @@ bool chooseGender(const SpeciesData& species, const RandomSource& random, Gender
   return true;
 }
 
-void clearPending(PokemonState& state) {
-  state.pending = {};
-  state.dashboardNotice = DashboardNotice::None;
+DashboardNotice noticeForEvent(const PendingEvent* event) {
+  if (event == nullptr) return DashboardNotice::None;
+  switch (event->kind) {
+    case PendingEventKind::Encounter:
+      return DashboardNotice::NewPokemon;
+    case PendingEventKind::Item:
+      return DashboardNotice::ItemFound;
+    case PendingEventKind::Evolution:
+      return DashboardNotice::WhatsThis;
+    case PendingEventKind::None:
+      return DashboardNotice::None;
+  }
+  return DashboardNotice::None;
+}
+
+void refreshDashboardNotice(PokemonState& state) {
+  state.dashboardNotice = noticeForEvent(pendingEventFront(state));
+}
+
+bool popPendingEvent(PokemonState& state) {
+  if (!dequeuePendingEvent(state)) return false;
+  refreshDashboardNotice(state);
+  return true;
 }
 
 const EvolutionRule* findEvolution(const PokemonRecord& record, const EvolutionTrigger trigger,
@@ -135,18 +155,21 @@ bool evolveCandidate(PokemonState& state, PokemonRecord& record, const uint16_t 
 
 bool queueEvolutionAfterLevelGain(PokemonState& state, const PokemonRecord& record, bool& queued) {
   queued = false;
-  if (state.pending.kind != PendingEventKind::None ||
-      (record.flags & recordFlag(RecordFlag::EvolutionPromptsDisabled)) != 0) {
+  if ((record.flags & recordFlag(RecordFlag::EvolutionPromptsDisabled)) != 0) {
     return true;
   }
+  for (const PendingEvent& event : state.pendingEvents) {
+    if (event.kind == PendingEventKind::Evolution && event.recordId == record.recordId) return true;
+  }
+  if (pendingEventCount(state) == PENDING_EVENT_CAPACITY) return true;
   const uint8_t level = levelForXp(record.totalXp);
   for (const EvolutionRule& rule : evolutionsFor(record.speciesId)) {
     if (rule.trigger != EvolutionTrigger::Level || level < rule.minimumLevel) continue;
-    state.pending.kind = PendingEventKind::Evolution;
-    state.pending.recordId = record.recordId;
-    state.pending.speciesId = rule.targetSpeciesId;
-    state.dashboardNotice = DashboardNotice::WhatsThis;
+    const PendingEvent event{record.recordId, rule.targetSpeciesId, 0, Gender::Unknown, EvolutionItem::None,
+                             PendingEventKind::Evolution};
+    if (!enqueuePendingEvent(state, event)) return false;
     if (!markSpecies(state.seenSpecies, rule.targetSpeciesId)) return false;
+    refreshDashboardNotice(state);
     queued = true;
     return true;
   }
@@ -161,12 +184,10 @@ bool finalizeEncounter(PokemonState& state, const uint16_t speciesId, const uint
   Gender gender = Gender::Unknown;
   if (species == nullptr || !chooseGender(*species, random, gender)) return false;
 
-  state.pending.kind = PendingEventKind::Encounter;
-  state.pending.speciesId = speciesId;
-  state.pending.level = level;
-  state.pending.gender = gender;
-  state.dashboardNotice = DashboardNotice::NewPokemon;
-  return markSpecies(state.seenSpecies, speciesId);
+  const PendingEvent event{0, speciesId, level, gender, EvolutionItem::None, PendingEventKind::Encounter};
+  if (!enqueuePendingEvent(state, event) || !markSpecies(state.seenSpecies, speciesId)) return false;
+  refreshDashboardNotice(state);
+  return true;
 }
 
 bool mewIsReady(const PokemonState& state) {
@@ -236,17 +257,18 @@ bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNee
   if (candidateCount > 1 && !randomBelow(random, static_cast<uint32_t>(candidateCount), selectedIndex)) return false;
   const uint8_t itemIndex = candidates[selectedIndex];
   ++state.itemCounts[itemIndex];
-  state.pending.kind = PendingEventKind::Item;
-  state.pending.item = static_cast<EvolutionItem>(itemIndex + 1U);
-  state.dashboardNotice = DashboardNotice::ItemFound;
+  const PendingEvent event{0, 0, 0, Gender::Unknown, static_cast<EvolutionItem>(itemIndex + 1U),
+                           PendingEventKind::Item};
+  if (!enqueuePendingEvent(state, event)) return false;
+  refreshDashboardNotice(state);
   created = true;
   return true;
 }
 
 bool processEncounterCheck(PokemonState& state, const uint8_t bookProgressPercent, const RandomSource& random,
                            PendingEventKind& generatedEvent) {
-  if (state.pending.kind != PendingEventKind::None) {
-    incrementCapped(state.encounterMisses, ENCOUNTER_MISSES_BEFORE_GUARANTEE);
+  if (pendingEventCount(state) == PENDING_EVENT_CAPACITY) {
+    state.encounterMisses = ENCOUNTER_MISSES_BEFORE_GUARANTEE;
     return true;
   }
 
@@ -269,8 +291,8 @@ bool processEncounterCheck(PokemonState& state, const uint8_t bookProgressPercen
 
 bool processHourlyItem(PokemonState& state, const RandomSource& random, const OwnedEvolutionNeeds ownedEvolutionNeeds,
                        PendingEventKind& generatedEvent) {
-  if (state.pending.kind != PendingEventKind::None) {
-    incrementCapped(state.itemMisses, 19);
+  if (pendingEventCount(state) == PENDING_EVENT_CAPACITY) {
+    state.itemMisses = 19;
     return true;
   }
   bool itemTriggered = state.itemMisses == 19;
@@ -348,19 +370,18 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, co
 }
 
 bool acknowledgeItem(PokemonState& state, const PokemonRecord& leader) {
+  const PendingEvent* pending = pendingEventFront(state);
   if (!validateState(state) || !validateRecord(leader) || state.partyRecordIds[0] != leader.recordId ||
-      state.pending.kind != PendingEventKind::Item) {
+      pending == nullptr || pending->kind != PendingEventKind::Item) {
     return false;
   }
   PokemonState candidate = state;
-  clearPending(candidate);
+  if (!popPendingEvent(candidate)) return false;
   state = candidate;
   return true;
 }
 
 bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool enabled, RecordMutation& mutation) {
-  const bool dismissingCurrentPrompt =
-      !enabled && state.pending.kind == PendingEventKind::Evolution && state.pending.recordId == record.recordId;
   if (!validateState(state) || !validateRecord(record) || mutation.kind != RecordMutationKind::None) {
     return false;
   }
@@ -371,7 +392,8 @@ bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool 
     recordCandidate.flags &= static_cast<uint8_t>(~recordFlag(RecordFlag::EvolutionPromptsDisabled));
   } else {
     recordCandidate.flags |= recordFlag(RecordFlag::EvolutionPromptsDisabled);
-    if (dismissingCurrentPrompt) clearPending(stateCandidate);
+    removePendingEvolutionsForRecord(stateCandidate, record.recordId);
+    refreshDashboardNotice(stateCandidate);
   }
   if (!validateRecord(recordCandidate)) return false;
 
@@ -387,10 +409,12 @@ bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool 
 
 bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const EncounterChoice choice,
                       const char* nickname, RecordMutation& mutation) {
+  const PendingEvent* front = pendingEventFront(state);
   if (!validateState(state) || !validateRecord(leader) || state.partyRecordIds[0] != leader.recordId ||
-      state.pending.kind != PendingEventKind::Encounter || mutation.kind != RecordMutationKind::None) {
+      front == nullptr || front->kind != PendingEventKind::Encounter || mutation.kind != RecordMutationKind::None) {
     return false;
   }
+  const PendingEvent pending = *front;
 
   PokemonState stateCandidate = state;
   RecordMutation mutationCandidate = mutation;
@@ -398,10 +422,10 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const En
     if (mutation.requestedRecordId == 0) return false;
     PokemonRecord caught{};
     caught.recordId = mutation.requestedRecordId;
-    caught.totalXp = xpRequired(state.pending.level);
-    caught.speciesId = state.pending.speciesId;
-    caught.caughtLevel = state.pending.level;
-    caught.gender = state.pending.gender;
+    caught.totalXp = xpRequired(pending.level);
+    caught.speciesId = pending.speciesId;
+    caught.caughtLevel = pending.level;
+    caught.gender = pending.gender;
     caught.origin = Origin::Caught;
     if (!setNickname(caught, nickname == nullptr ? "" : nickname) || !validateRecord(caught) ||
         !markSpecies(stateCandidate.seenSpecies, caught.speciesId) ||
@@ -420,7 +444,7 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const En
     return false;
   }
 
-  clearPending(stateCandidate);
+  if (!popPendingEvent(stateCandidate)) return false;
   if (!validateState(stateCandidate)) return false;
   state = stateCandidate;
   mutation = mutationCandidate;
@@ -429,13 +453,16 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const En
 
 bool resolveEvolution(PokemonState& state, PokemonRecord& record, const EvolutionChoice choice,
                       RecordMutation& mutation) {
-  if (!validateState(state) || !validateRecord(record) || state.pending.kind != PendingEventKind::Evolution ||
-      state.pending.recordId != record.recordId || mutation.kind != RecordMutationKind::None) {
+  const PendingEvent* front = pendingEventFront(state);
+  if (!validateState(state) || !validateRecord(record) || front == nullptr ||
+      front->kind != PendingEventKind::Evolution || front->recordId != record.recordId ||
+      mutation.kind != RecordMutationKind::None) {
     return false;
   }
+  const PendingEvent pending = *front;
 
   const EvolutionRule* rule =
-      findEvolution(record, EvolutionTrigger::Level, EvolutionItem::None, state.pending.speciesId);
+      findEvolution(record, EvolutionTrigger::Level, EvolutionItem::None, pending.speciesId);
   if (rule == nullptr || levelForXp(record.totalXp) < rule->minimumLevel) return false;
 
   PokemonState stateCandidate = state;
@@ -447,7 +474,7 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
     return false;
   }
 
-  clearPending(stateCandidate);
+  if (!popPendingEvent(stateCandidate)) return false;
   state = stateCandidate;
   record = recordCandidate;
   mutation = mutationCandidate;
@@ -455,7 +482,7 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
 }
 
 bool useEvolutionItem(PokemonState& state, PokemonRecord& record, const EvolutionItem item, RecordMutation& mutation) {
-  if (!validateState(state) || !validateRecord(record) || state.pending.kind != PendingEventKind::None ||
+  if (!validateState(state) || !validateRecord(record) || pendingEventFront(state) != nullptr ||
       item < EvolutionItem::MoonStone || item > EvolutionItem::LinkCable || mutation.kind != RecordMutationKind::None) {
     return false;
   }

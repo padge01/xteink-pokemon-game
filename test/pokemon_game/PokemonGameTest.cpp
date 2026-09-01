@@ -30,6 +30,7 @@ struct SequenceRandom {
   static uint32_t next(void* context, const uint32_t upperExclusive) {
     auto& sequence = *static_cast<SequenceRandom*>(context);
     if (sequence.index >= sequence.count) {
+      std::fprintf(stderr, "unexpected random draw: upper=%u after %zu values\n", upperExclusive, sequence.count);
       CHECK(false);
       return 0;
     }
@@ -174,10 +175,10 @@ void fourthEncounterCheckIsForcedAndCreatesOnlyOneEvent() {
       pokemon::applyCreditedMinutes(state, leader, 15, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(forced.status == pokemon::CreditStatus::Applied);
   CHECK(forced.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 1);
-  CHECK(state.pending.level == 2);
-  CHECK(state.pending.gender == pokemon::Gender::Female);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Encounter);
+  CHECK(state.pendingEvents[0].speciesId == 1);
+  CHECK(state.pendingEvents[0].level == 2);
+  CHECK(state.pendingEvents[0].gender == pokemon::Gender::Female);
   CHECK(state.encounterMisses == 0);
   CHECK(state.itemMisses == 1);
   CHECK(state.readingMinuteRemainder == 0);
@@ -203,69 +204,96 @@ void fifteenMinuteCheckUsesFortyPercentEncounterChance() {
 
   CHECK(result.status == pokemon::CreditStatus::Applied);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Encounter);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Encounter);
   CHECK(state.readingMinuteRemainder == 15);
   CHECK(sequence.index == std::size(draws));
 }
 
-void pendingEventBlocksRollsButStillAdvancesPity() {
+void fullQueueCreditsReadingAndPrimesGuaranteesWithoutRolling() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   pokemon::PokemonState state = stateWithLeader(leader);
-  state.pending.kind = pokemon::PendingEventKind::Encounter;
-  state.pending.speciesId = 81;
-  state.pending.level = 24;
-  state.pending.gender = pokemon::Gender::Genderless;
-  const pokemon::PendingEvent pendingBefore = state.pending;
+  state.pendingEvents[0] = {0, 81, 24, pokemon::Gender::Genderless, pokemon::EvolutionItem::None,
+                            pokemon::PendingEventKind::Encounter};
+  state.pendingEvents[1] = {0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone,
+                            pokemon::PendingEventKind::Item};
+  state.pendingEvents[2] = {leader.recordId, 26, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None,
+                            pokemon::PendingEventKind::Evolution};
+  state.readingMinuteRemainder = 59;
+  const auto pendingBefore = state.pendingEvents;
+  const uint32_t xpBefore = leader.totalXp;
   pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
 
   const pokemon::CreditResult result =
-      pokemon::applyCreditedMinutes(state, leader, 125, 50, pokemon::OwnedEvolutionNeeds{}, random);
+      pokemon::applyCreditedMinutes(state, leader, 1, 50, pokemon::OwnedEvolutionNeeds{}, random);
 
   CHECK(result.status == pokemon::CreditStatus::Applied);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::None);
-  CHECK(state.pending == pendingBefore);
+  CHECK(state.pendingEvents == pendingBefore);
   CHECK(state.encounterMisses == 3);
-  CHECK(state.itemMisses == 2);
-  CHECK(state.readingMinuteRemainder == 5);
-  CHECK(state.lifetimeMinutes == 125);
-  CHECK(leader.totalXp == 177);
+  CHECK(state.itemMisses == 19);
+  CHECK(state.readingMinuteRemainder == 0);
+  CHECK(state.lifetimeMinutes == 1);
+  CHECK(leader.totalXp == xpBefore + 1U);
 }
 
-void hourlyItemPityDefersAnEncounterThatIsAlsoDue() {
+void oneBoundaryQueuesItemEncounterAndEvolutionInOrder() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
+  leader.speciesId = 1;
+  leader.totalXp = pokemon::xpRequired(16) - 1U;
   pokemon::PokemonState state = stateWithLeader(leader);
-  state.readingMinuteRemainder = 45;
+  state.readingMinuteRemainder = 59;
   state.encounterMisses = 3;
   state.itemMisses = 19;
   constexpr uint32_t draws[] = {
       0,           // Select the first forced item.
-      1, 0, 0, 0,  // Then create the deferred encounter on the next check.
+      1, 0, 0, 0,  // Legendary miss, first species, minimum level, female roll.
   };
   SequenceRandom sequence{draws, std::size(draws)};
   pokemon::RandomSource random{&sequence, SequenceRandom::next};
 
   const pokemon::CreditResult result =
-      pokemon::applyCreditedMinutes(state, leader, 15, 25, pokemon::OwnedEvolutionNeeds{}, random);
+      pokemon::applyCreditedMinutes(state, leader, 1, 25, pokemon::OwnedEvolutionNeeds{}, random);
 
   CHECK(result.status == pokemon::CreditStatus::Applied);
-  CHECK(result.generatedEvent == pokemon::PendingEventKind::Item);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Item);
-  CHECK(state.pending.item == pokemon::EvolutionItem::MoonStone);
-  CHECK(state.encounterMisses == 3);
-  CHECK(state.itemMisses == 0);
-  CHECK(state.itemCounts[0] == 1);
-  CHECK(sequence.index == 1);
-
-  CHECK(pokemon::acknowledgeItem(state, leader));
-  const pokemon::CreditResult deferred =
-      pokemon::applyCreditedMinutes(state, leader, 15, 25, pokemon::OwnedEvolutionNeeds{}, random);
-  CHECK(deferred.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Encounter);
-  CHECK(state.encounterMisses == 0);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
+  CHECK(pokemon::pendingEventCount(state) == 3);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Item);
+  CHECK(state.pendingEvents[1].kind == pokemon::PendingEventKind::Encounter);
+  CHECK(state.pendingEvents[2].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[2].recordId == leader.recordId);
+  CHECK(state.pendingEvents[2].speciesId == 2);
+  CHECK(state.dashboardNotice == pokemon::DashboardNotice::ItemFound);
   CHECK(sequence.index == std::size(draws));
 }
 
-void encounterDueWithLevelGainPrioritizesTheEncounter() {
+void resolvingEventsPopsOnlyTheFrontAndRefreshesTheNotice() {
+  pokemon::PokemonRecord leader = leaderAtLevelFive();
+  leader.speciesId = 1;
+  leader.totalXp = pokemon::xpRequired(16);
+  pokemon::PokemonState state = stateWithLeader(leader);
+  state.pendingEvents[0] = {0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone,
+                            pokemon::PendingEventKind::Item};
+  state.pendingEvents[1] = {0, 4, 6, pokemon::Gender::Female, pokemon::EvolutionItem::None,
+                            pokemon::PendingEventKind::Encounter};
+  state.pendingEvents[2] = {leader.recordId, 2, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None,
+                            pokemon::PendingEventKind::Evolution};
+  state.dashboardNotice = pokemon::DashboardNotice::ItemFound;
+
+  CHECK(pokemon::acknowledgeItem(state, leader));
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Encounter);
+  CHECK(state.dashboardNotice == pokemon::DashboardNotice::NewPokemon);
+
+  pokemon::RecordMutation mutation{};
+  CHECK(pokemon::resolveEncounter(state, leader, pokemon::EncounterChoice::Pass, nullptr, mutation));
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.dashboardNotice == pokemon::DashboardNotice::WhatsThis);
+
+  CHECK(pokemon::resolveEvolution(state, leader, pokemon::EvolutionChoice::Cancel, mutation));
+  CHECK(pokemon::pendingEventCount(state) == 0);
+  CHECK(state.dashboardNotice == pokemon::DashboardNotice::None);
+}
+
+void encounterDueWithLevelGainQueuesEncounterBeforeEvolution() {
   pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
   bulbasaur.speciesId = 1;
   bulbasaur.totalXp = pokemon::xpRequired(16) - 1U;
@@ -279,28 +307,34 @@ void encounterDueWithLevelGainPrioritizesTheEncounter() {
   const pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 1, 0, pokemon::OwnedEvolutionNeeds{}, random);
 
-  CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 1);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Encounter);
+  CHECK(state.pendingEvents[0].speciesId == 1);
+  CHECK(state.pendingEvents[1].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[1].speciesId == 2);
   CHECK(state.itemMisses == 1);
 }
 
-void forcedItemWithLevelGainPrioritizesTheHourlyItem() {
+void forcedItemWithLevelGainQueuesItemBeforeEvolution() {
   pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
   bulbasaur.speciesId = 1;
   bulbasaur.totalXp = pokemon::xpRequired(16) - 1U;
   pokemon::PokemonState state = stateWithLeader(bulbasaur);
   state.readingMinuteRemainder = 59;
   state.itemMisses = 19;
-  constexpr uint32_t draws[] = {0};  // Select the first forced item.
+  constexpr uint32_t draws[] = {
+      0,  // Select the first forced item.
+      2,  // Miss the encounter due at the hourly boundary.
+  };
   SequenceRandom sequence{draws, std::size(draws)};
   pokemon::RandomSource random{&sequence, SequenceRandom::next};
 
   const pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 1, 0, pokemon::OwnedEvolutionNeeds{}, random);
 
-  CHECK(result.generatedEvent == pokemon::PendingEventKind::Item);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Item);
+  CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Item);
+  CHECK(state.pendingEvents[1].kind == pokemon::PendingEventKind::Evolution);
   CHECK(state.itemCounts[0] == 1);
   CHECK(sequence.index == std::size(draws));
 }
@@ -311,7 +345,13 @@ void multiHourCreditUsesLifetimeAtEachHourlyBoundary() {
   state.lifetimeMinutes = 1079;
   state.readingMinuteRemainder = 59;
   state.encounterMisses = 3;
-  constexpr uint32_t draws[] = {1, 1, 0, 0, 0};
+  constexpr uint32_t draws[] = {
+      1, 1, 0, 0, 0,  // 1080 minutes: item miss, then a regular encounter.
+      2, 2, 2,        // Three encounter misses.
+      1, 1, 0, 0, 0,  // 1140 minutes: item miss, then a regular encounter.
+      2, 2, 2,        // Three more encounter misses.
+      1, 0, 0, 0,     // 1200 minutes: item miss, Articuno, minimum level.
+  };
   SequenceRandom sequence{draws, std::size(draws)};
   pokemon::RandomSource random{&sequence, SequenceRandom::next};
 
@@ -320,8 +360,10 @@ void multiHourCreditUsesLifetimeAtEachHourlyBoundary() {
 
   CHECK(result.status == pokemon::CreditStatus::Applied);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 1);
-  CHECK(state.pending.level == 14);
+  CHECK(state.pendingEvents[0].speciesId == 1);
+  CHECK(state.pendingEvents[0].level == 14);
+  CHECK(state.pendingEvents[2].speciesId == 144);
+  CHECK(state.pendingEvents[2].level == 14);
   CHECK(state.lifetimeMinutes == 1200);
   CHECK(sequence.index == std::size(draws));
 }
@@ -337,7 +379,7 @@ pokemon::PendingEvent forceEncounterAtProgress(const uint8_t progress, const uin
   CHECK(result.status == pokemon::CreditStatus::Applied);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
   CHECK(sequence.index == drawCount);
-  return state.pending;
+  return state.pendingEvents[0];
 }
 
 void progressBandsGateStagesAndEncounterLevels() {
@@ -401,31 +443,35 @@ void everyEligibleRegularEncounterWeightIntervalSelectsItsSpecies() {
 void itemRollAndPityPreferAnOwnedEvolutionNeed() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   pokemon::PokemonState state = stateWithLeader(leader);
-  constexpr uint32_t randomItemDraws[] = {2, 2, 2, 0};
+  state.readingMinuteRemainder = 59;
+  constexpr uint32_t randomItemDraws[] = {
+      0,  // Trigger the hourly item.
+      2,  // Miss the encounter due at the same boundary.
+  };
   SequenceRandom randomItemSequence{randomItemDraws, std::size(randomItemDraws)};
   pokemon::RandomSource randomItem{&randomItemSequence, SequenceRandom::next};
   const pokemon::OwnedEvolutionNeeds thunderNeeded{1U << 2U};
 
-  pokemon::CreditResult result = pokemon::applyCreditedMinutes(state, leader, 60, 25, thunderNeeded, randomItem);
+  pokemon::CreditResult result = pokemon::applyCreditedMinutes(state, leader, 1, 25, thunderNeeded, randomItem);
   CHECK(result.status == pokemon::CreditStatus::Applied);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Item);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Item);
-  CHECK(state.pending.item == pokemon::EvolutionItem::ThunderStone);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Item);
+  CHECK(state.pendingEvents[0].item == pokemon::EvolutionItem::ThunderStone);
   CHECK(state.itemCounts[2] == 1);
   CHECK(state.itemMisses == 0);
-  CHECK(state.encounterMisses == 3);
+  CHECK(state.encounterMisses == 1);
   CHECK(state.dashboardNotice == pokemon::DashboardNotice::ItemFound);
 
   CHECK(pokemon::acknowledgeItem(state, leader));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
   CHECK(state.dashboardNotice == pokemon::DashboardNotice::None);
 
   state.itemMisses = 19;
   state.readingMinuteRemainder = 59;
-  pokemon::RandomSource pityRandom{nullptr, rejectUnexpectedDraw};
-  result = pokemon::applyCreditedMinutes(state, leader, 60, 25, thunderNeeded, pityRandom);
+  pokemon::RandomSource pityRandom{nullptr, chooseLast};
+  result = pokemon::applyCreditedMinutes(state, leader, 1, 25, thunderNeeded, pityRandom);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Item);
-  CHECK(state.pending.item == pokemon::EvolutionItem::ThunderStone);
+  CHECK(state.pendingEvents[0].item == pokemon::EvolutionItem::ThunderStone);
   CHECK(state.itemCounts[2] == 2);
 }
 
@@ -447,7 +493,7 @@ void saturatedItemsDoNotRejectReadingCredit() {
   CHECK(leader.totalXp == 53);
   CHECK(state.lifetimeMinutes == 1);
   CHECK(state.itemMisses == 0);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
   CHECK(sequence.index == 1);
   for (const uint16_t count : state.itemCounts) CHECK(count == UINT16_MAX);
 
@@ -455,14 +501,17 @@ void saturatedItemsDoNotRejectReadingCredit() {
   state.itemCounts[2] = UINT16_MAX;
   state.itemMisses = 19;
   state.readingMinuteRemainder = 59;
-  constexpr uint32_t fallbackDraws[] = {0};
+  constexpr uint32_t fallbackDraws[] = {
+      0,  // Select Moon Stone from the non-saturated fallback items.
+      2,  // Miss the encounter due at the same hourly boundary.
+  };
   SequenceRandom fallbackSequence{fallbackDraws, std::size(fallbackDraws)};
   pokemon::RandomSource fallbackRandom{&fallbackSequence, SequenceRandom::next};
   const pokemon::OwnedEvolutionNeeds thunderNeeded{1U << 2U};
   const pokemon::CreditResult fallback =
       pokemon::applyCreditedMinutes(state, leader, 1, 25, thunderNeeded, fallbackRandom);
   CHECK(fallback.status == pokemon::CreditStatus::Applied);
-  CHECK(state.pending.item == pokemon::EvolutionItem::MoonStone);
+  CHECK(state.pendingEvents[0].item == pokemon::EvolutionItem::MoonStone);
   CHECK(state.itemCounts[0] == 1);
   CHECK(state.itemCounts[2] == UINT16_MAX);
 }
@@ -480,11 +529,11 @@ void legendaryEligibilityAndMewOverrideRegularEncounters() {
   pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, leader, 1, 75, pokemon::OwnedEvolutionNeeds{}, birdRandom);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 144);
-  CHECK(state.pending.level == 14);
-  CHECK(state.pending.gender == pokemon::Gender::Genderless);
+  CHECK(state.pendingEvents[0].speciesId == 144);
+  CHECK(state.pendingEvents[0].level == 14);
+  CHECK(state.pendingEvents[0].gender == pokemon::Gender::Genderless);
 
-  state.pending = {};
+  state.pendingEvents[0] = {};
   state.dashboardNotice = pokemon::DashboardNotice::None;
   state.encounterMisses = 3;
   state.readingMinuteRemainder = 59;
@@ -500,10 +549,10 @@ void legendaryEligibilityAndMewOverrideRegularEncounters() {
   pokemon::RandomSource mewtwoRandom{&mewtwoSequence, SequenceRandom::next};
   result = pokemon::applyCreditedMinutes(state, leader, 1, 95, pokemon::OwnedEvolutionNeeds{}, mewtwoRandom);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 150);
-  CHECK(state.pending.level == 18);
+  CHECK(state.pendingEvents[0].speciesId == 150);
+  CHECK(state.pendingEvents[0].level == 18);
 
-  state.pending = {};
+  state.pendingEvents[0] = {};
   state.dashboardNotice = pokemon::DashboardNotice::None;
   state.encounterMisses = 3;
   state.readingMinuteRemainder = 59;
@@ -514,10 +563,10 @@ void legendaryEligibilityAndMewOverrideRegularEncounters() {
   pokemon::RandomSource duplicateRandom{&duplicateSequence, SequenceRandom::next};
   result = pokemon::applyCreditedMinutes(state, leader, 1, 95, pokemon::OwnedEvolutionNeeds{}, duplicateRandom);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 150);
+  CHECK(state.pendingEvents[0].speciesId == 150);
   CHECK(duplicateSequence.index == std::size(duplicateDraws));
 
-  state.pending = {};
+  state.pendingEvents[0] = {};
   state.dashboardNotice = pokemon::DashboardNotice::None;
   state.encounterMisses = 3;
   state.readingMinuteRemainder = 59;
@@ -530,17 +579,17 @@ void legendaryEligibilityAndMewOverrideRegularEncounters() {
   pokemon::RandomSource mewRandom{&mewSequence, SequenceRandom::next};
   result = pokemon::applyCreditedMinutes(state, leader, 1, 95, pokemon::OwnedEvolutionNeeds{}, mewRandom);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Encounter);
-  CHECK(state.pending.speciesId == 151);
-  CHECK(state.pending.level == 18);
+  CHECK(state.pendingEvents[0].speciesId == 151);
+  CHECK(state.pendingEvents[0].level == 18);
   CHECK(mewSequence.index == std::size(mewDraws));
 }
 
 pokemon::PokemonState stateWithEncounter(const pokemon::PokemonRecord& leader) {
   pokemon::PokemonState state = stateWithLeader(leader);
-  state.pending.kind = pokemon::PendingEventKind::Encounter;
-  state.pending.speciesId = 4;
-  state.pending.level = 6;
-  state.pending.gender = pokemon::Gender::Female;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Encounter;
+  state.pendingEvents[0].speciesId = 4;
+  state.pendingEvents[0].level = 6;
+  state.pendingEvents[0].gender = pokemon::Gender::Female;
   CHECK(pokemon::markSpecies(state.seenSpecies, 4));
   return state;
 }
@@ -562,7 +611,7 @@ void catchCreatesOneAppendAndPassCreatesNone() {
   CHECK(std::string_view(mutation.record.nickname.data()) == "Ember");
   CHECK(state.partyRecordIds[1] == 42);
   CHECK(pokemon::isSpeciesMarked(state.caughtSpecies, 4));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
   state = stateWithEncounter(leader);
   const pokemon::PokemonState beforeInvalidNickname = state;
@@ -578,7 +627,7 @@ void catchCreatesOneAppendAndPassCreatesNone() {
   CHECK(pokemon::resolveEncounter(state, leader, pokemon::EncounterChoice::Pass, nullptr, mutation));
   CHECK(mutation.kind == pokemon::RecordMutationKind::None);
   CHECK(!pokemon::isSpeciesMarked(state.caughtSpecies, 4));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 }
 
 void fullPartyCatchLeavesTheNewRecordForPcStorage() {
@@ -602,14 +651,14 @@ void resolvingABlockingEncounterWaitsForTheNextLevel() {
   pokemon::RecordMutation mutation{};
 
   CHECK(pokemon::resolveEncounter(state, bulbasaur, pokemon::EncounterChoice::Pass, nullptr, mutation));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
   const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
   const pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.speciesId == 2);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[0].speciesId == 2);
 }
 
 void acknowledgingABlockingItemWaitsForTheNextLevel() {
@@ -617,19 +666,19 @@ void acknowledgingABlockingItemWaitsForTheNextLevel() {
   bulbasaur.speciesId = 1;
   bulbasaur.totalXp = pokemon::xpRequired(17) - 1U;
   pokemon::PokemonState state = stateWithLeader(bulbasaur);
-  state.pending.kind = pokemon::PendingEventKind::Item;
-  state.pending.item = pokemon::EvolutionItem::MoonStone;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Item;
+  state.pendingEvents[0].item = pokemon::EvolutionItem::MoonStone;
   state.dashboardNotice = pokemon::DashboardNotice::ItemFound;
 
   CHECK(pokemon::acknowledgeItem(state, bulbasaur));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
   const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
   const pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.speciesId == 2);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[0].speciesId == 2);
 }
 
 void levelEvolutionPromptsOnceAndCanBeConfirmedOrBlocked() {
@@ -642,9 +691,9 @@ void levelEvolutionPromptsOnceAndCanBeConfirmedOrBlocked() {
   pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 31, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.recordId == bulbasaur.recordId);
-  CHECK(state.pending.speciesId == 2);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[0].recordId == bulbasaur.recordId);
+  CHECK(state.pendingEvents[0].speciesId == 2);
   CHECK(state.dashboardNotice == pokemon::DashboardNotice::WhatsThis);
 
   pokemon::RecordMutation mutation{};
@@ -653,7 +702,7 @@ void levelEvolutionPromptsOnceAndCanBeConfirmedOrBlocked() {
   CHECK(mutation.record.speciesId == 2);
   CHECK(bulbasaur.speciesId == 2);
   CHECK(pokemon::isSpeciesMarked(state.caughtSpecies, 2));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
   bulbasaur = leaderAtLevelFive();
   bulbasaur.speciesId = 1;
@@ -662,7 +711,7 @@ void levelEvolutionPromptsOnceAndCanBeConfirmedOrBlocked() {
   state = stateWithLeader(bulbasaur);
   result = pokemon::applyCreditedMinutes(state, bulbasaur, 31, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::None);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 }
 
 void reenablingPromptsWaitsForTheNextLevel() {
@@ -677,20 +726,20 @@ void reenablingPromptsWaitsForTheNextLevel() {
   CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0);
   CHECK(mutation.requestedRecordId == bulbasaur.recordId);
   CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
   const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
   const pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-  CHECK(state.pending.speciesId == 2);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Evolution);
+  CHECK(state.pendingEvents[0].speciesId == 2);
 
   mutation = {};
   CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, false, mutation));
   CHECK((bulbasaur.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) != 0);
   CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 }
 
 void levelHundredDoesNotCatchUpOrChainLevelEvolutions() {
@@ -702,40 +751,61 @@ void levelHundredDoesNotCatchUpOrChainLevelEvolutions() {
   pokemon::RecordMutation mutation{};
 
   CHECK(pokemon::setEvolutionPrompts(state, bulbasaur, true, mutation));
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
-  state.pending.kind = pokemon::PendingEventKind::Evolution;
-  state.pending.recordId = bulbasaur.recordId;
-  state.pending.speciesId = 2;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Evolution;
+  state.pendingEvents[0].recordId = bulbasaur.recordId;
+  state.pendingEvents[0].speciesId = 2;
   state.dashboardNotice = pokemon::DashboardNotice::WhatsThis;
   mutation = {};
   CHECK(pokemon::resolveEvolution(state, bulbasaur, pokemon::EvolutionChoice::Evolve, mutation));
   CHECK(bulbasaur.speciesId == 2);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 
   const pokemon::RandomSource random{nullptr, rejectUnexpectedDraw};
   const pokemon::CreditResult result =
       pokemon::applyCreditedMinutes(state, bulbasaur, 1, 10, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(result.currentLevel == 100);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::None);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
 }
 
 void promptTogglePreservesAnUnrelatedPendingEvent() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   leader.flags = pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled);
   pokemon::PokemonState state = stateWithEncounter(leader);
-  const pokemon::PendingEvent pendingBefore = state.pending;
+  const pokemon::PendingEvent pendingBefore = state.pendingEvents[0];
   pokemon::RecordMutation mutation{};
 
   CHECK(pokemon::setEvolutionPrompts(state, leader, true, mutation));
   CHECK((leader.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0);
-  CHECK(state.pending == pendingBefore);
+  CHECK(state.pendingEvents[0] == pendingBefore);
 
   mutation = {};
   CHECK(pokemon::setEvolutionPrompts(state, leader, false, mutation));
   CHECK((leader.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) != 0);
-  CHECK(state.pending == pendingBefore);
+  CHECK(state.pendingEvents[0] == pendingBefore);
+}
+
+void disablingPromptsRemovesOnlyMatchingQueuedEvolutions() {
+  pokemon::PokemonRecord leader = leaderAtLevelFive();
+  pokemon::PokemonState state = stateWithLeader(leader);
+  const pokemon::PendingEvent encounter{0, 4, 6, pokemon::Gender::Female, pokemon::EvolutionItem::None,
+                                        pokemon::PendingEventKind::Encounter};
+  const pokemon::PendingEvent evolution{leader.recordId, 26, 0, pokemon::Gender::Unknown,
+                                        pokemon::EvolutionItem::None, pokemon::PendingEventKind::Evolution};
+  const pokemon::PendingEvent item{0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::ThunderStone,
+                                   pokemon::PendingEventKind::Item};
+  state.pendingEvents = {encounter, evolution, item};
+  state.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
+  pokemon::RecordMutation mutation{};
+
+  CHECK(pokemon::setEvolutionPrompts(state, leader, false, mutation));
+  CHECK(pokemon::pendingEventCount(state) == 2);
+  CHECK(state.pendingEvents[0] == encounter);
+  CHECK(state.pendingEvents[1] == item);
+  CHECK(state.dashboardNotice == pokemon::DashboardNotice::NewPokemon);
+  CHECK(mutation.kind == pokemon::RecordMutationKind::Replace);
 }
 
 void rejectedPromptToggleDoesNotPartiallyMutate() {
@@ -773,8 +843,8 @@ void everyLevelEvolutionQueuesAtItsThreshold() {
       const pokemon::CreditResult result =
           pokemon::applyCreditedMinutes(state, record, 1, 0, pokemon::OwnedEvolutionNeeds{}, random);
       CHECK(result.status == pokemon::CreditStatus::Applied);
-      CHECK(state.pending.kind == pokemon::PendingEventKind::Evolution);
-      CHECK(state.pending.speciesId == rule.targetSpeciesId);
+      CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::Evolution);
+      CHECK(state.pendingEvents[0].speciesId == rule.targetSpeciesId);
       pokemon::RecordMutation mutation{};
       CHECK(pokemon::resolveEvolution(state, record, pokemon::EvolutionChoice::Evolve, mutation));
       CHECK(record.speciesId == rule.targetSpeciesId);
@@ -849,13 +919,13 @@ void rejectedInputsAndCancelledEvolutionDoNotPartiallyMutate() {
   leader.speciesId = 1;
   leader.totalXp = pokemon::xpRequired(16);
   state = stateWithLeader(leader);
-  state.pending.kind = pokemon::PendingEventKind::Evolution;
-  state.pending.recordId = leader.recordId;
-  state.pending.speciesId = 2;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Evolution;
+  state.pendingEvents[0].recordId = leader.recordId;
+  state.pendingEvents[0].speciesId = 2;
   state.dashboardNotice = pokemon::DashboardNotice::WhatsThis;
   CHECK(pokemon::resolveEvolution(state, leader, pokemon::EvolutionChoice::Cancel, mutation));
   CHECK(leader.speciesId == 1);
-  CHECK(state.pending.kind == pokemon::PendingEventKind::None);
+  CHECK(state.pendingEvents[0].kind == pokemon::PendingEventKind::None);
   CHECK(mutation.kind == pokemon::RecordMutationKind::None);
 }
 
@@ -867,10 +937,11 @@ int main() {
   creditClampsAndRejectsInvalidCallsWithoutMutation();
   fifteenMinuteCheckUsesFortyPercentEncounterChance();
   fourthEncounterCheckIsForcedAndCreatesOnlyOneEvent();
-  pendingEventBlocksRollsButStillAdvancesPity();
-  hourlyItemPityDefersAnEncounterThatIsAlsoDue();
-  encounterDueWithLevelGainPrioritizesTheEncounter();
-  forcedItemWithLevelGainPrioritizesTheHourlyItem();
+  fullQueueCreditsReadingAndPrimesGuaranteesWithoutRolling();
+  oneBoundaryQueuesItemEncounterAndEvolutionInOrder();
+  resolvingEventsPopsOnlyTheFrontAndRefreshesTheNotice();
+  encounterDueWithLevelGainQueuesEncounterBeforeEvolution();
+  forcedItemWithLevelGainQueuesItemBeforeEvolution();
   multiHourCreditUsesLifetimeAtEachHourlyBoundary();
   progressBandsGateStagesAndEncounterLevels();
   everyEligibleRegularEncounterWeightIntervalSelectsItsSpecies();
@@ -885,6 +956,7 @@ int main() {
   reenablingPromptsWaitsForTheNextLevel();
   levelHundredDoesNotCatchUpOrChainLevelEvolutions();
   promptTogglePreservesAnUnrelatedPendingEvent();
+  disablingPromptsRemovesOnlyMatchingQueuedEvolutions();
   rejectedPromptToggleDoesNotPartiallyMutate();
   everyLevelEvolutionQueuesAtItsThreshold();
   everyItemEvolutionConsumesExactlyOneItem();
