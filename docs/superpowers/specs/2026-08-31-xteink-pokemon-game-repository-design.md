@@ -1,5 +1,8 @@
 # Pokémon Game for Xteink X3 Repository Design
 
+> The artwork policy below is superseded by
+> [Full X3 install and artwork release design](2026-08-31-full-install-artwork-release-design.md).
+
 ## Project
 
 - Repository: `padge01/xteink-pokemon-game`

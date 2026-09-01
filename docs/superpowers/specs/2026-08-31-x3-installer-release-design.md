@@ -2,6 +2,11 @@
 
 Date: 2026-08-31
 
+> Superseded in part by
+> [Full X3 install and artwork release design](2026-08-31-full-install-artwork-release-design.md).
+> The project now plans to distribute a full artwork package, and the X3 has no
+> supported USB-flashing route.
+
 ## Goal
 
 Publish a real X3 release that ordinary users can install without Python,
