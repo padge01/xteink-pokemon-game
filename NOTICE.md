@@ -66,7 +66,7 @@ projects. Nothing in this repository claims authorization from a Pokémon rights
 holder. The Xteink name is used descriptively to identify the supported device;
 it does not claim authorization from or affiliation with Xteink.
 
-Pokémon Game for Xteink X3 is an unofficial, independently maintained,
+Xteink Pokémon Game is an unofficial, independently maintained,
 noncommercial project. It is not affiliated with or endorsed by Nintendo,
 Creatures Inc., GAME FREAK Inc., The Pokémon Company, Xteink, CrossInk,
 CrossPoint Reader, PokéAPI, PokéSprite, or Tesserae.
