@@ -1,7 +1,9 @@
 import importlib.util
+import os
 import re
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -24,6 +26,21 @@ class GitBranchTest(unittest.TestCase):
 
         self.assertNotEqual(short_hash, "00000")
         self.assertRegex(short_hash, re.compile(r"^[0-9a-f]{5}$"))
+
+    def test_pokemon_x3_release_receives_the_requested_version(self):
+        class CaptureEnv(dict):
+            def __init__(self):
+                super().__init__(PIOENV="pokemon-x3", PROJECT_DIR=str(REPO_ROOT))
+                self.defines = []
+
+            def Append(self, **values):
+                self.defines.extend(values.get("CPPDEFINES", []))
+
+        environment = CaptureEnv()
+        with mock.patch.dict(os.environ, {"CROSSINK_RELEASE_VERSION": "2.0.0"}, clear=False):
+            git_branch.inject_version(environment)
+
+        self.assertIn(("CROSSINK_VERSION", '\\"2.0.0\\"'), environment.defines)
 
 
 if __name__ == "__main__":

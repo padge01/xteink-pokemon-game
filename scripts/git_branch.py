@@ -2,6 +2,7 @@
 PlatformIO pre-build script: inject git info into version defines.
 
   default:       1.1.0-dev+<branch>  (local development builds)
+  pokemon-x3:    1.1.0-dev+<branch>  (local Pokémon development builds)
   production:    1.1.0               (when $CROSSINK_RELEASE_VERSION is set)
   default RC:    1.1.0-rc+<hash>       (when $CROSSINK_RC_HASH is set)
   test & debug:          1.2.6-<branch>+<5-char-hash>
@@ -163,7 +164,7 @@ def inject_version(env):
     project_dir = env['PROJECT_DIR']
     pioenv = env['PIOENV']
 
-    if pioenv == 'default':
+    if pioenv in {'default', 'pokemon-x3'}:
         if os.environ.get('CROSSINK_RC_HASH'):
             version_string = get_release_candidate_version(project_dir)
             print(f'CrossInk RC build version: {version_string}')

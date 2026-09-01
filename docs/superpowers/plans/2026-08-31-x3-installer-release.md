@@ -32,6 +32,8 @@
 **Files:**
 - Create: `scripts/build_pokemon_release.py`
 - Create: `test/pokemon_release/test_build_pokemon_release.py`
+- Modify: `scripts/git_branch.py`
+- Modify: `test/git_branch/test_git_branch.py`
 - Modify: `.github/workflows/release.yml`
 - Modify: `.github/workflows/release_candidate.yml`
 - Modify: `CHANGELOG.md`
@@ -41,7 +43,7 @@
 - Produces: `dist/xteink-pokemon-x3-v<version>.bin`, `dist/SHA256SUMS`.
 - Function: `build_release(firmware: Path, version: str, output: Path) -> tuple[Path, Path]`.
 
-- [ ] **Step 1: Write the failing release-contract tests**
+- [x] **Step 1: Write the failing release-contract tests**
 
 ```python
 def test_build_release_uses_public_filename_and_checksum(self):
@@ -62,13 +64,13 @@ def test_build_release_rejects_empty_firmware(self):
             RELEASE.build_release(firmware, "1.0.0", root / "dist")
 ```
 
-- [ ] **Step 2: Run the focused test and confirm the module is missing**
+- [x] **Step 2: Run the focused test and confirm the module is missing**
 
-Run: `python -m unittest test.pokemon_release.test_build_pokemon_release -v`
+Run: `python test/pokemon_release/test_build_pokemon_release.py -v`
 
 Expected: FAIL because `scripts/build_pokemon_release.py` does not exist.
 
-- [ ] **Step 3: Implement deterministic release naming and SHA-256 output**
+- [x] **Step 3: Implement deterministic release naming and SHA-256 output**
 
 ```python
 def build_release(firmware: Path, version: str, output: Path) -> tuple[Path, Path]:
@@ -86,7 +88,7 @@ def build_release(firmware: Path, version: str, output: Path) -> tuple[Path, Pat
     return binary, sums
 ```
 
-- [ ] **Step 4: Change both release workflows to build only `pokemon-x3` for this project and attach both output files**
+- [x] **Step 4: Change both release workflows to build only `pokemon-x3` for this project and attach both output files**
 
 The release workflow command becomes:
 
@@ -110,13 +112,13 @@ files: |
   dist/SHA256SUMS
 ```
 
-- [ ] **Step 5: Run the focused tests**
+- [x] **Step 5: Run the focused tests**
 
-Run: `python -m unittest test.pokemon_release.test_build_pokemon_release -v`
+Run: `python test/pokemon_release/test_build_pokemon_release.py -v`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the release contract**
+- [x] **Step 6: Commit the release contract**
 
 ```bash
 git add scripts/build_pokemon_release.py test/pokemon_release .github/workflows/release.yml .github/workflows/release_candidate.yml CHANGELOG.md
