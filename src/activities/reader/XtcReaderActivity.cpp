@@ -849,9 +849,11 @@ void XtcReaderActivity::render(RenderLock&&) {
     return;
   }
 
-  const bool pageRendered = renderPage(pageToRender);
 #if defined(CROSSINK_ENABLE_POKEMON)
+  const bool pageRendered = renderPage(pageToRender);
   if (pageRendered) pokemonTurnVerifier.renderSucceeded(static_cast<uint32_t>(millis()));
+#else
+  renderPage(pageToRender);
 #endif
   pageShownAtMs = millis();
   if (!queueProgressSave(pageToRender)) {
