@@ -6,7 +6,7 @@ import {
   fetchRelease,
   selectReleaseAssets,
   verifyReleaseChecksum,
-} from '../src/lib/installer/release-client.mjs';
+} from '../release-client.js';
 
 
 test('selectReleaseAssets returns the full install, firmware, and checksum', () => {
