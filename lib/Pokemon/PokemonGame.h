@@ -73,10 +73,9 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, ui
                                   const RandomSource& random);
 bool acknowledgeItem(PokemonState& state, const PokemonRecord& leader);
 bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, bool enabled, RecordMutation& mutation);
-bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, EncounterChoice choice,
-                      const char* nickname, RecordMutation& mutation);
-bool resolveEvolution(PokemonState& state, PokemonRecord& record, EvolutionChoice choice,
+bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, EncounterChoice choice, const char* nickname,
                       RecordMutation& mutation);
+bool resolveEvolution(PokemonState& state, PokemonRecord& record, EvolutionChoice choice, RecordMutation& mutation);
 bool useEvolutionItem(PokemonState& state, PokemonRecord& record, EvolutionItem item, RecordMutation& mutation);
 CollectionActionSet collectionActions(bool party, uint8_t partyCount);
 
