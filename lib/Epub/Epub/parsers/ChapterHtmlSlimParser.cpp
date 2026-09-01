@@ -2308,8 +2308,7 @@ void XMLCALL ChapterHtmlSlimParser::startElement(void* userData, const XML_Char*
     return;
   }
 
-  const bool cssPageBreakBefore =
-      userAlignmentBlockStyle.pageBreakBefore && isHeaderOrBlock(name);
+  const bool cssPageBreakBefore = userAlignmentBlockStyle.pageBreakBefore && isHeaderOrBlock(name);
   if (cssPageBreakBefore && ((self->currentTextBlock && !self->currentTextBlock->isEmpty()) ||
                              (self->currentPage && !self->currentPage->elements.empty()))) {
     if (self->partWordBufferIndex > 0) {

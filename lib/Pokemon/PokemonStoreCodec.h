@@ -1,10 +1,10 @@
 #pragma once
 
-#include "PokemonTypes.h"
-
 #include <array>
 #include <cstddef>
 #include <cstdint>
+
+#include "PokemonTypes.h"
 
 namespace pokemon {
 

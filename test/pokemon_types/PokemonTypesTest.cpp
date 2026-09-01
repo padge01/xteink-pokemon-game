@@ -5,8 +5,8 @@
 #include <cstring>
 #include <string_view>
 
-#include "Pokemon/PokemonSpecies.h"
 #include "Pokemon/PokemonPromptContext.h"
+#include "Pokemon/PokemonSpecies.h"
 #include "Pokemon/PokemonTypes.h"
 
 namespace {
@@ -21,12 +21,12 @@ using pokemon::RecordFlag;
 
 int failures = 0;
 
-#define CHECK(condition)                                                                     \
-  do {                                                                                       \
-    if (!(condition)) {                                                                      \
-      std::fprintf(stderr, "%s:%d check failed: %s\n", __FILE__, __LINE__, #condition);    \
-      ++failures;                                                                            \
-    }                                                                                        \
+#define CHECK(condition)                                                                \
+  do {                                                                                  \
+    if (!(condition)) {                                                                 \
+      std::fprintf(stderr, "%s:%d check failed: %s\n", __FILE__, __LINE__, #condition); \
+      ++failures;                                                                       \
+    }                                                                                   \
   } while (false)
 
 PokemonRecord validRecord() {
@@ -406,7 +406,7 @@ void speciesTableCoversKantoAndPinnedMetadata() {
 }
 
 void acquisitionRulesKeepItemsNecessaryAndMewSpecial() {
-  constexpr uint16_t evolutionOnly[] = {26, 31, 34, 36, 38, 40, 45, 59, 62, 65,
+  constexpr uint16_t evolutionOnly[] = {26, 31, 34, 36, 38, 40,  45,  59,  62,  65,
                                         68, 71, 76, 91, 94, 103, 121, 134, 135, 136};
   size_t actualEvolutionOnly = 0;
   for (uint16_t speciesId = 1; speciesId <= 151; ++speciesId) {
@@ -441,9 +441,8 @@ void everyKantoEvolutionMatchesTheCanonicalList() {
     for (const pokemon::EvolutionRule& rule : actual) {
       bool found = false;
       for (const ExpectedEvolution& expected : EXPECTED_EVOLUTIONS) {
-        if (expected.source == source && expected.target == rule.targetSpeciesId &&
-            expected.trigger == rule.trigger && expected.level == rule.minimumLevel &&
-            expected.item == rule.item) {
+        if (expected.source == source && expected.target == rule.targetSpeciesId && expected.trigger == rule.trigger &&
+            expected.level == rule.minimumLevel && expected.item == rule.item) {
           found = true;
           break;
         }

@@ -939,8 +939,7 @@ int SdCardFont::prewarmStyle(uint8_t styleIdx, const uint32_t* codepoints, uint3
   // makes the page and status bar evict one another and repeat SD reads.
   if (s.miniGlyphCount > 0 && s.miniIntervalCount > 0 && ESP.getFreeHeap() < MINI_RETAIN_MIN_FREE_HEAP) {
     const uint32_t unionUpperBound = s.miniGlyphCount + cpCount;
-    const uint32_t averageBitmapBytes =
-        s.miniBitmapUsed > 0 ? s.miniBitmapUsed / s.miniGlyphCount : 64U;
+    const uint32_t averageBitmapBytes = s.miniBitmapUsed > 0 ? s.miniBitmapUsed / s.miniGlyphCount : 64U;
     const uint32_t estimatedArenaBytes =
         unionUpperBound * (static_cast<uint32_t>(sizeof(EpdGlyph)) + averageBitmapBytes);
     constexpr uint32_t UNION_PRESSURE_HEADROOM = 12U * 1024U;

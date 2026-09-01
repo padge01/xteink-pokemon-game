@@ -34,18 +34,16 @@ void maximumConfigurationHasHandCheckedRows() {
   });
 
   constexpr std::array mainActions{
-      ReaderMenuAction::FOOTNOTES,         ReaderMenuAction::LOOKUP,
-      ReaderMenuAction::LOOKUP_HISTORY,    ReaderMenuAction::SELECT_CHAPTER,
-      ReaderMenuAction::READER_OPTIONS,    ReaderMenuAction::CONTROLS_OPTIONS,
-      ReaderMenuAction::GO_TO_PERCENT,     ReaderMenuAction::AUTO_PAGE_TURN,
-      ReaderMenuAction::READING_STATS,     ReaderMenuAction::TOGGLE_COMPLETED,
+      ReaderMenuAction::FOOTNOTES,        ReaderMenuAction::LOOKUP,         ReaderMenuAction::LOOKUP_HISTORY,
+      ReaderMenuAction::SELECT_CHAPTER,   ReaderMenuAction::READER_OPTIONS, ReaderMenuAction::CONTROLS_OPTIONS,
+      ReaderMenuAction::GO_TO_PERCENT,    ReaderMenuAction::AUTO_PAGE_TURN, ReaderMenuAction::READING_STATS,
+      ReaderMenuAction::TOGGLE_COMPLETED,
   };
   constexpr std::array bookmarkActions{
-      ReaderMenuAction::SAVE_CLIPPING,       ReaderMenuAction::VIEW_CLIPPINGS,
-      ReaderMenuAction::BOOKMARK_TOGGLE,     ReaderMenuAction::VIEW_BOOKMARKS,
-      ReaderMenuAction::DELETE_BOOKMARKS,    ReaderMenuAction::SYNC,
-      ReaderMenuAction::NEARBY_POSITION_SYNC, ReaderMenuAction::SEND_NEARBY_BOOK,
-      ReaderMenuAction::SCREENSHOT,          ReaderMenuAction::DISPLAY_QR,
+      ReaderMenuAction::SAVE_CLIPPING,        ReaderMenuAction::VIEW_CLIPPINGS,   ReaderMenuAction::BOOKMARK_TOGGLE,
+      ReaderMenuAction::VIEW_BOOKMARKS,       ReaderMenuAction::DELETE_BOOKMARKS, ReaderMenuAction::SYNC,
+      ReaderMenuAction::NEARBY_POSITION_SYNC, ReaderMenuAction::SEND_NEARBY_BOOK, ReaderMenuAction::SCREENSHOT,
+      ReaderMenuAction::DISPLAY_QR,
   };
   constexpr std::array settingsActions{
       ReaderMenuAction::DELETE_STATS,
@@ -85,13 +83,11 @@ void everyConditionalCombinationFitsAndSelectsCorrectLabels() {
            "main conditional count is wrong");
     expect(tabs.bookmarks.count == 7U + (input.hasBookmarks ? 2U : 0U) + (input.hasClippings ? 1U : 0U),
            "bookmark conditional count is wrong");
-    expect(tabs.settings.count == 3U + (input.showReadingPaceReset ? 1U : 0U),
-           "settings conditional count is wrong");
+    expect(tabs.settings.count == 3U + (input.showReadingPaceReset ? 1U : 0U), "settings conditional count is wrong");
     expect(tabs.main.count <= READER_MENU_MAX_ITEMS, "main menu exceeded fixed capacity");
     expect(tabs.bookmarks.count <= READER_MENU_MAX_ITEMS, "bookmark menu exceeded fixed capacity");
     expect(tabs.settings.count <= READER_MENU_MAX_ITEMS, "settings menu exceeded fixed capacity");
-    expect(tabs.main.contains(ReaderMenuAction::FOOTNOTES) == input.hasFootnotes,
-           "footnotes conditional row is wrong");
+    expect(tabs.main.contains(ReaderMenuAction::FOOTNOTES) == input.hasFootnotes, "footnotes conditional row is wrong");
     expect(tabs.main.contains(ReaderMenuAction::LOOKUP) == input.hasDictionary,
            "dictionary lookup conditional row is wrong");
     expect(tabs.main.contains(ReaderMenuAction::LOOKUP_HISTORY) == input.hasDictionary,
@@ -110,13 +106,12 @@ void everyConditionalCombinationFitsAndSelectsCorrectLabels() {
     expect(bookmark != nullptr, "bookmark toggle row is missing");
     expect(completion != nullptr, "completion toggle row is missing");
     if (bookmark) {
-      expect(bookmark->labelId == (input.isCurrentPageBookmarked ? StrId::STR_REMOVE_BOOKMARK
-                                                                : StrId::STR_ADD_BOOKMARK),
-             "bookmark toggle label is wrong");
+      expect(
+          bookmark->labelId == (input.isCurrentPageBookmarked ? StrId::STR_REMOVE_BOOKMARK : StrId::STR_ADD_BOOKMARK),
+          "bookmark toggle label is wrong");
     }
     if (completion) {
-      expect(completion->labelId == (input.isBookCompleted ? StrId::STR_MARK_UNFINISHED
-                                                           : StrId::STR_MARK_FINISHED),
+      expect(completion->labelId == (input.isBookCompleted ? StrId::STR_MARK_UNFINISHED : StrId::STR_MARK_FINISHED),
              "completion toggle label is wrong");
     }
   }
@@ -137,12 +132,10 @@ void appendRejectsOverflowWithoutChangingTheList() {
 
 void indexOfReportsStableButtonNavigationTargets() {
   const ReaderMenuTabs basic = buildReaderMenuItems({});
-  expect(basic.main.indexOf(ReaderMenuAction::SELECT_CHAPTER) == 0,
-         "chapter row index is wrong in the basic menu");
+  expect(basic.main.indexOf(ReaderMenuAction::SELECT_CHAPTER) == 0, "chapter row index is wrong in the basic menu");
   expect(basic.main.indexOf(ReaderMenuAction::READER_OPTIONS) == 1,
          "reader options row index is wrong in the basic menu");
-  expect(basic.main.indexOf(ReaderMenuAction::FOOTNOTES) == -1,
-         "missing optional row returned a valid index");
+  expect(basic.main.indexOf(ReaderMenuAction::FOOTNOTES) == -1, "missing optional row returned a valid index");
 
   const ReaderMenuTabs expanded = buildReaderMenuItems({
       .hasFootnotes = true,

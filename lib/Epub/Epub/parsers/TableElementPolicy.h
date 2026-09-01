@@ -10,8 +10,7 @@ constexpr bool isStandaloneCaption(const std::string_view name, const int tableD
   return tableDepth == 1 && isCaption(name);
 }
 
-constexpr bool isTransparentCellWrapper(const std::string_view name, const int tableDepth,
-                                        const bool isHeaderOrBlock) {
+constexpr bool isTransparentCellWrapper(const std::string_view name, const int tableDepth, const bool isHeaderOrBlock) {
   return tableDepth == 1 && isHeaderOrBlock && !isCaption(name);
 }
 

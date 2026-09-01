@@ -579,7 +579,11 @@ void TxtReaderActivity::render(RenderLock&&) {
   size_t offset = pageOffsets[currentPage];
   size_t nextOffset;
   currentPageLines.clear();
+#if defined(CROSSINK_ENABLE_POKEMON)
   const bool pageLoaded = loadPageAtOffset(offset, currentPageLines, nextOffset);
+#else
+  loadPageAtOffset(offset, currentPageLines, nextOffset);
+#endif
 
   renderer.clearScreen(ReaderUtils::readerBackgroundColor());
   renderPage();

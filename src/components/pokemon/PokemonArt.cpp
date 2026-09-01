@@ -16,8 +16,8 @@ void drawFallback(const GfxRenderer& renderer, const Rect bounds) {
   const char* mark = "?";
   const int width = renderer.getTextWidth(UI_12_FONT_ID, mark);
   const int height = renderer.getLineHeight(UI_12_FONT_ID);
-  renderer.drawText(UI_12_FONT_ID, bounds.x + (bounds.width - width) / 2,
-                    bounds.y + (bounds.height - height) / 2, mark);
+  renderer.drawText(UI_12_FONT_ID, bounds.x + (bounds.width - width) / 2, bounds.y + (bounds.height - height) / 2,
+                    mark);
 }
 
 bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, const bool fallback,
@@ -38,8 +38,8 @@ bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, 
     return false;
   }
 
-  const bool rendered = renderer.drawBitmap(bitmap, bounds.x, bounds.y, bounds.width, bounds.height, 0.0f, 0.0f,
-                                            bwPolicy);
+  const bool rendered =
+      renderer.drawBitmap(bitmap, bounds.x, bounds.y, bounds.width, bounds.height, 0.0f, 0.0f, bwPolicy);
   if (!rendered) {
     LOG_ERR("PKART", "Could not render Pokemon art: %s", path);
     if (fallback) drawFallback(renderer, bounds);
@@ -50,8 +50,8 @@ bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, 
 
 }  // namespace
 
-bool drawPokemonSpeciesArt(const GfxRenderer& renderer, const uint16_t speciesId, const bool hero,
-                           const Rect bounds, const bool fallback) {
+bool drawPokemonSpeciesArt(const GfxRenderer& renderer, const uint16_t speciesId, const bool hero, const Rect bounds,
+                           const bool fallback) {
   char path[64]{};
   return drawPath(renderer, pokemonSpeciesArtPath(speciesId, hero, path, sizeof(path)), bounds, fallback,
                   GfxRenderer::BitmapBwPolicy::ExistingThreshold);
@@ -64,8 +64,8 @@ bool drawPokemonPokedexArt(const GfxRenderer& renderer, const uint16_t speciesId
                   GfxRenderer::BitmapBwPolicy::ExistingThreshold);
 }
 
-bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, const bool hero,
-                        const Rect bounds, const bool fallback) {
+bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, const bool hero, const Rect bounds,
+                        const bool fallback) {
   char path[80]{};
   const char* pathValue = pokemonItemArtPath(item, hero, path, sizeof(path));
   if (pathValue == nullptr && item == EvolutionItem::LinkCable) return false;

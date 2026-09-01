@@ -1,6 +1,6 @@
-#include "components/themes/ButtonHintLayout.h"
 #include "EpdFont/builtinFonts/inter_10_regular.h"
 #include "EpdFont/builtinFonts/inter_8_regular.h"
+#include "components/themes/ButtonHintLayout.h"
 
 using ButtonHintLayout::Alignment;
 

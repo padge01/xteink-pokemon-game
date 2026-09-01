@@ -311,8 +311,7 @@ bool PokemonService::beginReadingSession() {
 
   PokemonState state{};
   PokemonRecord leader{};
-  if (!store_.loadState(state) || state.partyRecordIds[0] == 0 ||
-      !store_.readRecord(state.partyRecordIds[0], leader)) {
+  if (!store_.loadState(state) || state.partyRecordIds[0] == 0 || !store_.readRecord(state.partyRecordIds[0], leader)) {
     return false;
   }
 
@@ -344,8 +343,7 @@ void PokemonService::flushOnExit(const uint32_t nowMs) {
   readingSessionActive_ = false;
 }
 
-bool PokemonService::creditFromTracker(void* context, const uint16_t minutes,
-                                       const uint8_t bookProgressPercent) {
+bool PokemonService::creditFromTracker(void* context, const uint16_t minutes, const uint8_t bookProgressPercent) {
   return static_cast<PokemonService*>(context)->creditMinutes(minutes, bookProgressPercent);
 }
 

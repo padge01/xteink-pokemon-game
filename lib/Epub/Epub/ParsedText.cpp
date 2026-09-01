@@ -1,6 +1,4 @@
 #include "ParsedText.h"
-#include "ReorderedWidthScratch.h"
-#include "TokenBoundary.h"
 
 #include <Arena.h>
 #include <ArenaVector.h>
@@ -17,6 +15,8 @@
 #include <limits>
 #include <vector>
 
+#include "ReorderedWidthScratch.h"
+#include "TokenBoundary.h"
 #include "hyphenation/Hyphenator.h"
 
 constexpr int MAX_COST = std::numeric_limits<int>::max();
@@ -703,8 +703,7 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
       // Subsequent segments stay attached to the prefix. The fourth boundary state records a
       // legal break after a visible hyphen while preserving kerning and suppressing justification
       // when both segments remain on the same line.
-      const bool breakAfterPrevious =
-          !isFirstSegment && !words.empty() && endsWithBreakableHyphen(words.back());
+      const bool breakAfterPrevious = !isFirstSegment && !words.empty() && endsWithBreakableHyphen(words.back());
       processSegment(segment, inWordSegment, isFirstSegment ? effectiveAttachToPrevious : true,
                      isFirstSegment ? effectiveNoSpaceBefore : breakAfterPrevious);
 
@@ -1585,8 +1584,7 @@ bool ParsedText::extractLine(Arena& scratchArena, const size_t breakIndex, const
 
   if (willReorder) {
     ArenaVector<uint16_t> reorderedWidths(scratchArena);
-    const auto widthBuildResult =
-        ReorderedWidthScratch::build(reorderedWidths, lineWordWidths, visualOrderScratch);
+    const auto widthBuildResult = ReorderedWidthScratch::build(reorderedWidths, lineWordWidths, visualOrderScratch);
     if (widthBuildResult == ReorderedWidthScratch::BuildResult::ReserveFailed) {
       LOG_ERR("PTX", "OOM allocating reordered word-width scratch (%u words)",
               static_cast<unsigned>(visualOrderScratch.size()));

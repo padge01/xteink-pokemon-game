@@ -4,8 +4,8 @@
 
 #include "lib/Epub/Epub/ReorderedWidthScratch.h"
 
-using ReorderedWidthScratch::BuildResult;
 using ReorderedWidthScratch::build;
+using ReorderedWidthScratch::BuildResult;
 
 class ControlledScratch {
  public:
@@ -40,8 +40,8 @@ constexpr std::array<uint16_t, 3> VISUAL_ORDER{2, 0, 1};
 
 constexpr bool preservesVisualOrder() {
   ControlledScratch scratch(3, 3);
-  return build(scratch, WIDTHS, VISUAL_ORDER) == BuildResult::Success && scratch.size() == 3 &&
-         scratch[0] == 30 && scratch[1] == 10 && scratch[2] == 20;
+  return build(scratch, WIDTHS, VISUAL_ORDER) == BuildResult::Success && scratch.size() == 3 && scratch[0] == 30 &&
+         scratch[1] == 10 && scratch[2] == 20;
 }
 
 constexpr bool reportsReserveFailure() {

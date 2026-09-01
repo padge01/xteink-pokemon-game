@@ -1,6 +1,5 @@
-#include <gtest/gtest.h>
-
 #include <HalStorage.h>
+#include <gtest/gtest.h>
 
 #include "pokemon/PokemonService.h"
 
@@ -8,9 +7,7 @@ namespace {
 
 uint32_t zeroRandom(void*, uint32_t) { return 0; }
 
-uint32_t itemEventRandom(void*, const uint32_t upperExclusive) {
-  return upperExclusive == 4 ? 1U : 0U;
-}
+uint32_t itemEventRandom(void*, const uint32_t upperExclusive) { return upperExclusive == 4 ? 1U : 0U; }
 
 pokemon::PokemonRecord starterPikachu() {
   pokemon::PokemonRecord record{};
@@ -45,8 +42,7 @@ pokemon::PokemonRecord caughtPokemon(const uint32_t recordId, const uint16_t spe
   return record;
 }
 
-void appendOwnedPokemon(pokemon::PokemonStore& store, const pokemon::PokemonRecord& record,
-                        const bool addToParty) {
+void appendOwnedPokemon(pokemon::PokemonStore& store, const pokemon::PokemonRecord& record, const bool addToParty) {
   pokemon::PokemonState state{};
   ASSERT_TRUE(store.loadState(state));
   ASSERT_TRUE(pokemon::markSpecies(state.seenSpecies, record.speciesId));
@@ -140,8 +136,7 @@ TEST(PokemonService, CreatesOneDurableStarterWithChosenIdentity) {
   pokemon::PokemonStore store;
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
 
-  EXPECT_EQ(service.createStarter(25, pokemon::Gender::Female, "CinderVolt"),
-            pokemon::ServiceStatus::Ok);
+  EXPECT_EQ(service.createStarter(25, pokemon::Gender::Female, "CinderVolt"), pokemon::ServiceStatus::Ok);
 
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
@@ -169,8 +164,7 @@ TEST(PokemonService, RejectsSecondStarterWithoutChangingTheSave) {
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
   ASSERT_EQ(service.createStarter(1, pokemon::Gender::Male, ""), pokemon::ServiceStatus::Ok);
 
-  EXPECT_EQ(service.createStarter(4, pokemon::Gender::Female, ""),
-            pokemon::ServiceStatus::AlreadyStarted);
+  EXPECT_EQ(service.createStarter(4, pokemon::Gender::Female, ""), pokemon::ServiceStatus::AlreadyStarted);
 
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
@@ -287,8 +281,7 @@ TEST(PokemonService, ResolvesEncounterCatchThenAllowsNickname) {
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
 
   uint32_t caughtRecordId = 0;
-  ASSERT_EQ(service.resolveEncounter(pokemon::EncounterChoice::Catch, caughtRecordId),
-            pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(service.resolveEncounter(pokemon::EncounterChoice::Catch, caughtRecordId), pokemon::ServiceStatus::Ok);
   EXPECT_EQ(caughtRecordId, 2U);
   ASSERT_EQ(service.renamePokemon(caughtRecordId, "Nova"), pokemon::ServiceStatus::Ok);
 
@@ -316,8 +309,7 @@ TEST(PokemonService, ResolvesEncounterPassWithoutCreatingARecord) {
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
 
   uint32_t caughtRecordId = 99;
-  ASSERT_EQ(service.resolveEncounter(pokemon::EncounterChoice::Pass, caughtRecordId),
-            pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(service.resolveEncounter(pokemon::EncounterChoice::Pass, caughtRecordId), pokemon::ServiceStatus::Ok);
   EXPECT_EQ(caughtRecordId, 0U);
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
@@ -388,10 +380,8 @@ TEST(PokemonService, ConsumesStoneOnlyForApplicableEvolution) {
   ASSERT_TRUE(store.commit(state));
   pokemon::PokemonService service(store, {nullptr, zeroRandom});
 
-  EXPECT_EQ(service.useEvolutionItem(1, pokemon::EvolutionItem::WaterStone),
-            pokemon::ServiceStatus::NotApplicable);
-  ASSERT_EQ(service.useEvolutionItem(1, pokemon::EvolutionItem::ThunderStone),
-            pokemon::ServiceStatus::Ok);
+  EXPECT_EQ(service.useEvolutionItem(1, pokemon::EvolutionItem::WaterStone), pokemon::ServiceStatus::NotApplicable);
+  ASSERT_EQ(service.useEvolutionItem(1, pokemon::EvolutionItem::ThunderStone), pokemon::ServiceStatus::Ok);
 
   pokemon::PokemonSnapshot snapshot{};
   ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
@@ -409,8 +399,7 @@ TEST(PokemonService, ReadsBoundedPcPagesAndResetsToEmpty) {
 
   std::array<pokemon::PokemonRecord, 6> page{};
   size_t count = 0;
-  ASSERT_EQ(service.readPcPage(pokemon::PcOrder::PokedexNumber, 0, page, count),
-            pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(service.readPcPage(pokemon::PcOrder::PokedexNumber, 0, page, count), pokemon::ServiceStatus::Ok);
   ASSERT_EQ(count, 2U);
   EXPECT_EQ(page[0].speciesId, 4U);
   EXPECT_EQ(page[1].speciesId, 7U);
@@ -434,8 +423,7 @@ TEST(PokemonService, PcReadFailureReturnsStorageErrorInsteadOfAnEmptyPage) {
   size_t count = 99;
 
   Storage.setFailRead(true);
-  EXPECT_EQ(service.readPcPage(pokemon::PcOrder::CatchDate, 0, page, count),
-            pokemon::ServiceStatus::StorageError);
+  EXPECT_EQ(service.readPcPage(pokemon::PcOrder::CatchDate, 0, page, count), pokemon::ServiceStatus::StorageError);
   Storage.setFailRead(false);
   EXPECT_EQ(count, 0U);
 }

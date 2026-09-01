@@ -1,6 +1,5 @@
-#include <gtest/gtest.h>
-
 #include <PokemonDashboardLayout.h>
+#include <gtest/gtest.h>
 
 namespace {
 

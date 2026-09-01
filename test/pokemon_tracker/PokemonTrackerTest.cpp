@@ -1,6 +1,5 @@
-#include <gtest/gtest.h>
-
 #include <Pokemon/PokemonTracker.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <array>

@@ -10,12 +10,12 @@ namespace {
 
 int failures = 0;
 
-#define CHECK(condition)                                                                  \
-  do {                                                                                    \
-    if (!(condition)) {                                                                   \
+#define CHECK(condition)                                                                \
+  do {                                                                                  \
+    if (!(condition)) {                                                                 \
       std::fprintf(stderr, "%s:%d check failed: %s\n", __FILE__, __LINE__, #condition); \
-      ++failures;                                                                         \
-    }                                                                                     \
+      ++failures;                                                                       \
+    }                                                                                   \
   } while (false)
 
 uint32_t chooseFirst(void*, uint32_t) { return 0; }
@@ -136,15 +136,15 @@ void creditClampsAndRejectsInvalidCallsWithoutMutation() {
   rejectedState.partyRecordIds[0] = 99;
   const pokemon::PokemonRecord leaderBefore = rejectedLeader;
   const pokemon::PokemonState stateBefore = rejectedState;
-  const pokemon::CreditResult rejected = pokemon::applyCreditedMinutes(
-      rejectedState, rejectedLeader, 10, 20, pokemon::OwnedEvolutionNeeds{}, random);
+  const pokemon::CreditResult rejected =
+      pokemon::applyCreditedMinutes(rejectedState, rejectedLeader, 10, 20, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(rejected.status == pokemon::CreditStatus::Rejected);
   CHECK(rejectedLeader == leaderBefore);
   CHECK(rejectedState == stateBefore);
 
   rejectedState = stateWithLeader(rejectedLeader);
-  const pokemon::CreditResult noChange = pokemon::applyCreditedMinutes(
-      rejectedState, rejectedLeader, 0, 20, pokemon::OwnedEvolutionNeeds{}, random);
+  const pokemon::CreditResult noChange =
+      pokemon::applyCreditedMinutes(rejectedState, rejectedLeader, 0, 20, pokemon::OwnedEvolutionNeeds{}, random);
   CHECK(noChange.status == pokemon::CreditStatus::NoChange);
   CHECK(rejectedLeader == leaderBefore);
   CHECK(rejectedState == stateWithLeader(rejectedLeader));
@@ -326,8 +326,7 @@ void multiHourCreditUsesLifetimeAtEachHourlyBoundary() {
   CHECK(sequence.index == std::size(draws));
 }
 
-pokemon::PendingEvent forceEncounterAtProgress(const uint8_t progress, const uint32_t* draws,
-                                               const size_t drawCount) {
+pokemon::PendingEvent forceEncounterAtProgress(const uint8_t progress, const uint32_t* draws, const size_t drawCount) {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   pokemon::PokemonState state = stateWithLeader(leader);
   state.encounterMisses = 3;
@@ -377,16 +376,23 @@ void everyEligibleRegularEncounterWeightIntervalSelectsItsSpecies() {
       const pokemon::PendingEvent event = forceEncounterAtProgress(progress, draws, drawCount);
       CHECK(event.speciesId == speciesId);
       uint8_t expectedMinimumLevel = 2;
-      if (progress >= 95) expectedMinimumLevel = 18;
-      else if (progress >= 75) expectedMinimumLevel = 14;
-      else if (progress >= 50) expectedMinimumLevel = 9;
-      else if (progress >= 25) expectedMinimumLevel = 5;
+      if (progress >= 95)
+        expectedMinimumLevel = 18;
+      else if (progress >= 75)
+        expectedMinimumLevel = 14;
+      else if (progress >= 50)
+        expectedMinimumLevel = 9;
+      else if (progress >= 25)
+        expectedMinimumLevel = 5;
       CHECK(event.level == expectedMinimumLevel);
       const bool speciallyRare = speciesId == 1 || speciesId == 4 || speciesId == 7 || speciesId == 25;
       uint8_t weight = 1;
-      if (!speciallyRare && species.captureRate >= 200) weight = 4;
-      else if (!speciallyRare && species.captureRate >= 120) weight = 3;
-      else if (!speciallyRare && species.captureRate >= 60) weight = 2;
+      if (!speciallyRare && species.captureRate >= 200)
+        weight = 4;
+      else if (!speciallyRare && species.captureRate >= 120)
+        weight = 3;
+      else if (!speciallyRare && species.captureRate >= 60)
+        weight = 2;
       cumulativeWeight += weight;
     }
   }
@@ -400,8 +406,7 @@ void itemRollAndPityPreferAnOwnedEvolutionNeed() {
   pokemon::RandomSource randomItem{&randomItemSequence, SequenceRandom::next};
   const pokemon::OwnedEvolutionNeeds thunderNeeded{1U << 2U};
 
-  pokemon::CreditResult result =
-      pokemon::applyCreditedMinutes(state, leader, 60, 25, thunderNeeded, randomItem);
+  pokemon::CreditResult result = pokemon::applyCreditedMinutes(state, leader, 60, 25, thunderNeeded, randomItem);
   CHECK(result.status == pokemon::CreditStatus::Applied);
   CHECK(result.generatedEvent == pokemon::PendingEventKind::Item);
   CHECK(state.pending.kind == pokemon::PendingEventKind::Item);
@@ -563,8 +568,8 @@ void catchCreatesOneAppendAndPassCreatesNone() {
   const pokemon::PokemonState beforeInvalidNickname = state;
   mutation = {};
   mutation.requestedRecordId = 43;
-  CHECK(!pokemon::resolveEncounter(
-      state, leader, pokemon::EncounterChoice::Catch, "123456789012345678901234567890123", mutation));
+  CHECK(!pokemon::resolveEncounter(state, leader, pokemon::EncounterChoice::Catch, "123456789012345678901234567890123",
+                                   mutation));
   CHECK(state == beforeInvalidNickname);
   CHECK(mutation.kind == pokemon::RecordMutationKind::None);
 
@@ -791,16 +796,16 @@ void everyItemEvolutionConsumesExactlyOneItem() {
     pokemon::EvolutionItem item;
   };
   constexpr ItemEvolutionCase cases[] = {
-      {25, 26, pokemon::EvolutionItem::ThunderStone}, {30, 31, pokemon::EvolutionItem::MoonStone},
-      {33, 34, pokemon::EvolutionItem::MoonStone},    {35, 36, pokemon::EvolutionItem::MoonStone},
-      {37, 38, pokemon::EvolutionItem::FireStone},   {39, 40, pokemon::EvolutionItem::MoonStone},
-      {44, 45, pokemon::EvolutionItem::LeafStone},   {58, 59, pokemon::EvolutionItem::FireStone},
-      {61, 62, pokemon::EvolutionItem::WaterStone},  {64, 65, pokemon::EvolutionItem::LinkCable},
-      {67, 68, pokemon::EvolutionItem::LinkCable},   {70, 71, pokemon::EvolutionItem::LeafStone},
-      {75, 76, pokemon::EvolutionItem::LinkCable},   {90, 91, pokemon::EvolutionItem::WaterStone},
-      {93, 94, pokemon::EvolutionItem::LinkCable},   {102, 103, pokemon::EvolutionItem::LeafStone},
-      {120, 121, pokemon::EvolutionItem::WaterStone},{133, 134, pokemon::EvolutionItem::WaterStone},
-      {133, 135, pokemon::EvolutionItem::ThunderStone},{133, 136, pokemon::EvolutionItem::FireStone},
+      {25, 26, pokemon::EvolutionItem::ThunderStone},   {30, 31, pokemon::EvolutionItem::MoonStone},
+      {33, 34, pokemon::EvolutionItem::MoonStone},      {35, 36, pokemon::EvolutionItem::MoonStone},
+      {37, 38, pokemon::EvolutionItem::FireStone},      {39, 40, pokemon::EvolutionItem::MoonStone},
+      {44, 45, pokemon::EvolutionItem::LeafStone},      {58, 59, pokemon::EvolutionItem::FireStone},
+      {61, 62, pokemon::EvolutionItem::WaterStone},     {64, 65, pokemon::EvolutionItem::LinkCable},
+      {67, 68, pokemon::EvolutionItem::LinkCable},      {70, 71, pokemon::EvolutionItem::LeafStone},
+      {75, 76, pokemon::EvolutionItem::LinkCable},      {90, 91, pokemon::EvolutionItem::WaterStone},
+      {93, 94, pokemon::EvolutionItem::LinkCable},      {102, 103, pokemon::EvolutionItem::LeafStone},
+      {120, 121, pokemon::EvolutionItem::WaterStone},   {133, 134, pokemon::EvolutionItem::WaterStone},
+      {133, 135, pokemon::EvolutionItem::ThunderStone}, {133, 136, pokemon::EvolutionItem::FireStone},
   };
 
   for (const ItemEvolutionCase& itemCase : cases) {

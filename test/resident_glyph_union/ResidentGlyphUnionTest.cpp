@@ -16,8 +16,8 @@ constexpr bool mergesIntervalsAndRequestsWithoutDuplicates() {
   std::array<uint32_t, EXPECTED.size()> merged{};
   uint32_t mergedCount = 0;
 
-  if (mergeSorted(RESIDENT.data(), RESIDENT.size(), REQUESTED.data(), REQUESTED.size(), merged.data(),
-                  merged.size(), mergedCount) != MergeResult::Success) {
+  if (mergeSorted(RESIDENT.data(), RESIDENT.size(), REQUESTED.data(), REQUESTED.size(), merged.data(), merged.size(),
+                  mergedCount) != MergeResult::Success) {
     return false;
   }
   if (mergedCount != EXPECTED.size()) return false;
@@ -33,8 +33,8 @@ constexpr bool reportsCapacityExceededBeforeDroppingTailGlyphs() {
   std::array<uint32_t, 5> merged{};
   uint32_t mergedCount = 0;
 
-  return mergeSorted(RESIDENT.data(), RESIDENT.size(), REQUESTED.data(), REQUESTED.size(), merged.data(),
-                     merged.size(), mergedCount) == MergeResult::CapacityExceeded &&
+  return mergeSorted(RESIDENT.data(), RESIDENT.size(), REQUESTED.data(), REQUESTED.size(), merged.data(), merged.size(),
+                     mergedCount) == MergeResult::CapacityExceeded &&
          mergedCount == merged.size();
 }
 

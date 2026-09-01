@@ -90,9 +90,12 @@ bool chooseEncounterLevel(const uint8_t bookProgressPercent, const RandomSource&
 }
 
 bool chooseGender(const SpeciesData& species, const RandomSource& random, Gender& gender) {
-  if (species.genderRate == 255) gender = Gender::Genderless;
-  else if (species.genderRate == 0) gender = Gender::Male;
-  else if (species.genderRate == 8) gender = Gender::Female;
+  if (species.genderRate == 255)
+    gender = Gender::Genderless;
+  else if (species.genderRate == 0)
+    gender = Gender::Male;
+  else if (species.genderRate == 8)
+    gender = Gender::Female;
   else {
     uint32_t roll = 0;
     if (!randomBelow(random, 8, roll)) return false;
@@ -218,8 +221,7 @@ bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNee
   std::array<uint8_t, EVOLUTION_ITEM_COUNT> candidates{};
   size_t candidateCount = 0;
   for (uint8_t index = 0; index < EVOLUTION_ITEM_COUNT; ++index) {
-    if (state.itemCounts[index] != UINT16_MAX &&
-        (ownedEvolutionNeeds.mask & static_cast<uint8_t>(1U << index)) != 0) {
+    if (state.itemCounts[index] != UINT16_MAX && (ownedEvolutionNeeds.mask & static_cast<uint8_t>(1U << index)) != 0) {
       candidates[candidateCount++] = index;
     }
   }
@@ -265,8 +267,8 @@ bool processEncounterCheck(PokemonState& state, const uint8_t bookProgressPercen
   return true;
 }
 
-bool processHourlyItem(PokemonState& state, const RandomSource& random,
-                       const OwnedEvolutionNeeds ownedEvolutionNeeds, PendingEventKind& generatedEvent) {
+bool processHourlyItem(PokemonState& state, const RandomSource& random, const OwnedEvolutionNeeds ownedEvolutionNeeds,
+                       PendingEventKind& generatedEvent) {
   if (state.pending.kind != PendingEventKind::None) {
     incrementCapped(state.itemMisses, 19);
     return true;
@@ -356,10 +358,9 @@ bool acknowledgeItem(PokemonState& state, const PokemonRecord& leader) {
   return true;
 }
 
-bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool enabled,
-                         RecordMutation& mutation) {
-  const bool dismissingCurrentPrompt = !enabled && state.pending.kind == PendingEventKind::Evolution &&
-                                       state.pending.recordId == record.recordId;
+bool setEvolutionPrompts(PokemonState& state, PokemonRecord& record, const bool enabled, RecordMutation& mutation) {
+  const bool dismissingCurrentPrompt =
+      !enabled && state.pending.kind == PendingEventKind::Evolution && state.pending.recordId == record.recordId;
   if (!validateState(state) || !validateRecord(record) || mutation.kind != RecordMutationKind::None) {
     return false;
   }
@@ -433,8 +434,8 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
     return false;
   }
 
-  const EvolutionRule* rule = findEvolution(record, EvolutionTrigger::Level, EvolutionItem::None,
-                                            state.pending.speciesId);
+  const EvolutionRule* rule =
+      findEvolution(record, EvolutionTrigger::Level, EvolutionItem::None, state.pending.speciesId);
   if (rule == nullptr || levelForXp(record.totalXp) < rule->minimumLevel) return false;
 
   PokemonState stateCandidate = state;
@@ -453,11 +454,9 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
   return true;
 }
 
-bool useEvolutionItem(PokemonState& state, PokemonRecord& record, const EvolutionItem item,
-                      RecordMutation& mutation) {
+bool useEvolutionItem(PokemonState& state, PokemonRecord& record, const EvolutionItem item, RecordMutation& mutation) {
   if (!validateState(state) || !validateRecord(record) || state.pending.kind != PendingEventKind::None ||
-      item < EvolutionItem::MoonStone || item > EvolutionItem::LinkCable ||
-      mutation.kind != RecordMutationKind::None) {
+      item < EvolutionItem::MoonStone || item > EvolutionItem::LinkCable || mutation.kind != RecordMutationKind::None) {
     return false;
   }
 
@@ -479,9 +478,7 @@ bool useEvolutionItem(PokemonState& state, PokemonRecord& record, const Evolutio
 
 CollectionActionSet collectionActions(const bool party, const uint8_t partyCount) {
   CollectionActionSet actions{};
-  const auto append = [&actions](const CollectionAction action) {
-    actions.items[actions.count++] = action;
-  };
+  const auto append = [&actions](const CollectionAction action) { actions.items[actions.count++] = action; };
 
   append(CollectionAction::Summary);
   if (party) {

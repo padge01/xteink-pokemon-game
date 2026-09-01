@@ -250,8 +250,8 @@ class GfxRenderer {
   void drawIcon(const uint8_t bitmap[], int x, int y, int width, int height) const;
   void drawIconInverted(const uint8_t bitmap[], int x, int y, int size) const;
   void drawIconInverted(const uint8_t bitmap[], int x, int y, int width, int height) const;
-  bool drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0,
-                  float cropY = 0, BitmapBwPolicy bwPolicy = BitmapBwPolicy::ExistingThreshold) const;
+  bool drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0, float cropY = 0,
+                  BitmapBwPolicy bwPolicy = BitmapBwPolicy::ExistingThreshold) const;
   bool drawBitmap1Bit(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight) const;
   // Trapezoidal blit used by Flow/iPod-style carousels. Fits the bitmap into a
   // bounding box of width `w` and height `max(hL, hR)` whose top-left is (x, y).
@@ -294,8 +294,7 @@ class GfxRenderer {
                                        EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
   /// Returns the full ascender-to-descender pixel bounds for the font that
   /// drawText() resolves for this text, including a registered CJK fallback.
-  int getTextPixelHeight(int fontId, const char* text,
-                         EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  int getTextPixelHeight(int fontId, const char* text, EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
 
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,

@@ -7,29 +7,26 @@ namespace {
 
 int failures = 0;
 
-#define CHECK(condition)                                                                  \
-  do {                                                                                    \
-    if (!(condition)) {                                                                   \
+#define CHECK(condition)                                                                \
+  do {                                                                                  \
+    if (!(condition)) {                                                                 \
       std::fprintf(stderr, "%s:%d check failed: %s\n", __FILE__, __LINE__, #condition); \
-      ++failures;                                                                         \
-    }                                                                                     \
+      ++failures;                                                                       \
+    }                                                                                   \
   } while (false)
 
 uint32_t read32(const pokemon::StateBytes& bytes, const size_t offset) {
   return static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) |
-         (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
+         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) | (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
 }
 
 uint16_t readHeader16(const pokemon::HeaderBytes& bytes, const size_t offset) {
-  return static_cast<uint16_t>(bytes[offset]) |
-         static_cast<uint16_t>(static_cast<uint16_t>(bytes[offset + 1]) << 8U);
+  return static_cast<uint16_t>(bytes[offset]) | static_cast<uint16_t>(static_cast<uint16_t>(bytes[offset + 1]) << 8U);
 }
 
 uint32_t readHeader32(const pokemon::HeaderBytes& bytes, const size_t offset) {
   return static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) |
-         (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
+         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) | (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
 }
 
 void writeHeader32(pokemon::HeaderBytes& bytes, const size_t offset, const uint32_t value) {

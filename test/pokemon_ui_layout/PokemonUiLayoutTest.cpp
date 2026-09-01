@@ -1,6 +1,5 @@
-#include <gtest/gtest.h>
-
 #include <PokemonUiLayout.h>
+#include <gtest/gtest.h>
 
 TEST(PokemonUiLayoutTest, UsesAvailableHeightInsteadOfADeviceSpecificPageSize) {
   EXPECT_EQ(pokemon::pokemonRowsPerPage(792, 72, 48, 64, 10), 10);

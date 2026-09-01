@@ -11,8 +11,8 @@
 #include "MappedInputManager.h"
 #include "ReaderUtils.h"
 #include "activities/ActivityResult.h"
-#include "clippings/ClippingInitialSelection.h"
 #include "clippings/ClipTextBuilder.h"
+#include "clippings/ClippingInitialSelection.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -56,8 +56,8 @@ void ClipSelectionActivity::onEnter() {
     finish();
     return;
   }
-  cursorIdx = static_cast<int>(ClippingInitialSelection::initialCursorIndex(
-      wordStore.words.data(), readingOrder.data(), readingOrderSize));
+  cursorIdx = static_cast<int>(
+      ClippingInitialSelection::initialCursorIndex(wordStore.words.data(), readingOrder.data(), readingOrderSize));
 
   savedSectionPage = section.currentPage;
 

@@ -1068,9 +1068,8 @@ void FileBrowserActivity::buildListScreen(UiApp::ScreenType& screen) {
     const char* emptyMessage =
         fileListReadFailed
             ? tr(STR_ERROR_GENERAL_FAILURE)
-            : (fileListMemoryLimited
-                   ? tr(STR_MEMORY_ERROR)
-                   : (mode == Mode::PickFirmware ? tr(STR_NO_BIN_FILES) : tr(STR_NO_FILES_FOUND)));
+            : (fileListMemoryLimited ? tr(STR_MEMORY_ERROR)
+                                     : (mode == Mode::PickFirmware ? tr(STR_NO_BIN_FILES) : tr(STR_NO_FILES_FOUND)));
     screen.centeredText(emptyMessage, screen.theme().bodyText);
     return;
   }

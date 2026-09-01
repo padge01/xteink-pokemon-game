@@ -1,8 +1,8 @@
 #include "lib/FsHelpers/DirectoryIterationResult.h"
 
-using FsHelpers::DirectoryIterationResult;
 using FsHelpers::classifyDirectoryIterationEnd;
 using FsHelpers::directoryIterationFailed;
+using FsHelpers::DirectoryIterationResult;
 
 static_assert(classifyDirectoryIterationEnd(false, false) == DirectoryIterationResult::Complete,
               "Clean EOF must remain distinguishable from iteration failures");

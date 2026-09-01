@@ -20,9 +20,7 @@ int pokemonCenteredOffset(const int containerExtent, const int contentExtent) {
   return std::max(0, (containerExtent - contentExtent) / 2);
 }
 
-int pokemonRightAlignedX(const int rightEdge, const int contentWidth) {
-  return rightEdge - std::max(0, contentWidth);
-}
+int pokemonRightAlignedX(const int rightEdge, const int contentWidth) { return rightEdge - std::max(0, contentWidth); }
 
 PokemonListPresentation pokemonListPresentation(const bool hasArtwork) {
   freeink::ui::StyleSet styles = freeink::ui::selectedPlainListRowStyles();

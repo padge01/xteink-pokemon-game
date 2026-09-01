@@ -2,8 +2,7 @@
 
 using ImagePlacementPolicy::clampTopMarginToViewport;
 
-static_assert(clampTopMarginToViewport(0, 24, 430, 430) == 0,
-              "A full-height image must not retain a top margin");
+static_assert(clampTopMarginToViewport(0, 24, 430, 430) == 0, "A full-height image must not retain a top margin");
 static_assert(clampTopMarginToViewport(100, 20, 300, 430) == 20,
               "A fitting image must retain its requested top margin");
 static_assert(clampTopMarginToViewport(100, 50, 300, 430) == 30,

@@ -1767,8 +1767,7 @@ std::optional<uint16_t> Section::getPageForVisibleTextOffset(const uint32_t offs
   uint32_t magic = 0;
   uint8_t version = 0;
   if (!serialization::tryReadPod(f, magic) || magic != SECTION_CACHE_MAGIC || !serialization::tryReadPod(f, version) ||
-      !section_cache::isSupportedVersion(version) ||
-      !f.seek(HEADER_SIZE - sizeof(uint32_t) * 5 - sizeof(uint16_t))) {
+      !section_cache::isSupportedVersion(version) || !f.seek(HEADER_SIZE - sizeof(uint32_t) * 5 - sizeof(uint16_t))) {
     return std::nullopt;
   }
   uint16_t count = 0;
