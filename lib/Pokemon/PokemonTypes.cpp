@@ -2,10 +2,10 @@
 
 #include "PokemonTypes.h"
 
-#include "PokemonSpecies.h"
-
 #include <algorithm>
 #include <cstring>
+
+#include "PokemonSpecies.h"
 
 namespace pokemon {
 namespace {
@@ -71,15 +71,12 @@ void write32(RecordBytes& bytes, const size_t offset, const uint32_t value) {
 }
 
 uint16_t read16(const RecordBytes& bytes, const size_t offset) {
-  return static_cast<uint16_t>(bytes[offset]) |
-         static_cast<uint16_t>(static_cast<uint16_t>(bytes[offset + 1]) << 8U);
+  return static_cast<uint16_t>(bytes[offset]) | static_cast<uint16_t>(static_cast<uint16_t>(bytes[offset + 1]) << 8U);
 }
 
 uint32_t read32(const RecordBytes& bytes, const size_t offset) {
-  return static_cast<uint32_t>(bytes[offset]) |
-         (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) |
-         (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
+  return static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
+         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) | (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
 }
 
 bool canonicalNickname(const std::array<char, POKEMON_NICKNAME_BYTES>& nickname) {
