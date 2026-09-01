@@ -3,10 +3,10 @@
 
 #include "src/clippings/ClippingInitialSelection.h"
 
-using ClippingInitialSelection::WordWindow;
 using ClippingInitialSelection::centeredWordWindow;
 using ClippingInitialSelection::initialCursorIndex;
 using ClippingInitialSelection::leadingWordWindow;
+using ClippingInitialSelection::WordWindow;
 using ClippingInitialSelection::wordWindowForPage;
 
 constexpr WordRef wordAt(const int y, const int pageIdx) {
@@ -39,8 +39,7 @@ constexpr std::array<uint16_t, 9> READING_ORDER = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 static_assert(initialCursorIndex(WORDS.data(), READING_ORDER.data(), READING_ORDER.size()) == 3);
 
 constexpr std::array<WordRef, 8> EVEN_ROW_WORDS = {
-    wordAt(10, 0), wordAt(20, 0), wordAt(30, 0), wordAt(30, 0),
-    wordAt(40, 0), wordAt(5, 1),  wordAt(5, 1),  wordAt(5, 1),
+    wordAt(10, 0), wordAt(20, 0), wordAt(30, 0), wordAt(30, 0), wordAt(40, 0), wordAt(5, 1), wordAt(5, 1), wordAt(5, 1),
 };
 constexpr std::array<uint16_t, 8> EVEN_ROW_ORDER = {0, 1, 2, 3, 4, 5, 6, 7};
 
