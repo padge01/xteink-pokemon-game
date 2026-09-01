@@ -58,14 +58,13 @@ int main() {
   if (!check(!ImageToFramebufferDecoder::validateAndStoreDimensions(4096, 2049, dimensions, "test"),
              "An image above 8 MP was accepted"))
     return 1;
-  if (!check(dimensions.width == 123 && dimensions.height == 456,
-             "Rejected dimensions modified the caller's output"))
+  if (!check(dimensions.width == 123 && dimensions.height == 456, "Rejected dimensions modified the caller's output"))
     return 1;
   if (!check(!ImageToFramebufferDecoder::validateAndStoreDimensions(32768, 1, dimensions, "test"),
              "A width that cannot fit the section-cache representation was accepted"))
     return 1;
-  if (!check(!ImageToFramebufferDecoder::validateAndStoreDimensions(std::numeric_limits<int64_t>::max(), 2,
-                                                                     dimensions, "test"),
+  if (!check(!ImageToFramebufferDecoder::validateAndStoreDimensions(std::numeric_limits<int64_t>::max(), 2, dimensions,
+                                                                    "test"),
              "An overflowing source-area calculation was accepted"))
     return 1;
   if (!check(!ImageToFramebufferDecoder::validateAndStoreDimensions(0, 100, dimensions, "test"),
