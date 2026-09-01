@@ -1,7 +1,7 @@
+#include <HalStorage.h>
+
 #include <cstdint>
 #include <cstdio>
-
-#include <HalStorage.h>
 
 #include "pokemon/PokemonStore.h"
 
@@ -9,12 +9,12 @@ namespace {
 
 int failures = 0;
 
-#define CHECK(condition)                                                                  \
-  do {                                                                                    \
-    if (!(condition)) {                                                                   \
+#define CHECK(condition)                                                                \
+  do {                                                                                  \
+    if (!(condition)) {                                                                 \
       std::fprintf(stderr, "%s:%d check failed: %s\n", __FILE__, __LINE__, #condition); \
-      ++failures;                                                                         \
-    }                                                                                     \
+      ++failures;                                                                       \
+    }                                                                                   \
   } while (false)
 
 pokemon::PokemonRecord starterPikachu() {
@@ -279,9 +279,8 @@ void resetCommitsANewerEmptySnapshot() {
 }
 
 void everyInterruptedResetByteLeavesThePreviousSnapshotBootable() {
-  constexpr size_t emptySnapshotBytes = pokemon::POKEMON_SNAPSHOT_HEADER_BYTES +
-                                        pokemon::POKEMON_STATE_BYTES +
-                                        pokemon::POKEMON_SNAPSHOT_CRC_BYTES;
+  constexpr size_t emptySnapshotBytes =
+      pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + pokemon::POKEMON_STATE_BYTES + pokemon::POKEMON_SNAPSHOT_CRC_BYTES;
   for (size_t cut = 0; cut < emptySnapshotBytes; ++cut) {
     Storage.clear();
     pokemon::PokemonStore store;
