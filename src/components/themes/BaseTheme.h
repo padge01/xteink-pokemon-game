@@ -1,12 +1,12 @@
 #pragma once
 
+#include <EpdFontFamily.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
-
-#include <EpdFontFamily.h>
 
 #include "ButtonHintLayout.h"
 
