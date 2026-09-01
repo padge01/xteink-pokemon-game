@@ -21,6 +21,7 @@
 
 ### Fixed
 
+- Simulator builds now use a compatible pinned simulator revision instead of tracking breaking upstream changes.
 - X3 release packaging now rejects truncated artwork, produces reproducible ZIPs, resolves beta releases on the install page, and verifies checksums against the selected download.
 - Opening the EPUB reader menu on fragmented or low X3/X4 memory now fails safely instead of restarting the device.
 - Pokémon onboarding, collection rows, summaries, and Dashboard bands now use readable presentation sprites and non-overlapping level, gender, and experience fields in portrait and landscape.
