@@ -6,9 +6,7 @@ bool ReaderMenuItemList::append(const ReaderMenuAction action, const StrId label
   return true;
 }
 
-bool ReaderMenuItemList::contains(const ReaderMenuAction action) const {
-  return indexOf(action) >= 0;
-}
+bool ReaderMenuItemList::contains(const ReaderMenuAction action) const { return indexOf(action) >= 0; }
 
 int ReaderMenuItemList::indexOf(const ReaderMenuAction action) const {
   for (uint8_t index = 0; index < count; ++index) {
