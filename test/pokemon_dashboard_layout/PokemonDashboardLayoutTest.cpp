@@ -50,15 +50,16 @@ TEST(PokemonDashboardLayoutTest, PortraitUsesTwoRowsAndLandscapeUsesOne) {
   EXPECT_TRUE(pokemon::pokemonDashboardLayout(800, 68).singleRow);
 }
 
-TEST(PokemonDashboardLayoutTest, OmitsGenderAndKeepsUsefulColumnsWide) {
+TEST(PokemonDashboardLayoutTest, UsesACompactNoticeCellAndKeepsExpReadable) {
   for (const int width : {480, 800}) {
     const auto layout = pokemon::pokemonDashboardLayout(width, 68);
     ASSERT_TRUE(layout.valid);
     EXPECT_EQ(layout.gender.width, 0);
     EXPECT_GE(layout.identity.width, 160);
-    EXPECT_GE(layout.level.width, 80);
-    EXPECT_GE(layout.xp.width, 80);
-    EXPECT_GE(layout.notice.width, 100);
+    EXPECT_GE(layout.level.width, 140);
+    EXPECT_GE(layout.xp.width, 140);
+    EXPECT_GE(layout.notice.width, 24);
+    EXPECT_LE(layout.notice.width, 32);
   }
 }
 

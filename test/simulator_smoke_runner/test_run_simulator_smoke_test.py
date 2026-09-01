@@ -38,15 +38,16 @@ class SimulatorSmokeRunnerTest(unittest.TestCase):
         self.assertEqual(env["SDL_VIDEODRIVER"], "dummy")
         self.assertEqual(env["PRESERVE_ME"], "yes")
 
-    def test_pokedex_fixture_uses_production_card_dimensions(self) -> None:
+    def test_pokedex_fixture_uses_packaged_portrait_card_format(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             card = Path(temp_dir) / "004-charmander.bmp"
             RUNNER.prepare_pokedex_card_fixture(card)
             content = card.read_bytes()
 
         self.assertEqual(content[:2], b"BM")
-        self.assertEqual(struct.unpack_from("<ii", content, 18), (528, 792))
-        self.assertGreater(len(content), 400_000)
+        self.assertEqual(struct.unpack_from("<ii", content, 18), (472, 708))
+        self.assertEqual(struct.unpack_from("<H", content, 28)[0], 1)
+        self.assertLess(len(content), 50_000)
 
     def test_pokemon_output_requires_a_rendered_detail_card(self) -> None:
         self.assertEqual(

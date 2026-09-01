@@ -6,6 +6,7 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <PokemonSpecies.h>
+#include <PokemonUiLayout.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -148,6 +149,9 @@ bool PokemonActivity::refreshSnapshot() {
 }
 
 void PokemonActivity::setScreen(const Screen screen, const int selected) {
+  cleanRefreshNeeded_ = cleanRefreshNeeded_ ||
+                        pokemon::pokemonNeedsCleanRefresh(screen_ == Screen::PokedexDetail,
+                                                          screen == Screen::PokedexDetail, false);
   screen_ = screen;
   selected_ = std::max(0, selected);
   uiReady_ = false;
@@ -198,7 +202,23 @@ int PokemonActivity::logicalCount() const {
   return 0;
 }
 
-int PokemonActivity::pageStart() const { return (selected_ / 5) * 5; }
+int PokemonActivity::listTop() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  int top = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) + metrics.verticalSpacing;
+  if (screen_ == Screen::Starter || screen_ == Screen::ResetFirst || screen_ == Screen::ResetFinal) top += 72;
+  if (screen_ == Screen::Gender) top += 180;
+  if (screen_ == Screen::NicknameQuestion) top += 210;
+  return top;
+}
+
+int PokemonActivity::rowsPerPage() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  constexpr int rowHeight = 64;
+  const int bottomReserve = metrics.buttonHintsHeight + 8;
+  return pokemon::pokemonRowsPerPage(renderer.getScreenHeight(), listTop(), bottomReserve, rowHeight, ROW_CAPACITY);
+}
+
+int PokemonActivity::pageStart() const { return pokemon::pokemonPageStart(selected_, rowsPerPage()); }
 
 uint32_t PokemonActivity::selectedRecordId() const {
   if (screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget) {
@@ -278,10 +298,10 @@ void PokemonActivity::activate() {
       return;
     case Screen::Menu:
       if (selected_ == 0) setScreen(Screen::Party);
-      else if (selected_ == 1) setScreen(Screen::Pc);
-      else if (selected_ == 2) setScreen(Screen::Bag);
-      else if (selected_ == 3) setScreen(Screen::Pokedex);
-      else if (selected_ == 4) setScreen(Screen::PcOrder, static_cast<int>(pcOrder_));
+      else if (selected_ == 1) setScreen(Screen::Pokedex);
+      else if (selected_ == 2) setScreen(Screen::Pc);
+      else if (selected_ == 3) setScreen(Screen::PcOrder, static_cast<int>(pcOrder_));
+      else if (selected_ == 4) setScreen(Screen::Bag);
       else setScreen(Screen::ResetFirst);
       return;
     case Screen::Party:
@@ -520,7 +540,7 @@ void PokemonActivity::buildRows() {
   }
   const int start = pageStart();
   const int total = logicalCount();
-  rowCount_ = std::min(5, total - start);
+  rowCount_ = std::min(rowsPerPage(), std::max(0, total - start));
   const auto row = [this, start](const int local, const char* label, const char* value = nullptr) {
     snprintf(labels_[local].data(), labels_[local].size(), "%s", label == nullptr ? "" : label);
     if (value != nullptr) snprintf(values_[local].data(), values_[local].size(), "%s", value);
@@ -545,10 +565,10 @@ void PokemonActivity::buildRows() {
         break;
       case Screen::Menu:
         row(local, index == 0 ? tr(STR_POKEMON_PARTY)
-                              : index == 1 ? tr(STR_POKEMON_PC_BOX)
-                              : index == 2 ? tr(STR_POKEMON_BAG)
-                              : index == 3 ? tr(STR_POKEDEX)
-                              : index == 4 ? tr(STR_POKEMON_PC_SORT)
+                              : index == 1 ? tr(STR_POKEDEX)
+                              : index == 2 ? tr(STR_POKEMON_PC_BOX)
+                              : index == 3 ? tr(STR_POKEMON_PC_SORT)
+                              : index == 4 ? tr(STR_POKEMON_BAG)
                                            : tr(STR_POKEMON_RESET));
         break;
       case Screen::Party:
@@ -653,11 +673,8 @@ void PokemonActivity::buildList(UiApp::ScreenType& screen) {
   const bool artRows = screen_ == Screen::Starter || screen_ == Screen::Party || screen_ == Screen::Move ||
                        screen_ == Screen::Pc || screen_ == Screen::Bag || screen_ == Screen::ItemTarget ||
                        screen_ == Screen::Pokedex;
-  int top = metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput) + metrics.verticalSpacing;
+  int top = listTop();
   rowHeight_ = 64;
-  if (screen_ == Screen::Starter || screen_ == Screen::ResetFirst || screen_ == Screen::ResetFinal) top += 72;
-  if (screen_ == Screen::Gender) top += 180;
-  if (screen_ == Screen::NicknameQuestion) top += 210;
   if (screen_ == Screen::Event) top = renderer.getScreenHeight() - metrics.buttonHintsHeight - rowCount_ * rowHeight_ - 8;
   listBounds_ = Rect{8, top, renderer.getScreenWidth() - 16, rowCount_ * rowHeight_};
   screen.setContentMargin(fui::Insets{static_cast<int16_t>(listBounds_.y), 8,
@@ -670,14 +687,14 @@ void PokemonActivity::buildList(UiApp::ScreenType& screen) {
   props.inputMask = fui::InputTouch;
   props.rowHeight = static_cast<int16_t>(rowHeight_);
   props.rowGap = 0;
-  props.sidePadding = artRows ? 104 : 16;
-  if (artRows) {
-    // A Game Boy-style cursor keeps monochrome artwork on white paper. An
-    // inverted row makes the SD-backed black sprite disappear into the fill.
-    props.rowStyles = fui::selectedPlainListRowStyles();
-    props.selectionMarker = fui::SelectionMarker::Triangle;
-    props.markerInset = 86;
-  }
+  // A Game Boy-style cursor keeps every choice on white paper. Grey dither
+  // ghosts under FAST e-ink refreshes, while an inverted row hides SD-backed
+  // black artwork. Only the spacing differs between text and artwork rows.
+  const pokemon::PokemonListPresentation presentation = pokemon::pokemonListPresentation(artRows);
+  props.sidePadding = static_cast<int16_t>(presentation.sidePadding);
+  props.rowStyles = presentation.rowStyles;
+  props.selectionMarker = fui::SelectionMarker::Triangle;
+  props.markerInset = static_cast<int16_t>(presentation.markerInset);
   props.valueInset = 8;
   screen.list(props);
 }
@@ -691,19 +708,12 @@ void PokemonActivity::renderFocused() {
   if (screen_ == Screen::PokedexDetail) {
     int marginTop = 0, marginRight = 0, marginBottom = 0, marginLeft = 0;
     renderer.getOrientedViewableTRBL(&marginTop, &marginRight, &marginBottom, &marginLeft);
-    const int availableWidth = renderer.getScreenWidth() - marginLeft - marginRight - 8;
-    const int availableHeight =
-        renderer.getScreenHeight() - marginTop - marginBottom - metrics.buttonHintsHeight - 8;
-    int cardWidth = std::min(availableWidth, availableHeight * 2 / 3);
-    int cardHeight = cardWidth * 3 / 2;
-    if (cardHeight > availableHeight) {
-      cardHeight = availableHeight;
-      cardWidth = cardHeight * 2 / 3;
-    }
-    const Rect cardBounds{marginLeft + (availableWidth - cardWidth) / 2 + 4,
-                          marginTop + (availableHeight - cardHeight) / 2 + 4, cardWidth, cardHeight};
-    const char* name = speciesName(pokedexSpecies_);
-    const bool rendered = pokemon::drawPokemonPokedexArt(renderer, pokedexSpecies_, name, cardBounds, false);
+    const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
+    const auto card = pokemon::pokemonPokedexCardBounds(renderer.getScreenWidth() - marginLeft - marginRight,
+                                                        renderer.getScreenHeight(), marginTop, marginBottom,
+                                                        metrics.buttonHintsHeight, landscape);
+    const Rect cardBounds{marginLeft + card.x, card.y, card.width, card.height};
+    const bool rendered = pokemon::drawPokemonPokedexArt(renderer, pokedexSpecies_, landscape, cardBounds, false);
     if (!rendered) {
       pokemon::drawPokemonSpeciesArt(renderer, pokedexSpecies_, true,
                                      Rect{(renderer.getScreenWidth() - 120) / 2, marginTop + 80, 120, 90});
@@ -777,15 +787,19 @@ void PokemonActivity::renderFocused() {
              pokemon::levelForXp(record.totalXp), genderText(record.gender));
     renderer.drawText(UI_10_FONT_ID, textX, y, line);
     y += 26;
-    const int valueX = textX + (landscape ? 170 : 155);
+    const int valueRight = renderer.getScreenWidth() - 28;
+    const auto drawField = [this, textX, valueRight](const int fieldY, const char* label, const char* value) {
+      renderer.drawText(UI_10_FONT_ID, textX, fieldY, label, true, EpdFontFamily::BOLD);
+      const int width = renderer.getTextWidth(UI_10_FONT_ID, value);
+      renderer.drawText(UI_10_FONT_ID, pokemon::pokemonRightAlignedX(valueRight, width), fieldY, value);
+    };
     char types[48]{};
     if (species->secondaryType == pokemon::PokemonType::None) {
       snprintf(types, sizeof(types), "%s", typeName(species->primaryType));
     } else {
       snprintf(types, sizeof(types), "%s / %s", typeName(species->primaryType), typeName(species->secondaryType));
     }
-    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_TYPE), true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, valueX, y, types);
+    drawField(y, tr(STR_POKEMON_TYPE), types);
     y += 26;
     const pokemon::LevelXpProgress progress = pokemon::levelXpProgress(record.totalXp);
     if (progress.required == 0) {
@@ -794,17 +808,14 @@ void PokemonActivity::renderFocused() {
       snprintf(line, sizeof(line), "%lu / %lu", static_cast<unsigned long>(progress.earned),
                static_cast<unsigned long>(progress.required));
     }
-    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EXP_SHORT), true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, valueX, y, line);
+    drawField(y, tr(STR_POKEMON_EXP_POINTS), line);
     y += 26;
     snprintf(line, sizeof(line), "%s %u", tr(STR_POKEMON_LEVEL), record.caughtLevel);
-    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_MET), true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, valueX, y, line);
+    drawField(y, tr(STR_POKEMON_MET), line);
     y += 26;
     const auto evolutions = pokemon::evolutionsFor(record.speciesId);
     if (evolutions.empty()) {
-      renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTION), true, EpdFontFamily::BOLD);
-      renderer.drawText(UI_10_FONT_ID, valueX, y, tr(STR_POKEMON_NO_EVOLUTION));
+      drawField(y, tr(STR_POKEMON_EVOLUTION), tr(STR_POKEMON_NO_EVOLUTION));
       y += 26;
     } else {
       bool first = true;
@@ -820,13 +831,14 @@ void PokemonActivity::renderFocused() {
           renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTION), true, EpdFontFamily::BOLD);
           first = false;
         }
-        renderer.drawText(UI_10_FONT_ID, valueX, y, line);
+        renderer.drawText(UI_10_FONT_ID, pokemon::pokemonRightAlignedX(
+                                              valueRight, renderer.getTextWidth(UI_10_FONT_ID, line)),
+                          y, line);
         y += 26;
       }
     }
     const bool prompts = (record.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0;
-    renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTIONS), true, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, valueX, y, prompts ? tr(STR_POKEMON_ON) : tr(STR_POKEMON_OFF));
+    drawField(y, tr(STR_POKEMON_EVOLUTION_PROMPTS_FIELD), prompts ? tr(STR_POKEMON_ON) : tr(STR_POKEMON_OFF));
     return;
   }
   if (screen_ != Screen::Event) return;
@@ -861,7 +873,7 @@ void PokemonActivity::renderRowArt() {
   if (!artRows) return;
   const int start = pageStart();
   for (int local = 0; local < rowCount_; ++local) {
-    const int y = listBounds_.y + local * rowHeight_ + 2;
+    const int rowY = listBounds_.y + local * rowHeight_;
     uint16_t speciesId = 0;
     if (screen_ == Screen::Starter) speciesId = STARTERS[start + local];
     else if ((screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget) &&
@@ -872,14 +884,17 @@ void PokemonActivity::renderRowArt() {
       speciesId = static_cast<uint16_t>(start + local + 1);
     }
     if (screen_ == Screen::Bag) {
+      constexpr int itemSize = 32;
       pokemon::drawPokemonItemArt(renderer, static_cast<pokemon::EvolutionItem>(start + local + 1), false,
-                                  Rect{listBounds_.x + 5, y, 80, 60}, false);
+                                  Rect{listBounds_.x + 5 + pokemon::pokemonCenteredOffset(80, itemSize),
+                                       rowY + pokemon::pokemonCenteredOffset(rowHeight_, itemSize), itemSize, itemSize},
+                                  false);
     } else if (speciesId != 0) {
       // The 40x30 menu files are intentionally native-sized and GfxRenderer
       // does not upscale. Use the same approved icon's 120x90 presentation
       // copy so it can be reduced cleanly into the row instead of appearing
       // as a tiny 40x30 mark on the X3 panel.
-      pokemon::drawPokemonSpeciesArt(renderer, speciesId, true, Rect{listBounds_.x + 5, y, 80, 60});
+      pokemon::drawPokemonSpeciesArt(renderer, speciesId, true, Rect{listBounds_.x + 5, rowY + 2, 80, 60});
     }
   }
 }
@@ -920,7 +935,8 @@ void PokemonActivity::render(RenderLock&&) {
   uiReady_ = true;
   renderFocused();
   renderRowArt();
-  renderer.displayBuffer();
+  renderer.displayBuffer(cleanRefreshNeeded_ ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
+  cleanRefreshNeeded_ = false;
 }
 
 #endif

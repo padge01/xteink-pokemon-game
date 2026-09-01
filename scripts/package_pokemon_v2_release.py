@@ -19,6 +19,8 @@ def expected_art() -> dict[Path, tuple[int, int]]:
     for species_id in range(1, 152):
         files[Path("sprites") / f"{species_id:03}.bmp"] = (40, 30)
         files[Path("heroes") / f"{species_id:03}.bmp"] = (120, 90)
+        files[Path("pokedex/portrait") / f"{species_id:03}.bmp"] = (472, 708)
+        files[Path("pokedex/landscape") / f"{species_id:03}.bmp"] = (288, 432)
     for item in ITEMS:
         files[Path("items") / f"{item}.bmp"] = (32, 32)
         files[Path("heroes/items") / f"{item}.bmp"] = (64, 64)

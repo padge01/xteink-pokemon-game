@@ -1,6 +1,6 @@
 # Pokémon companion V2 beta
 
-This optional private X3/X4 build adds a small reading companion to CrossInk. It
+This X3 beta build adds a small reading companion to CrossInk. It
 is a collection and progression feature, not a recreation of a full Pokémon
 game. Normal CrossInk builds compile it out completely.
 
@@ -13,7 +13,7 @@ game. Normal CrossInk builds compile it out completely.
 - Move Party members, deposit them in the PC Box, withdraw them, rename them,
   and sort the PC by catch date, Pokédex number, or name.
 - Browse a complete original-151 Pokédex. Seen and caught entries are tracked,
-  and selecting a seen entry opens its full-size card from `/sleep`.
+  and selecting a seen entry opens its packaged Pokédex card.
 - Find wild Pokémon and rare evolution items through verified reading. A pending
   event waits in the Pokémon menu until the reader chooses what to do.
 - Evolve by level, an applicable stone, or the Link Cable item. Evolution prompts
@@ -38,9 +38,17 @@ bounded reading counters rather than timers or background tasks, so the feature
 does no work while the device is idle. Wild levels scale with book progress,
 while uncommon species and evolution items remain rarer outcomes.
 
-## Install the private beta
+The game checks for a wild encounter every 15 credited minutes. Two of the five
+roll values produce an encounter; after three misses, the next available check
+is guaranteed. Species use four gentle rarity tiers instead of raw capture-rate
+weights, with the three starters and Pikachu in the rarest tier. Evolution-item
+checks remain hourly. When an hourly item and encounter are both due, the rarer
+item event is shown first and the guaranteed encounter carries to the next
+15-minute check.
 
-The verified release archive contains:
+## Install the beta
+
+The locally generated, validated personal installation archive contains:
 
 - `update.bin` (the exact filename consumed by the on-device updater)
 - `.crosspoint/pokemon/` with the required artwork
@@ -51,10 +59,10 @@ The verified release archive contains:
 Before installing, back up the SD card and keep the last known-good firmware.
 Copy `update.bin` to the SD-card root and merge the supplied
 `.crosspoint` folder into the SD-card root. Do not rename or flatten the artwork
-folders. The original-151 Pokédex cards must remain in `/sleep`, with filenames
-such as `/sleep/001-bulbasaur.bmp`; the detail screen streams these existing
-cards directly rather than keeping a second copy in memory. Flash the firmware
-using the device's normal on-device update flow.
+folders. Pokédex cards live under
+`/.crosspoint/pokemon/pokedex/{portrait,landscape}/001.bmp` through `151.bmp`;
+they are part of the local artwork pack and do not depend on a personal sleep-screen
+folder. Flash the firmware using the device's normal on-device update flow.
 
 V2 snapshots are `/.crosspoint/pokemon-v2-a.bin` and
 `/.crosspoint/pokemon-v2-b.bin`. Back up both to preserve a collection. The
@@ -63,13 +71,14 @@ the current collection, so an interrupted reset can recover the previous save.
 Deleting both files manually also resets Pokémon onboarding without touching
 books or reading statistics.
 
-The artwork is for private demonstration only and is not part of public source
-or ordinary firmware releases. See [Third-party assets](third-party-assets.md).
+The artwork is user-supplied and generated locally. It is not part of public
+source or public firmware releases. See [Artwork setup](artwork-setup.md) and
+[Third-party assets](third-party-assets.md).
 
-Pokédex detail cards are streamed one row at a time from `/sleep` and converted
-from their existing grayscale palette to the X3's 1-bit display with a stable,
-allocation-free dither. This preserves midtone detail without loading a second
-framebuffer or changing the small menu and dashboard sprites.
+Pokédex detail cards are pre-sized and converted to one-bit BMPs on the computer,
+then streamed one row at a time from the dedicated SD path. Portrait cards are
+472×708 and landscape cards are 288×432. The device performs no grayscale
+conversion and allocates no second framebuffer.
 
 ## X3 release checklist
 
@@ -88,16 +97,16 @@ the X3's raw GPIO mapping, physical switch behavior, or actual e-ink pixels.
 3. With one Party member, confirm Move and Deposit are absent. After adding a
    second member, confirm Move reorders only occupied slots and Deposit cannot
    empty the Party.
-4. Verify list wrapping, Pokédex paging beyond the first screen, PC sorting, and
-   the two-step reset. Open a seen Pokédex entry and confirm its `/sleep` card
-   is detailed rather than solid black; Nidoran♀ and Nidoran♂ should resolve to
-   their `-f` and `-m` filenames.
+4. Verify list wrapping, dimension-derived Pokédex paging beyond the first
+   screen, PC sorting, and the two-step reset. Open a seen Pokédex entry in both
+   orientations and confirm the dedicated card is crisp and readable.
 5. Turn real pages for at least one five-minute checkpoint, exit the book, and
    reboot. Confirm EXP and collection state survive.
 6. Review Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff in portrait and
    landscape. Confirm the companion band clears the dashboard controls and its
-   sprite and EXP text remain distinct. Other themes intentionally omit the
-   companion band.
+   sprite and complete EXP fraction remain distinct. A pending event should show
+   only a `!` at the far right. Other themes intentionally omit the companion
+   band.
 7. Inspect `crash_report.txt` and serial logs if any restart occurs; preserve both
    Pokémon snapshots before reproducing a storage problem.
 

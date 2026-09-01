@@ -11,6 +11,10 @@ namespace pokemon {
 namespace {
 
 constexpr uint8_t OWNED_NEEDS_MASK = 0x3FU;
+constexpr uint8_t ENCOUNTER_CHECK_MINUTES = 15;
+constexpr uint8_t ENCOUNTER_CHANCE_DENOMINATOR = 5;
+constexpr uint8_t ENCOUNTER_CHANCE_SUCCESSES = 2;
+constexpr uint8_t ENCOUNTER_MISSES_BEFORE_GUARANTEE = 3;
 
 bool randomBelow(const RandomSource& random, const uint32_t upperExclusive, uint32_t& output) {
   if (random.below == nullptr || upperExclusive == 0) return false;
@@ -33,9 +37,12 @@ bool regularEncounterEligible(const SpeciesData& species, const uint8_t bookProg
 
 uint8_t encounterWeight(const SpeciesData& species) {
   if (species.speciesId == 1 || species.speciesId == 4 || species.speciesId == 7 || species.speciesId == 25) {
-    return 8;
+    return 1;
   }
-  return species.captureRate;
+  if (species.captureRate >= 200) return 4;
+  if (species.captureRate >= 120) return 3;
+  if (species.captureRate >= 60) return 2;
+  return 1;
 }
 
 bool chooseRegularSpecies(const uint8_t bookProgressPercent, const RandomSource& random, uint16_t& speciesId) {
@@ -234,31 +241,27 @@ bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNee
   return true;
 }
 
-bool processHourlyEncounter(PokemonState& state, const uint8_t bookProgressPercent, const RandomSource& random,
-                            bool& checkItem, PendingEventKind& generatedEvent) {
-  checkItem = false;
+bool processEncounterCheck(PokemonState& state, const uint8_t bookProgressPercent, const RandomSource& random,
+                           PendingEventKind& generatedEvent) {
   if (state.pending.kind != PendingEventKind::None) {
-    incrementCapped(state.encounterMisses, 5);
-    incrementCapped(state.itemMisses, 19);
+    incrementCapped(state.encounterMisses, ENCOUNTER_MISSES_BEFORE_GUARANTEE);
     return true;
   }
 
-  bool encounterTriggered = state.encounterMisses == 5;
+  bool encounterTriggered = state.encounterMisses >= ENCOUNTER_MISSES_BEFORE_GUARANTEE;
   if (!encounterTriggered) {
     uint32_t encounterRoll = 0;
-    if (!randomBelow(random, 4, encounterRoll)) return false;
-    encounterTriggered = encounterRoll == 0;
+    if (!randomBelow(random, ENCOUNTER_CHANCE_DENOMINATOR, encounterRoll)) return false;
+    encounterTriggered = encounterRoll < ENCOUNTER_CHANCE_SUCCESSES;
   }
   if (encounterTriggered) {
     if (!createEncounter(state, bookProgressPercent, random)) return false;
     state.encounterMisses = 0;
-    incrementCapped(state.itemMisses, 19);
     generatedEvent = PendingEventKind::Encounter;
     return true;
   }
-  incrementCapped(state.encounterMisses, 5);
+  incrementCapped(state.encounterMisses, ENCOUNTER_MISSES_BEFORE_GUARANTEE);
 
-  checkItem = true;
   return true;
 }
 
@@ -315,16 +318,16 @@ CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, co
     const bool gainedLevel = minuteLevel > result.currentLevel;
     result.currentLevel = minuteLevel;
 
-    bool checkItem = false;
-    if (stateCandidate.readingMinuteRemainder == 60) {
+    const bool hourlyBoundary = stateCandidate.readingMinuteRemainder == 60;
+    if (hourlyBoundary) {
       stateCandidate.readingMinuteRemainder = 0;
-      if (!processHourlyEncounter(stateCandidate, bookProgressPercent, random, checkItem, generatedEvent)) {
-        return result;
-      }
+      if (!processHourlyItem(stateCandidate, random, ownedEvolutionNeeds, generatedEvent)) return result;
     }
 
-    if (checkItem && !processHourlyItem(stateCandidate, random, ownedEvolutionNeeds, generatedEvent)) {
-      return result;
+    if (hourlyBoundary || stateCandidate.readingMinuteRemainder % ENCOUNTER_CHECK_MINUTES == 0) {
+      if (!processEncounterCheck(stateCandidate, bookProgressPercent, random, generatedEvent)) {
+        return result;
+      }
     }
 
     if (gainedLevel) {

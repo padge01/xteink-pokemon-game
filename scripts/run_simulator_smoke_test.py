@@ -72,25 +72,26 @@ def prepare_pokemon_assets(temp_root: Path) -> None:
         raise FileNotFoundError(f"Pokemon assets not found: {POKEMON_ASSETS}")
     target = temp_root / "fs_" / ".crosspoint" / "pokemon"
     shutil.copytree(POKEMON_ASSETS, target)
-    prepare_pokedex_card_fixture(temp_root / "fs_" / "sleep" / "004-charmander.bmp")
+    prepare_pokedex_card_fixture(target / "pokedex" / "portrait" / "004.bmp")
+    prepare_pokedex_card_fixture(target / "pokedex" / "landscape" / "004.bmp", 288, 432)
 
 
-def prepare_pokedex_card_fixture(target: Path) -> None:
-    """Write a production-size 8-bit grayscale card that exercises /sleep downscaling."""
-    width = 528
-    height = 792
-    row_stride = (width + 3) & ~3
-    palette = b"".join(bytes((value, value, value, 0)) for value in range(256))
+def prepare_pokedex_card_fixture(target: Path, width: int = 472, height: int = 708) -> None:
+    """Write a packaged-size 1-bit card that exercises the dedicated SD path."""
+    row_stride = ((width + 31) // 32) * 4
+    palette = bytes((0, 0, 0, 0, 255, 255, 255, 0))
     pixels = bytearray()
     for y in range(height):
-        row = bytes(((x * 3 + y * 5) & 0xFF) for x in range(width))
+        row = bytearray(b"\xff" * row_stride)
+        for x in range(width):
+            if (x % 23 == 0 or y % 29 == 0):
+                row[x // 8] &= ~(0x80 >> (x % 8))
         pixels.extend(row)
-        pixels.extend(b"\0" * (row_stride - width))
 
     pixel_offset = 14 + 40 + len(palette)
     file_size = pixel_offset + len(pixels)
     header = struct.pack("<2sIHHI", b"BM", file_size, 0, 0, pixel_offset)
-    dib = struct.pack("<IiiHHIIiiII", 40, width, height, 1, 8, 0, len(pixels), 2835, 2835, 256, 256)
+    dib = struct.pack("<IiiHHIIiiII", 40, width, height, 1, 1, 0, len(pixels), 2835, 2835, 2, 2)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(header + dib + palette + pixels)
 

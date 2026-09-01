@@ -18,20 +18,14 @@ TEST(PokemonArtPath, RejectsSpeciesOutsideTheOriginal151) {
   EXPECT_STREQ(path, "");
 }
 
-TEST(PokemonArtPath, BuildsExistingSleepCoverPokedexPaths) {
+TEST(PokemonArtPath, BuildsDedicatedOrientationSpecificPokedexPaths) {
   char path[64]{};
-  ASSERT_NE(pokemon::pokemonPokedexArtPath(1, "Bulbasaur", path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/sleep/001-bulbasaur.bmp");
-  ASSERT_NE(pokemon::pokemonPokedexArtPath(29, "Nidoran♀", path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/sleep/029-nidoran-f.bmp");
-  ASSERT_NE(pokemon::pokemonPokedexArtPath(32, "Nidoran♂", path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/sleep/032-nidoran-m.bmp");
-  ASSERT_NE(pokemon::pokemonPokedexArtPath(83, "Farfetch'd", path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/sleep/083-farfetchd.bmp");
-  ASSERT_NE(pokemon::pokemonPokedexArtPath(122, "Mr. Mime", path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/sleep/122-mr-mime.bmp");
-  ASSERT_NE(pokemon::pokemonPokedexArtPath(151, "Mew", path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/sleep/151-mew.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(1, false, path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/.crosspoint/pokemon/pokedex/portrait/001.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(29, true, path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/.crosspoint/pokemon/pokedex/landscape/029.bmp");
+  ASSERT_NE(pokemon::pokemonPokedexArtPath(151, false, path, sizeof(path)), nullptr);
+  EXPECT_STREQ(path, "/.crosspoint/pokemon/pokedex/portrait/151.bmp");
 }
 
 TEST(PokemonArtPath, BuildsStonePathsButLeavesLinkCableBlank) {

@@ -1,0 +1,99 @@
+name: X3 device-test report
+description: Record physical acceptance results for an exact firmware build
+title: "[X3 test] "
+labels: ["hardware-test"]
+body:
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Full commit used to build the tested firmware.
+    validations:
+      required: true
+
+  - type: input
+    id: firmware_hash
+    attributes:
+      label: Firmware SHA-256
+      description: SHA-256 of the exact binary installed on the X3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installation path
+      options:
+        - SD Card Firmware Update
+        - USB custom firmware flash
+        - Other recovery path
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: preconditions
+    attributes:
+      label: Preconditions
+      options:
+        - label: The complete SD card was backed up before installation.
+          required: true
+        - label: Both Pokémon snapshot files were backed up or did not yet exist.
+          required: true
+        - label: The installed artwork pack passed the included validator.
+          required: true
+        - label: A known-good rollback firmware and recovery path were available.
+          required: true
+
+  - type: checkboxes
+    id: interface
+    attributes:
+      label: Interface checks
+      options:
+        - label: Starter, gender, and nickname setup works with side and front buttons.
+          required: true
+        - label: Selected rows retain their sprites and the header does not clip.
+          required: true
+        - label: Lists wrap or page correctly, including the complete Pokédex.
+          required: true
+        - label: Party movement, PC deposit/withdrawal, sorting, Bag, and reset behave correctly.
+          required: true
+        - label: Pokédex cards are readable in portrait and landscape.
+          required: true
+
+  - type: checkboxes
+    id: persistence
+    attributes:
+      label: Reading and persistence checks
+      options:
+        - label: Five minutes of real page turns credits EXP after leaving the reader.
+          required: true
+        - label: Leaving a book open without page turns credits no EXP.
+          required: true
+        - label: Party and EXP survive a reboot.
+          required: true
+        - label: Opening and closing Pokémon after reading does not create a crash report.
+          required: true
+
+  - type: checkboxes
+    id: dashboard
+    attributes:
+      label: Dashboard checks
+      options:
+        - label: Dashboard companion art and complete EXP fraction are readable.
+          required: true
+        - label: Lyra companion layout is readable in portrait and landscape.
+          required: true
+        - label: Lyra 3 Covers companion layout is readable in portrait and landscape.
+          required: true
+        - label: Rounded Raff companion layout is readable in portrait and landscape.
+          required: true
+        - label: A pending event shows only the intended indicator and does not crowd EXP.
+          required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: Result and evidence
+      description: Record failures, screen photos, crash-report status, free-heap observations, and anything not covered above.
+    validations:
+      required: true

@@ -1,109 +1,90 @@
-name: Bug Report
-description: Report an issue or unexpected behavior
-title: "Short, descriptive title of the issue"
+name: Bug report
+description: Report a reproducible problem on an Xteink X3
+title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to report this bug! Please fill out the details below. If you have a feature request, please use the [Discussions](https://github.com/uxjulia/CrossInk/discussions/categories/ideas) feature so that issues focuses only on immediate bugs.
-
-  - type: dropdown
-    id: device-type
-    attributes:
-      label: Device
-      description: Which device is this affecting?
-      options:
-        - "--- Select ---"
-        - X4
-        - X3
-        - X4 Pro
-        - Seeed Sticky
-    validations:
-      required: true
+        This project supports the Xteink X3 only. Back up both Pokémon save files before reproducing storage or reset problems. Do not attach copyrighted books or Pokémon artwork.
 
   - type: input
     id: version
     attributes:
-      label: Affected Version
-      description: What version of the project/library are you using? (e.g., v1.2.3, master branch commit SHA)
-      placeholder: Ex. v1.2.3
+      label: Firmware version or commit
+      description: Give the release name or full commit used to build the exact binary.
+      placeholder: v0.1.0-beta.1 or 40-character commit
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: X3 hardware
+      description: Include the hardware or display revision if known.
+      placeholder: Xteink X3, revision unknown
     validations:
       required: true
 
   - type: dropdown
-    id: epub-state
+    id: orientation
     attributes:
-      label: EPUB Optimization
-      description: Is your EPUB optimized?
+      label: Orientation
       options:
-        - "--- Select ---"
-        - No / Not Applicable
-        - Yes, using the built-in web transfer EPUB optimizer
-        - Yes, using a different EPUB optimizer
-        - What is an EPUB optimizer?
+        - Portrait
+        - Landscape
+        - Both
+        - Not applicable
     validations:
       required: true
 
   - type: dropdown
-    id: cache-state
+    id: artwork
     attributes:
-      label: Cache State
-      description: Have you attempted to clear any cached data?
+      label: Local artwork pack
+      description: Did the included packager validate the exact artwork folder installed on the SD card?
       options:
-        - "--- Select ---"
-        - No / Not Applicable
-        - Yes, book cache (Reader menu > Delete Book Cache)
-        - Yes, reading cache (Settings > System > Clear Reading Cache)
-        - Yes, device cache (SD Card > ./crosspoint folder)
-        - All of the above
+        - Validated successfully
+        - Not validated
+        - Artwork is not involved
     validations:
       required: true
 
   - type: textarea
-    id: bug-description
+    id: description
     attributes:
-      label: Describe the Bug
-      description: A clear and concise description of what the bug is.
+      label: What happened?
+      description: Describe the visible result and whether the device restarted, froze, or continued working.
     validations:
       required: true
 
   - type: textarea
-    id: steps-to-reproduce
+    id: steps
     attributes:
-      label: Steps to Reproduce
-      description: Clearly list the steps necessary to reproduce the unexpected behavior.
+      label: Steps to reproduce
       placeholder: |
-        1. Go to '...'
-        2. Select '...'
-        3. Crash
+        1. Start on ...
+        2. Press ...
+        3. Select ...
     validations:
       required: true
 
   - type: textarea
-    id: expected-behavior
+    id: expected
     attributes:
-      label: Expected Behavior
-      description: A clear and concise description of what you expected to happen.
-    validations:
-      required: true
-
-  - type: dropdown
-    id: epub-attachment
-    attributes:
-      label: File Provided
-      description: If your issue is related to a specific file (EPUB, XTC, etc.), please make sure to attach the exact file in this ticket or email it to julia@uxj.io and reference your issue number. **_EPUBs and XTC files need to be zipped to be attached._**
-      options:
-        - "--- Select ---"
-        - Not Applicable
-        - I've attached it
-        - I've emailed it
+      label: Expected result
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: Relevant Log Output/Screenshots
-      description: If applicable, error messages, or log output to help explain your problem. If a crash_report.txt file was generated include it here or your issue may not be addressed in a timely manner. You can drag and drop images here.
+      label: Crash report or logs
+      description: Attach crash_report.txt when one was created. Remove credentials and private book information first.
       render: shell
+
+  - type: textarea
+    id: images
+    attributes:
+      label: Screen photo
+      description: A photo of the X3 is useful for clipping, ghosting, contrast, and button-focus problems. Do not attach Pokémon source artwork.

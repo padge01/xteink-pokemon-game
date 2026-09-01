@@ -8,7 +8,7 @@
 namespace pokemon {
 
 const char* pokemonSpeciesArtPath(uint16_t speciesId, bool hero, char* output, size_t outputSize);
-const char* pokemonPokedexArtPath(uint16_t speciesId, const char* speciesName, char* output, size_t outputSize);
+const char* pokemonPokedexArtPath(uint16_t speciesId, bool landscape, char* output, size_t outputSize);
 const char* pokemonItemArtPath(EvolutionItem item, bool hero, char* output, size_t outputSize);
 
 }  // namespace pokemon

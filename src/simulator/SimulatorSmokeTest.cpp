@@ -488,7 +488,7 @@ class SimulatorSmokeTest {
     addTap(MappedInputManager::Button::Back);
     inputScript.push_back(render("Pokemon Menu Restored", 4));
 
-    for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
+    addTap(MappedInputManager::Button::Down);
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Pokedex", 4));
     for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
@@ -500,7 +500,7 @@ class SimulatorSmokeTest {
     inputScript.push_back(assertActivity("Pokemon"));
 
     addTap(MappedInputManager::Button::Back);
-    addTap(MappedInputManager::Button::Down);
+    for (int i = 0; i < 2; ++i) addTap(MappedInputManager::Button::Down);
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Empty PC", 4));
     inputScript.push_back(assertActivity("Pokemon"));

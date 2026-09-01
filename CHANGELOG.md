@@ -2,14 +2,17 @@
 
 ### Added
 
+- Release tooling now produces an installable X3 firmware binary with a SHA-256 checksum for the project installer.
 - Private Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
 - Private Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
 - Private Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
 - Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff themes can show the lead Pokémon in a compact, borderless status band.
-- A verified private-demo packager now bundles the X3/X4 firmware with exactly 151 wide Pokémon icons, presentation sprites, five evolution-stone images, attribution, and SHA-256 checksums.
+- A verified private-demo packager now bundles the X3/X4 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
 
 ### Changed
 
+- Pokémon companion builds now check for wild encounters every 15 credited minutes with a 40% chance, guarantee the next available check after three misses, and use four gentler species-rarity tiers while keeping evolution-item checks hourly.
+- The Pokémon menu now presents Party, Pokédex, PC Box, PC Box sort, Bag, and Reset in the approved collection-first order.
 - The web EPUB optimizer now removes unused publisher-embedded fonts, their stylesheet rules, manifest records, and font-obfuscation metadata to produce smaller books.
 
 ### Fixed
@@ -17,7 +20,9 @@
 - Opening the EPUB reader menu on fragmented or low X3/X4 memory now fails safely instead of restarting the device.
 - Pokémon onboarding, collection rows, summaries, and Dashboard bands now use readable presentation sprites and non-overlapping level, gender, and experience fields in portrait and landscape.
 - Pokémon dashboards now show larger lead artwork with compact in-level EXP, summaries show useful progression and evolution details, and seen Pokédex entries open the existing full-size SD-card Pokédex covers.
-- Pokémon Pokédex covers now preserve grayscale detail with allocation-free 1-bit dithering, and artwork read failures show a fallback instead of a blank detail page.
+- Pokémon Pokédex cards now use preprocessed one-bit portrait and landscape assets, and artwork read failures show a fallback instead of a blank detail page.
+- Pokémon lists now use solid white cursor rows, Bag icons are vertically centered, summary fields remain aligned, and Pokédex pagination is derived from the actual X3/X4 screen height.
+- Pokémon dashboard EXP no longer truncates when values gain digits; pending events use a compact `!` indicator instead of permanently reserving space for a full message.
 - EPUBs with padding after `</html>` now finish parsing normally, and ZIP read errors can no longer underflow into unsafe buffer lengths.
 - KOReader authentication and sync now keep Wi-Fi awake for the transaction and skip a redundant NTP wait.
 - Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
@@ -25,7 +30,7 @@
 - Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
 - Standard CrossInk builds now compile the private Pokémon core out completely and no longer require generated species data.
 - Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.
-- Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves encounter then item priority at hourly level-up boundaries.
+- Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves pending-event priority at hourly level-up boundaries.
 - Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
 - Pokémon menus now wrap and page correctly, respond to the X3 front navigation rocker on press, keep selected artwork visible with a classic cursor, keep header rules clear of their titles, preserve save errors, and return nickname cancellation to the screen that opened it.
 - Pokémon Party and PC menus now hide actions that cannot succeed, distinguish PC read failures from an empty box, and preserve the previous collection if reset is interrupted.

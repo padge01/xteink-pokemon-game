@@ -12,15 +12,17 @@ DashboardLayout pokemonDashboardLayout(const int width, const int height) {
   constexpr int textX = 112;
   const int textWidth = width - textX - 6;
   layout.singleRow = width >= 620;
-  const int identityWidth = textWidth * 45 / 100;
-  const int statsWidth = textWidth * 25 / 100;
+  constexpr int noticeWidth = 28;
+  const int usefulWidth = textWidth - noticeWidth;
+  const int identityWidth = usefulWidth * 55 / 100;
+  const int statsWidth = usefulWidth - identityWidth;
   const int statsX = textX + identityWidth;
   const int halfHeight = height / 2;
   layout.identity = {textX, 0, identityWidth, height};
   layout.level = {statsX, 0, statsWidth, halfHeight};
   layout.gender = {width, 0, 0, 0};
   layout.xp = {statsX, halfHeight, statsWidth, height - halfHeight};
-  layout.notice = {statsX + statsWidth, 0, textWidth - identityWidth - statsWidth, height};
+  layout.notice = {statsX + statsWidth, 0, noticeWidth, height};
   layout.valid = true;
   return layout;
 }

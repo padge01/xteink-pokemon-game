@@ -9,7 +9,7 @@ fixed-size char buffer.
 
 ### Version 1
 
-Private Pokémon companion builds alternate complete snapshots between
+The `pokemon-x3` build alternates complete snapshots between
 `pokemon-v2-a.bin` and `pokemon-v2-b.bin`. Startup validates both files and uses
 the newest supported sequence. A commit streams the active roster into the
 inactive file, applies at most one append or replacement, syncs and closes it,
@@ -82,7 +82,7 @@ reading statistics.
 
 ## `/.crosspoint/pokemon/`
 
-The optional private artwork pack is stored separately from firmware state:
+The locally generated artwork pack is stored separately from firmware state:
 
 ```text
 /.crosspoint/pokemon/
@@ -91,12 +91,17 @@ The optional private artwork pack is stored separately from firmware state:
   items/moon-stone.bmp, fire-stone.bmp, thunder-stone.bmp,
         water-stone.bmp, leaf-stone.bmp
   heroes/items/<the same five names>.bmp
+  pokedex/portrait/001.bmp ... 151.bmp
+  pokedex/landscape/001.bmp ... 151.bmp
 ```
 
 Species icons are 40×30 one-bit BMPs and presentation sprites are 120×90.
 Item icons are 32×32 and item presentation images are 64×64. Missing or invalid
 images fall back to text rather than preventing the Pokémon activity from
-opening. The Link Cable intentionally has no image.
+opening. The Link Cable intentionally has no image. Pokédex detail cards are
+one-bit BMPs: 472×708 for portrait and 288×432 for landscape. They are generated
+offline so opening a detail page requires no grayscale conversion or large
+temporary allocation on the ESP32-C3.
 
 ## `book.bin`
 

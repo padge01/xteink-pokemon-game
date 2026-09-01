@@ -57,11 +57,11 @@ bool drawPokemonSpeciesArt(const GfxRenderer& renderer, const uint16_t speciesId
                   GfxRenderer::BitmapBwPolicy::ExistingThreshold);
 }
 
-bool drawPokemonPokedexArt(const GfxRenderer& renderer, const uint16_t speciesId, const char* speciesName,
+bool drawPokemonPokedexArt(const GfxRenderer& renderer, const uint16_t speciesId, const bool landscape,
                            const Rect bounds, const bool fallback) {
   char path[64]{};
-  return drawPath(renderer, pokemonPokedexArtPath(speciesId, speciesName, path, sizeof(path)), bounds, fallback,
-                  GfxRenderer::BitmapBwPolicy::DitherNativeGray);
+  return drawPath(renderer, pokemonPokedexArtPath(speciesId, landscape, path, sizeof(path)), bounds, fallback,
+                  GfxRenderer::BitmapBwPolicy::ExistingThreshold);
 }
 
 bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, const bool hero,

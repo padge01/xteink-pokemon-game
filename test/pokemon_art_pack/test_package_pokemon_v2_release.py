@@ -25,6 +25,14 @@ def write_bmp(path: Path, width: int, height: int) -> None:
 
 
 class PokemonArtPackTest(unittest.TestCase):
+    def test_release_requires_both_pokedex_orientations_for_every_species(self) -> None:
+        expected = PACKAGE.expected_art()
+        self.assertEqual(expected[Path("pokedex/portrait/001.bmp")], (472, 708))
+        self.assertEqual(expected[Path("pokedex/landscape/001.bmp")], (288, 432))
+        self.assertEqual(expected[Path("pokedex/portrait/151.bmp")], (472, 708))
+        self.assertEqual(expected[Path("pokedex/landscape/151.bmp")], (288, 432))
+        self.assertEqual(len(expected), 614)
+
     def test_release_filters_dirty_source_and_verifies_exact_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

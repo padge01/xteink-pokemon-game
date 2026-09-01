@@ -1,9 +1,9 @@
-# Xteink Pokémon Game Repository Design
+# Pokémon Game for Xteink X3 Repository Design
 
 ## Project
 
 - Repository: `padge01/xteink-pokemon-game`
-- Display name: **Xteink Pokémon Game**
+- Display name: **Pokémon Game for Xteink X3**
 - Description: **An unofficial reading-powered Pokémon companion game for the Xteink X3, built on CrossInk.**
 - Visibility: public
 - License: MIT for project code
@@ -65,10 +65,13 @@
 
 ## Artwork Policy
 
-- Do not commit generated Pokémon artwork.
-- Do not attach the complete artwork pack to a public GitHub release without explicit redistribution permission.
+- Do not commit or publish Pokémon artwork, rendered Pokédex cards, or generated artwork packs.
+- Public source and GitHub releases contain code and conversion tools only.
+- Users obtain source artwork themselves and run the conversion tools locally.
+- Attribution records provenance; it does not grant redistribution permission.
 - Link to u/xDaftTurtle's original Reddit post and X3 archive.
 - Credit u/xDaftTurtle / dmellok and Tesserae for the Pokédex screen design and rendered cards.
+- Do not rehost u/xDaftTurtle's rendered cards without their explicit permission.
 - Include local conversion and packaging scripts.
 - Credit PokeAPI Sprites for Pokémon icons.
 - Credit PokéSprite for evolution-stone images.
@@ -99,4 +102,3 @@
 5. Push the reviewed branch as `main`.
 6. Flash and physically accept the staged X3 firmware.
 7. Publish `v0.1.0-beta.1` only after physical acceptance and a final release audit.
-

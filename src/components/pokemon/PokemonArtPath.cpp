@@ -45,57 +45,14 @@ const char* pokemonSpeciesArtPath(const uint16_t speciesId, const bool hero, cha
                                   static_cast<unsigned>(speciesId)));
 }
 
-const char* pokemonPokedexArtPath(const uint16_t speciesId, const char* speciesName, char* output,
+const char* pokemonPokedexArtPath(const uint16_t speciesId, const bool landscape, char* output,
                                   const size_t outputSize) {
   if (output == nullptr || outputSize == 0) return nullptr;
   output[0] = '\0';
-  if (speciesId == 0 || speciesId > KANTO_SPECIES_COUNT || speciesName == nullptr || speciesName[0] == '\0') {
-    return nullptr;
-  }
-
-  const char* specialSlug = nullptr;
-  switch (speciesId) {
-    case 29:
-      specialSlug = "nidoran-f";
-      break;
-    case 32:
-      specialSlug = "nidoran-m";
-      break;
-    case 83:
-      specialSlug = "farfetchd";
-      break;
-    case 122:
-      specialSlug = "mr-mime";
-      break;
-    default:
-      break;
-  }
-
-  char slug[32]{};
-  if (specialSlug != nullptr) {
-    std::snprintf(slug, sizeof(slug), "%s", specialSlug);
-  } else {
-    size_t written = 0;
-    bool lastWasDash = false;
-    for (size_t index = 0; speciesName[index] != '\0' && written + 1 < sizeof(slug); ++index) {
-      const unsigned char value = static_cast<unsigned char>(speciesName[index]);
-      if (value >= 'A' && value <= 'Z') {
-        slug[written++] = static_cast<char>(value - 'A' + 'a');
-        lastWasDash = false;
-      } else if ((value >= 'a' && value <= 'z') || (value >= '0' && value <= '9')) {
-        slug[written++] = static_cast<char>(value);
-        lastWasDash = false;
-      } else if (value == ' ' || value == '-') {
-        if (written != 0 && !lastWasDash) {
-          slug[written++] = '-';
-          lastWasDash = true;
-        }
-      }
-    }
-    if (written != 0 && slug[written - 1] == '-') slug[written - 1] = '\0';
-  }
+  if (speciesId == 0 || speciesId > KANTO_SPECIES_COUNT) return nullptr;
   return finishPath(output, outputSize,
-                    std::snprintf(output, outputSize, "/sleep/%03u-%s.bmp", static_cast<unsigned>(speciesId), slug));
+                    std::snprintf(output, outputSize, "/.crosspoint/pokemon/pokedex/%s/%03u.bmp",
+                                  landscape ? "landscape" : "portrait", static_cast<unsigned>(speciesId)));
 }
 
 const char* pokemonItemArtPath(const EvolutionItem item, const bool hero, char* output,

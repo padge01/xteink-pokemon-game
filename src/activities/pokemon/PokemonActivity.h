@@ -45,7 +45,7 @@ class PokemonActivity final : public Activity {
     Message,
   };
 
-  static constexpr uint8_t ROW_CAPACITY = 6;
+  static constexpr uint8_t ROW_CAPACITY = 10;
   using UiApp = freeink::ui::FreeInkApp<24, 8>;
 
   void loadInitialScreen();
@@ -63,6 +63,8 @@ class PokemonActivity final : public Activity {
   void renderRowArt();
   void renderHeaderAndHints();
   int logicalCount() const;
+  int listTop() const;
+  int rowsPerPage() const;
   int pageStart() const;
   bool isListScreen() const;
   uint32_t selectedRecordId() const;
@@ -91,6 +93,7 @@ class PokemonActivity final : public Activity {
   std::array<std::array<char, 32>, ROW_CAPACITY> values_{};
   Rect listBounds_{};
   int rowHeight_ = 0;
+  bool cleanRefreshNeeded_ = true;
   freeink::ui::GfxRendererTarget uiTarget_;
   UiApp app_;
   ButtonNavigator navigator_;
