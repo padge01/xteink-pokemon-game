@@ -149,9 +149,9 @@ bool PokemonActivity::refreshSnapshot() {
 }
 
 void PokemonActivity::setScreen(const Screen screen, const int selected) {
-  cleanRefreshNeeded_ = cleanRefreshNeeded_ ||
-                        pokemon::pokemonNeedsCleanRefresh(screen_ == Screen::PokedexDetail,
-                                                          screen == Screen::PokedexDetail, false);
+  cleanRefreshNeeded_ =
+      cleanRefreshNeeded_ ||
+      pokemon::pokemonNeedsCleanRefresh(screen_ == Screen::PokedexDetail, screen == Screen::PokedexDetail, false);
   screen_ = screen;
   selected_ = std::max(0, selected);
   uiReady_ = false;
@@ -178,8 +178,7 @@ int PokemonActivity::logicalCount() const {
     case Screen::Party:
       return pokemon::PARTY_SIZE;
     case Screen::Actions: {
-      const auto actions =
-          pokemon::collectionActions(actionSource_ == Screen::Party, snapshot_.partyCount);
+      const auto actions = pokemon::collectionActions(actionSource_ == Screen::Party, snapshot_.partyCount);
       return actions.count;
     }
     case Screen::Pc:
@@ -249,7 +248,7 @@ void PokemonActivity::finishStarter(const char* nickname) {
 
 void PokemonActivity::openNickname(const uint32_t recordId, const bool starter, const Screen cancelScreen) {
   auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_POKEMON_NICKNAME), "", 32,
-                                                            InputType::Text);
+                                                           InputType::Text);
   if (!keyboard) {
     LOG_ERR("PokemonActivity", "Could not allocate nickname keyboard");
     showMessage(tr(STR_POKEMON_SAVE_ERROR), cancelScreen);
@@ -289,20 +288,26 @@ void PokemonActivity::activate() {
     case Screen::NicknameQuestion:
       if (selected_ == 0) {
         openNickname(nicknamePrompt_.recordId, nicknamePrompt_.isStarter(), Screen::NicknameQuestion);
-      }
-      else if (nicknamePrompt_.isStarter()) finishStarter("");
+      } else if (nicknamePrompt_.isStarter())
+        finishStarter("");
       else {
         nicknamePrompt_ = {};
         setScreen(Screen::Menu);
       }
       return;
     case Screen::Menu:
-      if (selected_ == 0) setScreen(Screen::Party);
-      else if (selected_ == 1) setScreen(Screen::Pokedex);
-      else if (selected_ == 2) setScreen(Screen::Pc);
-      else if (selected_ == 3) setScreen(Screen::PcOrder, static_cast<int>(pcOrder_));
-      else if (selected_ == 4) setScreen(Screen::Bag);
-      else setScreen(Screen::ResetFirst);
+      if (selected_ == 0)
+        setScreen(Screen::Party);
+      else if (selected_ == 1)
+        setScreen(Screen::Pokedex);
+      else if (selected_ == 2)
+        setScreen(Screen::Pc);
+      else if (selected_ == 3)
+        setScreen(Screen::PcOrder, static_cast<int>(pcOrder_));
+      else if (selected_ == 4)
+        setScreen(Screen::Bag);
+      else
+        setScreen(Screen::ResetFirst);
       return;
     case Screen::Party:
     case Screen::Pc: {
@@ -332,8 +337,8 @@ void PokemonActivity::activate() {
         }
         case pokemon::CollectionAction::Deposit:
         case pokemon::CollectionAction::Withdraw: {
-          const auto status = party ? service_.depositPokemon(focusedRecordId_)
-                                    : service_.withdrawPokemon(focusedRecordId_);
+          const auto status =
+              party ? service_.depositPokemon(focusedRecordId_) : service_.withdrawPokemon(focusedRecordId_);
           if (status == pokemon::ServiceStatus::LastPokemon)
             showMessage(tr(STR_POKEMON_LAST_PARTY), actionSource_);
           else if (status == pokemon::ServiceStatus::PartyFull)
@@ -352,8 +357,7 @@ void PokemonActivity::activate() {
         case pokemon::CollectionAction::EvolutionPrompts: {
           pokemon::PokemonRecord record{};
           if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) return;
-          const bool enabled =
-              (record.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0;
+          const bool enabled = (record.flags & pokemon::recordFlag(pokemon::RecordFlag::EvolutionPromptsDisabled)) == 0;
           if (service_.setEvolutionPrompts(focusedRecordId_, !enabled) != pokemon::ServiceStatus::Ok) {
             showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Actions);
           } else {
@@ -369,7 +373,8 @@ void PokemonActivity::activate() {
       int from = 0;
       while (from < snapshot_.partyCount && snapshot_.party[from].recordId != focusedRecordId_) ++from;
       const auto status = service_.movePartyMember(static_cast<uint8_t>(from), static_cast<uint8_t>(selected_));
-      if (status != pokemon::ServiceStatus::Ok) showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Party);
+      if (status != pokemon::ServiceStatus::Ok)
+        showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Party);
       else {
         if (!refreshSnapshot()) return;
         setScreen(Screen::Party);
@@ -382,13 +387,17 @@ void PokemonActivity::activate() {
       return;
     case Screen::Bag:
       selectedItem_ = static_cast<pokemon::EvolutionItem>(selected_ + 1);
-      if (snapshot_.state.itemCounts[selected_] == 0) showMessage(tr(STR_POKEMON_NOT_APPLICABLE), Screen::Bag);
-      else setScreen(Screen::ItemTarget);
+      if (snapshot_.state.itemCounts[selected_] == 0)
+        showMessage(tr(STR_POKEMON_NOT_APPLICABLE), Screen::Bag);
+      else
+        setScreen(Screen::ItemTarget);
       return;
     case Screen::ItemTarget: {
       const auto status = service_.useEvolutionItem(selectedRecordId(), selectedItem_);
-      if (status == pokemon::ServiceStatus::NotApplicable) showMessage(tr(STR_POKEMON_NOT_APPLICABLE), Screen::Bag);
-      else if (status != pokemon::ServiceStatus::Ok) showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Bag);
+      if (status == pokemon::ServiceStatus::NotApplicable)
+        showMessage(tr(STR_POKEMON_NOT_APPLICABLE), Screen::Bag);
+      else if (status != pokemon::ServiceStatus::Ok)
+        showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Bag);
       else {
         if (!refreshSnapshot()) return;
         setScreen(Screen::Party);
@@ -417,16 +426,19 @@ void PokemonActivity::activate() {
           nicknamePrompt_ = pokemon::PokemonPromptContext::forCaught(pending.speciesId, caught);
           snprintf(message_, sizeof(message_), tr(STR_POKEMON_NICKNAME_QUESTION), speciesName(pending.speciesId));
           setScreen(Screen::NicknameQuestion);
-        } else setScreen(Screen::Menu);
+        } else
+          setScreen(Screen::Menu);
       } else if (pending.kind == pokemon::PendingEventKind::Item) {
-        if (service_.acknowledgeItem() != pokemon::ServiceStatus::Ok) showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Event);
+        if (service_.acknowledgeItem() != pokemon::ServiceStatus::Ok)
+          showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Event);
         else {
           if (!refreshSnapshot()) return;
           setScreen(Screen::Menu);
         }
       } else if (pending.kind == pokemon::PendingEventKind::Evolution) {
         const auto choice = selected_ == 0 ? pokemon::EvolutionChoice::Evolve : pokemon::EvolutionChoice::Cancel;
-        if (service_.resolveEvolution(choice) != pokemon::ServiceStatus::Ok) showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Event);
+        if (service_.resolveEvolution(choice) != pokemon::ServiceStatus::Ok)
+          showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Event);
         else {
           if (!refreshSnapshot()) return;
           setScreen(Screen::Menu);
@@ -435,15 +447,19 @@ void PokemonActivity::activate() {
       return;
     }
     case Screen::ResetFirst:
-      if (selected_ == 0) setScreen(Screen::ResetFinal);
-      else setScreen(Screen::Menu);
+      if (selected_ == 0)
+        setScreen(Screen::ResetFinal);
+      else
+        setScreen(Screen::Menu);
       return;
     case Screen::ResetFinal:
       if (selected_ == 0 && service_.reset() == pokemon::ServiceStatus::Ok) {
         snapshot_ = {};
         setScreen(Screen::Starter);
-      } else if (selected_ == 0) showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Menu);
-      else setScreen(Screen::Menu);
+      } else if (selected_ == 0)
+        showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Menu);
+      else
+        setScreen(Screen::Menu);
       return;
     case Screen::Message:
       setScreen(returnScreen_);
@@ -461,7 +477,8 @@ void PokemonActivity::goBack() {
       setScreen(Screen::Starter);
       return;
     case Screen::NicknameQuestion:
-      if (nicknamePrompt_.isStarter()) setScreen(Screen::Gender);
+      if (nicknamePrompt_.isStarter())
+        setScreen(Screen::Gender);
       else {
         nicknamePrompt_ = {};
         setScreen(Screen::Menu);
@@ -564,12 +581,12 @@ void PokemonActivity::buildRows() {
         row(local, index == 0 ? tr(STR_YES) : tr(STR_NO));
         break;
       case Screen::Menu:
-        row(local, index == 0 ? tr(STR_POKEMON_PARTY)
-                              : index == 1 ? tr(STR_POKEDEX)
-                              : index == 2 ? tr(STR_POKEMON_PC_BOX)
-                              : index == 3 ? tr(STR_POKEMON_PC_SORT)
-                              : index == 4 ? tr(STR_POKEMON_BAG)
-                                           : tr(STR_POKEMON_RESET));
+        row(local, index == 0   ? tr(STR_POKEMON_PARTY)
+                   : index == 1 ? tr(STR_POKEDEX)
+                   : index == 2 ? tr(STR_POKEMON_PC_BOX)
+                   : index == 3 ? tr(STR_POKEMON_PC_SORT)
+                   : index == 4 ? tr(STR_POKEMON_BAG)
+                                : tr(STR_POKEMON_RESET));
         break;
       case Screen::Party:
       case Screen::Move:
@@ -586,8 +603,7 @@ void PokemonActivity::buildRows() {
         break;
       }
       case Screen::Actions: {
-        const auto actions =
-            pokemon::collectionActions(actionSource_ == Screen::Party, snapshot_.partyCount);
+        const auto actions = pokemon::collectionActions(actionSource_ == Screen::Party, snapshot_.partyCount);
         if (index >= actions.count) break;
         const char* label = nullptr;
         switch (actions.items[index]) {
@@ -633,8 +649,9 @@ void PokemonActivity::buildRows() {
         break;
       }
       case Screen::PcOrder:
-        row(local, index == 0 ? tr(STR_POKEMON_CATCH_DATE)
-                              : index == 1 ? tr(STR_POKEMON_NUMBER) : tr(STR_POKEMON_ALPHABETICAL));
+        row(local, index == 0   ? tr(STR_POKEMON_CATCH_DATE)
+                   : index == 1 ? tr(STR_POKEMON_NUMBER)
+                                : tr(STR_POKEMON_ALPHABETICAL));
         break;
       case Screen::Bag: {
         const auto item = static_cast<pokemon::EvolutionItem>(index + 1);
@@ -657,7 +674,8 @@ void PokemonActivity::buildRows() {
           row(local, index == 0 ? tr(STR_POKEMON_CATCH) : tr(STR_POKEMON_PASS));
         } else if (snapshot_.state.pending.kind == pokemon::PendingEventKind::Evolution) {
           row(local, index == 0 ? tr(STR_POKEMON_EVOLVE) : tr(STR_POKEMON_CANCEL));
-        } else row(local, tr(STR_OK));
+        } else
+          row(local, tr(STR_OK));
         break;
       case Screen::Summary:
       case Screen::PokedexDetail:
@@ -675,10 +693,12 @@ void PokemonActivity::buildList(UiApp::ScreenType& screen) {
                        screen_ == Screen::Pokedex;
   int top = listTop();
   rowHeight_ = 64;
-  if (screen_ == Screen::Event) top = renderer.getScreenHeight() - metrics.buttonHintsHeight - rowCount_ * rowHeight_ - 8;
+  if (screen_ == Screen::Event)
+    top = renderer.getScreenHeight() - metrics.buttonHintsHeight - rowCount_ * rowHeight_ - 8;
   listBounds_ = Rect{8, top, renderer.getScreenWidth() - 16, rowCount_ * rowHeight_};
-  screen.setContentMargin(fui::Insets{static_cast<int16_t>(listBounds_.y), 8,
-                                      static_cast<int16_t>(renderer.getScreenHeight() - listBounds_.y - listBounds_.height), 8});
+  screen.setContentMargin(
+      fui::Insets{static_cast<int16_t>(listBounds_.y), 8,
+                  static_cast<int16_t>(renderer.getScreenHeight() - listBounds_.y - listBounds_.height), 8});
   fui::ListProps props;
   props.items = rows_.data();
   props.count = static_cast<uint16_t>(std::max(0, rowCount_));
@@ -746,9 +766,9 @@ void PokemonActivity::renderFocused() {
     return;
   }
   if (screen_ == Screen::NicknameQuestion || screen_ == Screen::ResetFirst || screen_ == Screen::ResetFinal) {
-    const char* prompt = screen_ == Screen::NicknameQuestion
-                             ? message_
-                             : screen_ == Screen::ResetFirst ? tr(STR_POKEMON_RESET_QUESTION) : tr(STR_POKEMON_RESET_CONFIRM);
+    const char* prompt = screen_ == Screen::NicknameQuestion ? message_
+                         : screen_ == Screen::ResetFirst     ? tr(STR_POKEMON_RESET_QUESTION)
+                                                             : tr(STR_POKEMON_RESET_CONFIRM);
     centered(renderer, UI_12_FONT_ID, contentTop + 18, prompt, EpdFontFamily::BOLD);
     if (screen_ == Screen::NicknameQuestion) {
       pokemon::drawPokemonSpeciesArt(renderer, nicknamePrompt_.speciesId, true,
@@ -759,8 +779,7 @@ void PokemonActivity::renderFocused() {
   if (screen_ == Screen::Summary) {
     pokemon::PokemonRecord record{};
     if (service_.readRecord(focusedRecordId_, record) != pokemon::ServiceStatus::Ok) {
-      LOG_ERR("PokemonActivity", "Failed to load summary record %lu",
-              static_cast<unsigned long>(focusedRecordId_));
+      LOG_ERR("PokemonActivity", "Failed to load summary record %lu", static_cast<unsigned long>(focusedRecordId_));
       centered(renderer, UI_12_FONT_ID, contentTop + 100, tr(STR_POKEMON_LOAD_ERROR), EpdFontFamily::BOLD);
       return;
     }
@@ -783,8 +802,7 @@ void PokemonActivity::renderFocused() {
     y += 27;
     char line[96];
     snprintf(line, sizeof(line), "%s %03u    %s %u    %s", tr(STR_POKEMON_NUMBER_SHORT), record.speciesId,
-             tr(STR_POKEMON_LEVEL),
-             pokemon::levelForXp(record.totalXp), genderText(record.gender));
+             tr(STR_POKEMON_LEVEL), pokemon::levelForXp(record.totalXp), genderText(record.gender));
     renderer.drawText(UI_10_FONT_ID, textX, y, line);
     y += 26;
     const int valueRight = renderer.getScreenWidth() - 28;
@@ -831,9 +849,9 @@ void PokemonActivity::renderFocused() {
           renderer.drawText(UI_10_FONT_ID, textX, y, tr(STR_POKEMON_EVOLUTION), true, EpdFontFamily::BOLD);
           first = false;
         }
-        renderer.drawText(UI_10_FONT_ID, pokemon::pokemonRightAlignedX(
-                                              valueRight, renderer.getTextWidth(UI_10_FONT_ID, line)),
-                          y, line);
+        renderer.drawText(UI_10_FONT_ID,
+                          pokemon::pokemonRightAlignedX(valueRight, renderer.getTextWidth(UI_10_FONT_ID, line)), y,
+                          line);
         y += 26;
       }
     }
@@ -875,10 +893,13 @@ void PokemonActivity::renderRowArt() {
   for (int local = 0; local < rowCount_; ++local) {
     const int rowY = listBounds_.y + local * rowHeight_;
     uint16_t speciesId = 0;
-    if (screen_ == Screen::Starter) speciesId = STARTERS[start + local];
+    if (screen_ == Screen::Starter)
+      speciesId = STARTERS[start + local];
     else if ((screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget) &&
-             start + local < snapshot_.partyCount) speciesId = snapshot_.party[start + local].speciesId;
-    else if (screen_ == Screen::Pc && local < static_cast<int>(pcCount_)) speciesId = pcPage_[local].speciesId;
+             start + local < snapshot_.partyCount)
+      speciesId = snapshot_.party[start + local].speciesId;
+    else if (screen_ == Screen::Pc && local < static_cast<int>(pcCount_))
+      speciesId = pcPage_[local].speciesId;
     else if (screen_ == Screen::Pokedex &&
              pokemon::isSpeciesMarked(snapshot_.state.seenSpecies, static_cast<uint16_t>(start + local + 1))) {
       speciesId = static_cast<uint16_t>(start + local + 1);
@@ -907,13 +928,19 @@ void PokemonActivity::renderHeaderAndHints() {
     return;
   }
   const char* title = tr(STR_POKEMON);
-  if (screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget) title = tr(STR_POKEMON_PARTY);
-  else if (screen_ == Screen::Pc || screen_ == Screen::PcOrder) title = tr(STR_POKEMON_PC_BOX);
-  else if (screen_ == Screen::Bag) title = tr(STR_POKEMON_BAG);
-  else if (screen_ == Screen::Pokedex) title = tr(STR_POKEDEX);
-  else if (screen_ == Screen::Summary || screen_ == Screen::Actions) title = tr(STR_POKEMON_SUMMARY);
+  if (screen_ == Screen::Party || screen_ == Screen::Move || screen_ == Screen::ItemTarget)
+    title = tr(STR_POKEMON_PARTY);
+  else if (screen_ == Screen::Pc || screen_ == Screen::PcOrder)
+    title = tr(STR_POKEMON_PC_BOX);
+  else if (screen_ == Screen::Bag)
+    title = tr(STR_POKEMON_BAG);
+  else if (screen_ == Screen::Pokedex)
+    title = tr(STR_POKEDEX);
+  else if (screen_ == Screen::Summary || screen_ == Screen::Actions)
+    title = tr(STR_POKEMON_SUMMARY);
   const Rect header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
-  if (mappedInput.hasTouchHardware()) TouchHeaderBackButton::draw(renderer, uiTarget_, header, title, false);
+  if (mappedInput.hasTouchHardware())
+    TouchHeaderBackButton::draw(renderer, uiTarget_, header, title, false);
   else {
     // Let the theme draw its rule and battery, then place the title ourselves.
     // Some X3 font builds extend below their reported line cell; the standard
