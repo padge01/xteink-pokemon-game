@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-"""Build and verify the private original-151 Pokémon X3 release archive."""
+"""Build and verify original-151 Pokémon X3 release archives."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import struct
+import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ITEMS = ("moon-stone", "fire-stone", "thunder-stone", "water-stone", "leaf-stone")
+VERSION_PATTERN = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]*")
 
 
 def expected_art() -> dict[Path, tuple[int, int]]:
@@ -43,6 +46,17 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: handle.read(65536), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def normalize_version(version: str) -> str:
+    clean = version.removeprefix("v")
+    if VERSION_PATTERN.fullmatch(clean) is None:
+        raise ValueError("invalid release version")
+    return clean
 
 
 def validate_art(root: Path, allow_extra: bool = False) -> list[dict[str, object]]:
@@ -107,15 +121,158 @@ def verify(output: Path) -> None:
             raise ValueError(f"hash mismatch: {relative}")
 
 
+def _write_tree_checksums(root: Path) -> None:
+    lines = []
+    for path in sorted((candidate for candidate in root.rglob("*") if candidate.is_file()),
+                       key=lambda candidate: candidate.relative_to(root).as_posix()):
+        lines.append(f"{sha256(path)}  {path.relative_to(root).as_posix()}")
+    (root / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="ascii")
+
+
+def build_public_release(source: Path, firmware: Path, notice: Path, version: str,
+                         output: Path) -> tuple[Path, Path, Path]:
+    source = source.resolve()
+    firmware = firmware.resolve()
+    notice = notice.resolve()
+    clean_version = normalize_version(version)
+    if not firmware.is_file() or firmware.stat().st_size == 0:
+        raise ValueError("firmware is missing or empty")
+    if not notice.is_file():
+        raise ValueError("rights and attribution notice is missing")
+
+    assets = validate_art(source, allow_extra=True)
+    output.mkdir(parents=True, exist_ok=True)
+    firmware_asset = output / f"xteink-pokemon-x3-firmware-v{clean_version}.bin"
+    full_zip = output / f"xteink-pokemon-x3-full-v{clean_version}.zip"
+    release_sums = output / "SHA256SUMS.txt"
+    shutil.copy2(firmware, firmware_asset)
+
+    with tempfile.TemporaryDirectory(prefix="xteink-pokemon-full-") as temporary:
+        staging = Path(temporary)
+        art_output = staging / ".crosspoint/pokemon"
+        for relative in expected_art():
+            destination = art_output / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source / relative, destination)
+        shutil.copy2(firmware, staging / "update.bin")
+        shutil.copy2(notice, staging / "RIGHTS_AND_ATTRIBUTION.md")
+        manifest = {"format": 1, "scope": "original-151", "assets": assets}
+        (art_output / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        _write_tree_checksums(staging)
+
+        if full_zip.exists():
+            full_zip.unlink()
+        with zipfile.ZipFile(full_zip, "w", zipfile.ZIP_DEFLATED) as package:
+            for path in sorted((candidate for candidate in staging.rglob("*") if candidate.is_file()),
+                               key=lambda candidate: candidate.relative_to(staging).as_posix()):
+                package.write(path, path.relative_to(staging).as_posix())
+
+    verify_archive(full_zip, firmware_asset, notice)
+    release_sums.write_text(
+        f"{sha256(full_zip)}  {full_zip.name}\n"
+        f"{sha256(firmware_asset)}  {firmware_asset.name}\n",
+        encoding="ascii",
+    )
+    return full_zip, firmware_asset, release_sums
+
+
+def _parse_checksums(text: str) -> dict[str, str]:
+    checksums: dict[str, str] = {}
+    for line in text.splitlines():
+        digest, separator, relative = line.partition("  ")
+        if separator != "  " or len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+            raise ValueError("invalid checksum entry")
+        if relative in checksums:
+            raise ValueError(f"duplicate checksum entry: {relative}")
+        checksums[relative] = digest
+    return checksums
+
+
+def _bmp_bytes_info(data: bytes) -> tuple[int, int, int]:
+    if len(data) < 30 or data[:2] != b"BM":
+        raise ValueError("archive contains a non-BMP artwork file")
+    width, height = struct.unpack_from("<ii", data, 18)
+    bits = struct.unpack_from("<H", data, 28)[0]
+    return width, abs(height), bits
+
+
+def verify_archive(archive: Path, firmware: Path, notice: Path) -> None:
+    expected_paths = {
+        f".crosspoint/pokemon/{relative.as_posix()}" for relative in expected_art()
+    }
+    expected_paths.update({
+        ".crosspoint/pokemon/manifest.json",
+        "RIGHTS_AND_ATTRIBUTION.md",
+        "SHA256SUMS.txt",
+        "update.bin",
+    })
+
+    with zipfile.ZipFile(archive) as package:
+        names = package.namelist()
+        if len(names) != len(set(names)):
+            raise ValueError("archive contains duplicate paths")
+        for name in names:
+            path = PurePosixPath(name)
+            if path.is_absolute() or ".." in path.parts or "\\" in name:
+                raise ValueError(f"unsafe archive path: {name}")
+        actual_paths = set(names)
+        if actual_paths != expected_paths:
+            missing = expected_paths - actual_paths
+            extra = actual_paths - expected_paths
+            raise ValueError(f"archive layout mismatch: {len(missing)} missing, {len(extra)} extra")
+
+        if package.read("update.bin") != firmware.read_bytes():
+            raise ValueError("archive firmware does not match firmware-only asset")
+        if package.read("RIGHTS_AND_ATTRIBUTION.md") != notice.read_bytes():
+            raise ValueError("archive rights notice does not match repository notice")
+
+        manifest = json.loads(package.read(".crosspoint/pokemon/manifest.json"))
+        manifest_assets = {entry["path"]: entry for entry in manifest.get("assets", [])}
+        if set(manifest_assets) != expected_paths - {
+            ".crosspoint/pokemon/manifest.json", "RIGHTS_AND_ATTRIBUTION.md",
+            "SHA256SUMS.txt", "update.bin",
+        }:
+            raise ValueError("archive manifest does not match artwork files")
+
+        for relative, dimensions in expected_art().items():
+            name = f".crosspoint/pokemon/{relative.as_posix()}"
+            data = package.read(name)
+            width, height, bits = _bmp_bytes_info(data)
+            if (width, height) != dimensions or bits != 1:
+                raise ValueError(f"invalid archived BMP {name}: {width}x{height} {bits}bpp")
+            entry = manifest_assets[name]
+            if entry.get("sha256") != sha256_bytes(data):
+                raise ValueError(f"manifest hash mismatch: {name}")
+            if (entry.get("width"), entry.get("height"), entry.get("bits_per_pixel")) != (
+                width, height, bits
+            ):
+                raise ValueError(f"manifest metadata mismatch: {name}")
+
+        embedded_sums = _parse_checksums(package.read("SHA256SUMS.txt").decode("ascii"))
+        checksummed_paths = expected_paths - {"SHA256SUMS.txt"}
+        if set(embedded_sums) != checksummed_paths:
+            raise ValueError("embedded checksums do not match archive contents")
+        for name, digest in embedded_sums.items():
+            if sha256_bytes(package.read(name)) != digest:
+                raise ValueError(f"embedded checksum mismatch: {name}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-pack", type=Path, required=True)
     parser.add_argument("--firmware", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--notice", type=Path, default=Path("docs/third-party-assets.md"))
+    parser.add_argument("--notice", type=Path, default=Path("RIGHTS_AND_ATTRIBUTION.md"))
+    parser.add_argument("--version", required=True)
     args = parser.parse_args()
-    archive = build(args.source_pack, args.firmware, args.notice, args.output)
-    print(f"Verified private release: {archive}")
+    full_zip, firmware_asset, sums = build_public_release(
+        args.source_pack, args.firmware, args.notice, args.version, args.output
+    )
+    print(full_zip)
+    print(firmware_asset)
+    print(sums)
 
 
 if __name__ == "__main__":
