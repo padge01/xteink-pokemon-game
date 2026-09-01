@@ -13,6 +13,7 @@ namespace {
 
 using pokemon::Gender;
 using pokemon::Origin;
+using pokemon::PendingEvent;
 using pokemon::PendingEventKind;
 using pokemon::PokemonRecord;
 using pokemon::PokemonState;
@@ -258,38 +259,75 @@ void stateValidationRejectsPartyAndPokedexCorruption() {
 
 void pendingEventValidationFollowsItsTag() {
   PokemonState state = validState();
-  state.pending.kind = PendingEventKind::Encounter;
-  state.pending.speciesId = 81;
-  state.pending.level = 24;
-  state.pending.gender = Gender::Genderless;
+  state.pendingEvents[0].kind = PendingEventKind::Encounter;
+  state.pendingEvents[0].speciesId = 81;
+  state.pendingEvents[0].level = 24;
+  state.pendingEvents[0].gender = Gender::Genderless;
   CHECK(pokemon::validateState(state));
 
-  state.pending.gender = Gender::Female;
+  state.pendingEvents[0].gender = Gender::Female;
   CHECK(!pokemon::validateState(state));
-  state.pending.speciesId = 1;
-  state.pending.gender = Gender::Genderless;
+  state.pendingEvents[0].speciesId = 1;
+  state.pendingEvents[0].gender = Gender::Genderless;
   CHECK(!pokemon::validateState(state));
 
-  state.pending.speciesId = 81;
-  state.pending.gender = Gender::Genderless;
-  state.pending.item = pokemon::EvolutionItem::MoonStone;
+  state.pendingEvents[0].speciesId = 81;
+  state.pendingEvents[0].gender = Gender::Genderless;
+  state.pendingEvents[0].item = pokemon::EvolutionItem::MoonStone;
   CHECK(!pokemon::validateState(state));
 
   state = validState();
-  state.pending.kind = PendingEventKind::Item;
-  state.pending.item = pokemon::EvolutionItem::LeafStone;
+  state.pendingEvents[0].kind = PendingEventKind::Item;
+  state.pendingEvents[0].item = pokemon::EvolutionItem::LeafStone;
   CHECK(pokemon::validateState(state));
 
-  state.pending.recordId = 3;
+  state.pendingEvents[0].recordId = 3;
   CHECK(!pokemon::validateState(state));
 
   state = validState();
-  state.pending.kind = PendingEventKind::Evolution;
-  state.pending.recordId = 1;
-  state.pending.speciesId = 2;
+  state.pendingEvents[0].kind = PendingEventKind::Evolution;
+  state.pendingEvents[0].recordId = 1;
+  state.pendingEvents[0].speciesId = 2;
   CHECK(pokemon::validateState(state));
 
-  state.pending.level = 16;
+  state.pendingEvents[0].level = 16;
+  CHECK(!pokemon::validateState(state));
+}
+
+void pendingEventQueueIsFixedFifoAndCompacted() {
+  PokemonState state = validState();
+  const PendingEvent encounter{0, 25, 5, Gender::Female, pokemon::EvolutionItem::None,
+                               PendingEventKind::Encounter};
+  const PendingEvent item{0, 0, 0, Gender::Unknown, pokemon::EvolutionItem::ThunderStone,
+                          PendingEventKind::Item};
+  const PendingEvent evolution{1, 2, 0, Gender::Unknown, pokemon::EvolutionItem::None,
+                               PendingEventKind::Evolution};
+  const PendingEvent fourth{2, 5, 0, Gender::Unknown, pokemon::EvolutionItem::None,
+                            PendingEventKind::Evolution};
+
+  CHECK(pokemon::pendingEventCount(state) == 0);
+  CHECK(pokemon::pendingEventFront(state) == nullptr);
+  CHECK(pokemon::enqueuePendingEvent(state, encounter));
+  CHECK(pokemon::enqueuePendingEvent(state, item));
+  CHECK(pokemon::enqueuePendingEvent(state, evolution));
+  const PokemonState full = state;
+  CHECK(!pokemon::enqueuePendingEvent(state, fourth));
+  CHECK(state == full);
+  CHECK(pokemon::pendingEventCount(state) == pokemon::PENDING_EVENT_CAPACITY);
+  CHECK(pokemon::pendingEventFront(state) != nullptr);
+  CHECK(*pokemon::pendingEventFront(state) == encounter);
+
+  CHECK(pokemon::dequeuePendingEvent(state));
+  CHECK(*pokemon::pendingEventFront(state) == item);
+  CHECK(pokemon::removePendingEvolutionsForRecord(state, evolution.recordId) == 1);
+  CHECK(pokemon::pendingEventCount(state) == 1);
+  CHECK(*pokemon::pendingEventFront(state) == item);
+  CHECK(pokemon::dequeuePendingEvent(state));
+  CHECK(!pokemon::dequeuePendingEvent(state));
+  CHECK(pokemon::pendingEventFront(state) == nullptr);
+
+  state = validState();
+  state.pendingEvents[1] = encounter;
   CHECK(!pokemon::validateState(state));
 }
 
@@ -475,6 +513,7 @@ int main() {
   levelProgressIsRelativeToTheCurrentLevel();
   stateValidationRejectsPartyAndPokedexCorruption();
   pendingEventValidationFollowsItsTag();
+  pendingEventQueueIsFixedFifoAndCompacted();
   speciesTableCoversKantoAndPinnedMetadata();
   acquisitionRulesKeepItemsNecessaryAndMewSpecial();
   everyKantoEvolutionMatchesTheCanonicalList();

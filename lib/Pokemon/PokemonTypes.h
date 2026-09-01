@@ -14,6 +14,7 @@ constexpr uint32_t MAXIMUM_TOTAL_XP = 8340;
 constexpr size_t POKEDEX_BYTES = 19;
 constexpr size_t PARTY_SIZE = 6;
 constexpr size_t EVOLUTION_ITEM_COUNT = 6;
+constexpr size_t PENDING_EVENT_CAPACITY = 3;
 
 enum class Gender : uint8_t {
   Unknown = 0,
@@ -94,7 +95,7 @@ using PokedexBits = std::array<uint8_t, POKEDEX_BYTES>;
 
 struct PokemonState {
   std::array<uint32_t, PARTY_SIZE> partyRecordIds{};
-  PendingEvent pending{};
+  std::array<PendingEvent, PENDING_EVENT_CAPACITY> pendingEvents{};
   std::array<uint16_t, EVOLUTION_ITEM_COUNT> itemCounts{};
   PokedexBits seenSpecies{};
   PokedexBits caughtSpecies{};
@@ -118,6 +119,12 @@ uint8_t levelForXp(uint32_t totalXp);
 LevelXpProgress levelXpProgress(uint32_t totalXp);
 bool markSpecies(PokedexBits& bits, uint16_t speciesId);
 bool isSpeciesMarked(const PokedexBits& bits, uint16_t speciesId);
+size_t pendingEventCount(const PokemonState& state);
+const PendingEvent* pendingEventFront(const PokemonState& state);
+PendingEvent* pendingEventFront(PokemonState& state);
+bool enqueuePendingEvent(PokemonState& state, const PendingEvent& event);
+bool dequeuePendingEvent(PokemonState& state);
+size_t removePendingEvolutionsForRecord(PokemonState& state, uint32_t recordId);
 bool validateState(const PokemonState& state);
 
 }  // namespace pokemon

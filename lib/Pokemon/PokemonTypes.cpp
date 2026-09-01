@@ -95,6 +95,25 @@ bool genderMatchesSpecies(const uint16_t speciesId, const Gender gender) {
   return gender == Gender::Male || gender == Gender::Female;
 }
 
+bool validatePendingEvent(const PendingEvent& event) {
+  switch (event.kind) {
+    case PendingEventKind::None:
+      return event.recordId == 0 && event.speciesId == 0 && event.level == 0 && event.gender == Gender::Unknown &&
+             event.item == EvolutionItem::None;
+    case PendingEventKind::Encounter:
+      return event.recordId == 0 && event.speciesId >= 1 && event.speciesId <= KANTO_SPECIES_COUNT &&
+             event.level >= 1 && event.level <= 100 && genderMatchesSpecies(event.speciesId, event.gender) &&
+             event.item == EvolutionItem::None;
+    case PendingEventKind::Item:
+      return event.recordId == 0 && event.speciesId == 0 && event.level == 0 && event.gender == Gender::Unknown &&
+             event.item >= EvolutionItem::MoonStone && event.item <= EvolutionItem::LinkCable;
+    case PendingEventKind::Evolution:
+      return event.recordId != 0 && event.speciesId >= 1 && event.speciesId <= KANTO_SPECIES_COUNT &&
+             event.level == 0 && event.gender == Gender::Unknown && event.item == EvolutionItem::None;
+  }
+  return false;
+}
+
 }  // namespace
 
 bool validateNickname(const std::string_view nickname) {
@@ -193,6 +212,55 @@ bool isSpeciesMarked(const PokedexBits& bits, const uint16_t speciesId) {
   return (bits[zeroBased / 8U] & static_cast<uint8_t>(1U << (zeroBased % 8U))) != 0;
 }
 
+size_t pendingEventCount(const PokemonState& state) {
+  size_t count = 0;
+  while (count < state.pendingEvents.size() && state.pendingEvents[count].kind != PendingEventKind::None) ++count;
+  return count;
+}
+
+const PendingEvent* pendingEventFront(const PokemonState& state) {
+  return state.pendingEvents[0].kind == PendingEventKind::None ? nullptr : &state.pendingEvents[0];
+}
+
+PendingEvent* pendingEventFront(PokemonState& state) {
+  return state.pendingEvents[0].kind == PendingEventKind::None ? nullptr : &state.pendingEvents[0];
+}
+
+bool enqueuePendingEvent(PokemonState& state, const PendingEvent& event) {
+  if (event.kind == PendingEventKind::None || !validatePendingEvent(event)) return false;
+  const size_t count = pendingEventCount(state);
+  if (count == state.pendingEvents.size()) return false;
+  for (size_t index = count; index < state.pendingEvents.size(); ++index) {
+    if (state.pendingEvents[index].kind != PendingEventKind::None) return false;
+  }
+  state.pendingEvents[count] = event;
+  return true;
+}
+
+bool dequeuePendingEvent(PokemonState& state) {
+  if (state.pendingEvents[0].kind == PendingEventKind::None) return false;
+  for (size_t index = 1; index < state.pendingEvents.size(); ++index) {
+    state.pendingEvents[index - 1] = state.pendingEvents[index];
+  }
+  state.pendingEvents.back() = {};
+  return true;
+}
+
+size_t removePendingEvolutionsForRecord(PokemonState& state, const uint32_t recordId) {
+  if (recordId == 0) return 0;
+  size_t writeIndex = 0;
+  size_t removed = 0;
+  for (const PendingEvent& event : state.pendingEvents) {
+    if (event.kind == PendingEventKind::Evolution && event.recordId == recordId) {
+      ++removed;
+      continue;
+    }
+    if (event.kind != PendingEventKind::None) state.pendingEvents[writeIndex++] = event;
+  }
+  while (writeIndex < state.pendingEvents.size()) state.pendingEvents[writeIndex++] = {};
+  return removed;
+}
+
 bool validateState(const PokemonState& state) {
   bool foundEmptyPartySlot = false;
   for (size_t slot = 0; slot < state.partyRecordIds.size(); ++slot) {
@@ -216,23 +284,16 @@ bool validateState(const PokemonState& state) {
     return false;
   }
 
-  const PendingEvent& event = state.pending;
-  switch (event.kind) {
-    case PendingEventKind::None:
-      return event.recordId == 0 && event.speciesId == 0 && event.level == 0 && event.gender == Gender::Unknown &&
-             event.item == EvolutionItem::None;
-    case PendingEventKind::Encounter:
-      return event.recordId == 0 && event.speciesId >= 1 && event.speciesId <= KANTO_SPECIES_COUNT &&
-             event.level >= 1 && event.level <= 100 && genderMatchesSpecies(event.speciesId, event.gender) &&
-             event.item == EvolutionItem::None;
-    case PendingEventKind::Item:
-      return event.recordId == 0 && event.speciesId == 0 && event.level == 0 && event.gender == Gender::Unknown &&
-             event.item >= EvolutionItem::MoonStone && event.item <= EvolutionItem::LinkCable;
-    case PendingEventKind::Evolution:
-      return event.recordId != 0 && event.speciesId >= 1 && event.speciesId <= KANTO_SPECIES_COUNT &&
-             event.level == 0 && event.gender == Gender::Unknown && event.item == EvolutionItem::None;
+  bool foundEmptyEvent = false;
+  for (const PendingEvent& event : state.pendingEvents) {
+    if (!validatePendingEvent(event)) return false;
+    if (event.kind == PendingEventKind::None) {
+      foundEmptyEvent = true;
+    } else if (foundEmptyEvent) {
+      return false;
+    }
   }
-  return false;
+  return true;
 }
 
 }  // namespace pokemon

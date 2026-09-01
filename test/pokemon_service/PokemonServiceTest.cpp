@@ -7,7 +7,7 @@ namespace {
 
 uint32_t zeroRandom(void*, uint32_t) { return 0; }
 
-uint32_t itemEventRandom(void*, const uint32_t upperExclusive) { return upperExclusive == 4 ? 1U : 0U; }
+uint32_t itemEventRandom(void*, const uint32_t upperExclusive) { return upperExclusive == 5 ? 2U : 0U; }
 
 pokemon::PokemonRecord starterPikachu() {
   pokemon::PokemonRecord record{};
