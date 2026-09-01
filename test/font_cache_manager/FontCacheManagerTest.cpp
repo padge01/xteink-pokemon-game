@@ -1,10 +1,10 @@
+#include <FontCacheManager.h>
+#include <SdCardFont.h>
+
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <string>
-
-#include <FontCacheManager.h>
-#include <SdCardFont.h>
 
 namespace {
 
