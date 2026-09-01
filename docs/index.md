@@ -3,20 +3,25 @@ title: Home
 nav_order: 1
 ---
 
-# CrossInk
+# Xteink Pokémon Game
 
-Welcome to CrossInk, a personal fork of CrossPoint Reader.
+A lightweight, reading-powered Pokémon companion for the Xteink X3, built on CrossInk.
 
-[View on GitHub](https://github.com/uxjulia/CrossInk)
+- [Download and install](https://padge01.github.io/xteink-pokemon-game/install.html)
+- [Pokémon companion guide](./pokemon-v2-beta.md)
+- [Installation details](./installation.md)
+- [Project scope](../SCOPE.md)
+- [Rights and attribution](../RIGHTS_AND_ATTRIBUTION.md)
 
-## User Docs
+## CrossInk reference
+
+The remaining documents are inherited CrossInk reader documentation. X3-specific installation and Pokémon instructions above take precedence for this project.
 
 - [User Guide](./user-guide.md)
-- [Installation](./installation.md)
-- [SD Card Fonts](./sd-card-fonts.md)
-- [Reader Features](./reader-features.md)
-- [Dictionary](./dictionary.md)
 - [Controls](./controls.md)
+- [Reader Features](./reader-features.md)
+- [SD Card Fonts](./sd-card-fonts.md)
+- [Dictionary](./dictionary.md)
 - [Reading Stats Sync](./reading-stats-sync.md)
 - [Nearby File Transfer](./nearby-file-transfer.md)
 - [Nearby Position Sync](./nearby-position-sync.md)
