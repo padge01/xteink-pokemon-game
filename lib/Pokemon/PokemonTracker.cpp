@@ -80,8 +80,8 @@ bool PokemonTracker::commitWholeMinutes(const uint16_t minimumMinutes) {
   if (wholeMinutes < minimumMinutes) return true;
   if (creditMinutes_ == nullptr) return false;
 
-  const uint16_t minutes = static_cast<uint16_t>(
-      std::min<uint32_t>(wholeMinutes, std::numeric_limits<uint16_t>::max()));
+  const uint16_t minutes =
+      static_cast<uint16_t>(std::min<uint32_t>(wholeMinutes, std::numeric_limits<uint16_t>::max()));
   if (!creditMinutes_(context_, minutes, bookProgressPercent_)) return false;
   committedSeconds_ += static_cast<uint32_t>(minutes) * 60U;
   return true;
