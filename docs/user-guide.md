@@ -5,6 +5,8 @@ nav_order: 1.5
 
 # CrossInk User Guide
 
+> This is inherited CrossInk reader documentation. For this X3 project, the [installation guide](./installation.md), [Pokémon guide](./pokemon-v2-beta.md), and [controls guide](./controls.md) take precedence.
+
 Welcome to the **CrossInk** firmware. This guide covers day-to-day device use.
 For focused reference material, see [Reader Features](./reader-features.md),
 [Controls](./controls.md), [SD Card Fonts](./sd-card-fonts.md),
@@ -56,16 +58,7 @@ For focused reference material, see [Reader Features](./reader-features.md),
 
 ## 1. Hardware Overview
 
-The device utilises the standard buttons on the Xteink X4 (in the same layout as the manufacturer firmware, by default):
-
-### Button Layout
-
-| Location        | Buttons                                              |
-| --------------- | ---------------------------------------------------- |
-| **Bottom Edge** | **Back**, **Confirm**, **Left**, **Right**           |
-| **Right Side**  | **Power**, **Volume Up**, **Volume Down**, **Reset** |
-
-Button layout can be customized in **Settings > Controls**.
+This build targets the Xteink X3. Use the [controls guide](./controls.md) for the physical X3 button layout and logical actions. Button assignments can be changed in **Settings > Controls**.
 
 ### Taking a Screenshot
 
@@ -297,9 +290,7 @@ device model and build.
 
 - **Time to Sleep**: Set the duration of inactivity before the device automatically goes to sleep. Values are in minutes, with a "Never" option at the end of the range.
 
-- **Device**: Set the device name and time-to-sleep timeout. Devices with a
-  real-time clock also expose clock format, UTC offset, and a sync action.
-
+- **Device**: Set the device name and time-to-sleep timeout. Devices with a  real-time clock also expose clock format, UTC offset, and a sync action.
 - **Files & Cache**: Configure hidden files, file extensions, file-browser view,
   finished-book behavior, and clear the reading cache.
 
@@ -597,9 +588,7 @@ Turn **Touch Reader Controls** off in **Reader Options** to disable these
 page-turn and gesture controls. **Disable Touchscreen** prevents touch input
 while a book is open but keeps it available in reader menus. For the different
 touch selection gestures used by [dictionary lookup](./dictionary.md#looking-up-a-word)
-and [clippings](./reader-features.md#clippings-and-highlights), see those
-feature guides.
-
+and [clippings](./reader-features.md#clippings-and-highlights), see thosefeature guides.
 ### Footnote Navigation
 
 When reading an EPUB that contains footnotes, you can navigate to the footnote text by selecting the footnote reference in the book. From the footnote, you can return to your original reading position.
@@ -692,47 +681,8 @@ If an issue or crash is encountered while using CrossInk, feel free to raise an 
 
 **Crash reports on SD card:** After a crash, CrossInk automatically saves a crash report to the SD card (no USB connection needed). Check the root of the SD card for a crash log file and include it with any bug report.
 
-**Serial monitor logs:** For more detailed debugging, connect the device to a computer and run the custom debugging monitor script (requires Python 3 with `pyserial`, `colorama`, and `matplotlib`; install via `pip3 install pyserial colorama matplotlib`):
-
-```
-python3 scripts/debugging_monitor.py
-```
-
-The script auto-detects the serial port. You can also specify one explicitly:
-
-```
-python3 scripts/debugging_monitor.py /dev/ttyACM0        # Linux
-python3 scripts/debugging_monitor.py /dev/tty.usbmodem1  # macOS
-python3 scripts/debugging_monitor.py COM7                # Windows
-```
-
-**Features:**
-
-- Color-coded log output by category (errors, memory, display, EPUB parsing, etc.)
-- Live memory usage graph (free RAM, total RAM, max contiguous allocation) updated every second
-- Interactive command prompt — type a command and press Enter to send it to the device
-- Screenshot capture — saves the current display to `screenshot.bmp` when triggered by the device
-
-**Options:**
-
-| Option               | Description                                               |
-| -------------------- | --------------------------------------------------------- |
-| `--baud RATE`        | Baud rate (default: 115200)                               |
-| `--filter KEYWORD`   | Show only lines containing the keyword (case-insensitive) |
-| `--suppress KEYWORD` | Hide lines containing the keyword (case-insensitive)      |
-
-**Examples:**
-
-```
-# Show only memory-related log lines
-python3 scripts/debugging_monitor.py --filter MEM
-
-# Hide noisy SD card log lines
-python3 scripts/debugging_monitor.py --suppress "[SD]"
-```
-
-Press **Ctrl-C** or close the graph window to exit.
+**Serial monitor logs:** The X3 has no user-accessible USB data port, so USB serial-monitor instructions from other CrossInk targets do not apply. Use the SD-card crash report for ordinary X3 bug reports.
 
 If the device is stuck in a bootloop, press and release the Reset button. Then, press and hold on to the configured Back button and the Power Button to boot to the Home Screen.
 
-There can be issues with broken cache or config. In this case, delete the `.crosspoint` directory on your SD card (or consider deleting only `settings.json`, `state.json`, or `epub_*` cache directories in the `.crosspoint/` folder).
+Broken cache or configuration can cause startup problems. Back up the SD card first, then remove only the specific cache or configuration file identified during troubleshooting. Do not delete the entire `.crosspoint` folder: it also contains Pokémon saves, artwork, reader settings, and other user data.

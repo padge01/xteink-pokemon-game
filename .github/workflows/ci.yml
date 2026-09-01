@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   clang-format:
     runs-on: ubuntu-latest
@@ -107,7 +111,7 @@ jobs:
           set -euo pipefail
           {
             echo "## ${{ matrix.environment }} firmware build stats"
-            grep -E "RAM:\s|Flash:\s" pio-${{ matrix.environment }}.log | while read -r line; do echo "- ${line}"; done
+            grep -E "RAM:\\s|Flash:\\s" pio-${{ matrix.environment }}.log | while read -r line; do echo "- ${line}"; done
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload firmware artifacts
@@ -119,6 +123,16 @@ jobs:
             .pio/build/default/firmware-x3-x4.bin
           if-no-files-found: error
 
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Test release downloads
+        run: node --test site/test/*.test.mjs
+
   # This job is used as the PR required actions check, allows for changes to other steps in the future without breaking
   # PR requirements.
   test-status:
@@ -127,6 +141,7 @@ jobs:
       - build
       - clang-format
       - cppcheck
+      - site
     if: always()
     runs-on: ubuntu-latest
     steps:

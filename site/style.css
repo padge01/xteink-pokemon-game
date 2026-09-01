@@ -27,7 +27,7 @@ header {
 .label,
 .step {
   margin: 0 0 8px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -55,7 +55,7 @@ h1 {
 
 .release-status {
   margin: 20px 0;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
   font-size: 0.9rem;
 }
 
@@ -105,8 +105,13 @@ h2 {
   color: #111;
 }
 
-.action[aria-disabled="true"],
-.action:disabled {
+.action:focus-visible,
+footer a:focus-visible {
+  outline: 3px solid #111;
+  outline-offset: 3px;
+}
+
+.action[aria-disabled="true"] {
   cursor: wait;
   opacity: 0.42;
   pointer-events: none;
@@ -122,13 +127,6 @@ ol {
 .install-card > p,
 footer p {
   margin-bottom: 0;
-}
-
-.flash-progress {
-  padding: 12px;
-  background: #ecece7;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 0.88rem;
 }
 
 footer {

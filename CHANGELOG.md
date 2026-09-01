@@ -2,17 +2,18 @@
 
 ### Added
 
-- Release tooling now produces an installable X3 firmware binary with a SHA-256 checksum for the project installer.
-- Private Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
-- Private Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
-- Private Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
+- Release tooling now produces an installable X3 firmware binary with a SHA-256 checksum for the download page.
+- Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
+- Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
+- Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
 - Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff themes can show the lead Pokémon in a compact, borderless status band.
-- A verified private-demo packager now bundles the X3/X4 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
+- The release packager now bundles the X3 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
 - Complete X3 installation archives now include the tested firmware and all required Pokémon artwork in one SD-card ZIP.
 - Added a public rights and attribution request process for artwork removal, replacement, or corrected credit.
 
 ### Changed
 
+- The download page now uses four plain static files instead of Astro, npm packages, and a generated site bundle.
 - Pokémon companion builds now check for wild encounters every 15 credited minutes with a 40% chance, guarantee the next available check after three misses, and use four gentler species-rarity tiers while keeping evolution-item checks hourly.
 - The Pokémon menu now presents Party, Pokédex, PC Box, PC Box sort, Bag, and Reset in the approved collection-first order.
 - The web EPUB optimizer now removes unused publisher-embedded fonts, their stylesheet rules, manifest records, and font-obfuscation metadata to produce smaller books.
@@ -29,9 +30,9 @@
 - EPUBs with padding after `</html>` now finish parsing normally, and ZIP read errors can no longer underflow into unsafe buffer lengths.
 - KOReader authentication and sync now keep Wi-Fi awake for the transaction and skip a redundant NTP wait.
 - Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
-- The private firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
-- Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
-- Standard CrossInk builds now compile the private Pokémon core out completely and no longer require generated species data.
+- The X3 firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
+- Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
+- Standard CrossInk builds now compile the Pokémon core out completely and no longer require generated species data.
 - Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.
 - Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves pending-event priority at hourly level-up boundaries.
 - Pokémon companion progression now evaluates recovered reading in chronological order, preserves credit when item storage is saturated, and offers level evolutions only after an actual level gain.
@@ -197,9 +198,7 @@
 - File Browser now indexes large SD-card folders so directories with many books can be browsed without loading every filename into memory at once.
 - EPUB text clipping with saved highlights, clipping lists, and Kindle-style `/My Clippings.txt` export.
 - `Create Clipping` is now available as a reader shortcut for short/long Power, long-press Menu, and long-press Back actions.
-- Per-book EPUB options for font, layout, styling, reading aids, and render modes, including `CrossInk Default`, `Balanced`, and `Light` modes for difficult books.
-- Arena allocator (`lib/Memory/Arena.h`) for burst-then-discard allocation patterns - reduces heap fragmentation during EPUB parsing and page layout over long reading sessions.
-- Optimized EPUBs now store location metadata at `META-INF/x-locations.json`.
+- Per-book EPUB options for font, layout, styling, reading aids, and render modes, including `CrossInk Default`, `Balanced`, and `Light` modes for difficult books.- Arena allocator (`lib/Memory/Arena.h`) for burst-then-discard allocation patterns - reduces heap fragmentation during EPUB parsing and page layout over long reading sessions.- Optimized EPUBs now store location metadata at `META-INF/x-locations.json`.
 - X3 SD-card writes now use the RTC for file timestamps when the clock is available.
 
 ### Changed
@@ -399,41 +398,3 @@
 - File Browser Home/Back long-press action for toggling hidden files and folders.
 - EPUB rendering and diagnostics improvements, including visible `<hr>` separators and heap logs around section rebuilds, image extraction, page serialization, and sleep-cache rebuilds.
 - Reader font coverage for block redactions, black-square ornaments, Greek category letters, and turned-comma punctuation (PR #104).
-- Simulator tools for testing sleep/wake behavior and smoke-testing common screens and EPUB reader menus.
-
-### Changed
-
-- Reduced Controls settings section spacing so the grouped controls fit better on X3 screens.
-- Made front reader long-press actions trigger when the hold delay is reached while normal page turns still trigger on release.
-- Used the fast EPUB spine/TOC indexing path for books with 300+ spine entries so heavily split books build `book.bin` faster on first open.
-- Allowed the web file manager and WebDAV to browse dot-prefixed hidden files when hidden files are enabled, matching the device file browser.
-
-### Fixed
-
-- Reader button and shortcut behavior, including X3 power-button wake filtering, folder delete long-press timing, and WiFi scan/connect screens that could not be exited while work was in progress.
-- RoundedRaff home-menu, keyboard, and button-hint rendering issues so Settings remains reachable and compact labels no longer overlap or disappear.
-- Font and glyph handling now reduces persistent SD-card font advance-cache memory, releases optional font caches before image extraction only when heap is tight, and shows a visible replacement symbol when compact UI fonts lack `U+FFFD`.
-- KOReader Sync authentication diagnostics and an in-reader sync crash, including clearer handling when a server or proxy returns non-JSON content.
-- EPUB text rendering for redactions, whitespace-only XHTML text nodes, simple black CSS span backgrounds, list bullets in `<li><p>...</p></li>` items, and very long base64-like text runs.
-- EPUB image, thumbnail, and section-rebuild stability so image-heavy chapters use less temporary memory, scale images more reliably, avoid stale dimensions, and suppress optional image work earlier under heap pressure.
-- EPUB low-memory and cache safety now skips optional next-chapter indexing and sleep-page cache rebuilds when heap is tight, fails safely with a malformed-book warning and Home exit path, rebuilds incompatible fork-written caches, and handles low-memory CSS parsing, truncated SD writes, invalid serialized strings, and failed temp-cache promotion.
-- Home no longer crashes after clearing reading cache when the source EPUB cache is missing.
-- Reader prewarm behavior now skips image decoding, keeps mixed-style font glyphs cached together, and avoids section rebuilds for render-quality-only option changes.
-- Concurrent render/storage crashes are avoided by serializing `GfxRenderer` scratch-buffer access, shared SPI bus access, and failed SPI lock cleanup.
-- Recent Books, EPUB/XTC thumbnail caches, deleted-folder metadata, and XTC cover scaling now keep cached book data in sync and grid covers fill their slots correctly.
-- Simulator build configuration now lets SDL2 and simulator-provided network/OTA shims compile cleanly.
-
----
-
-## [v1.2.9.1] - 2026-05-03
-
-### Changed
-
-- Cleaned up EPUB table rendering by removing synthetic row/cell labels and defaulting table cells to readable left alignment
-- Allow simple EPUB tables with full-width note rows so a single `colspan` cell spanning the whole table no longer forces the entire table back to paragraph fallback
-
-### Fixed
-
-- Power-button shortcut conflicts outside the reader so reader-only actions fall back to `Confirm` while Sleep, Refresh, Screenshot, Sync Progress, and File Transfer remain real power actions.
-- Potential crash when using `Go to %` in EPUBs.
-- Potential crash when entering sleep with Page Overlay enabled if the cached EPUB page data is invalid.

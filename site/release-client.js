@@ -34,7 +34,6 @@ export async function fetchRelease(tag = '', fetchImpl = fetch) {
   if (response.ok) {
     return selectReleaseAssets(await response.json());
   }
-
   if (tag || response.status !== 404) {
     throw new Error(`Release lookup failed (${response.status}).`);
   }
@@ -74,7 +73,6 @@ export async function verifyReleaseChecksum(
 
   const digest = new Uint8Array(await subtle.digest('SHA-256', firmware));
   const actual = Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
-
   if (actual !== published) {
     throw new Error('Firmware checksum does not match the published release.');
   }
