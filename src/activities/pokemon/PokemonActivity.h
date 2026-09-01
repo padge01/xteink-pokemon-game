@@ -5,7 +5,6 @@
 #include <FreeInkApp.h>
 #include <FreeInkUIGfxRenderer.h>
 #include <PokemonPromptContext.h>
-#include "pokemon/PokemonService.h"
 
 #include <array>
 #include <atomic>
@@ -13,6 +12,7 @@
 
 #include "activities/Activity.h"
 #include "components/themes/BaseTheme.h"
+#include "pokemon/PokemonService.h"
 #include "util/ButtonNavigator.h"
 
 class PokemonActivity final : public Activity {
