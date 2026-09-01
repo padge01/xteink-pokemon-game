@@ -2,9 +2,9 @@
 
 #include "src/util/SleepWakePolicy.h"
 
-using SleepWakePolicy::Resume;
 using SleepWakePolicy::hasValidSavedFrame;
 using SleepWakePolicy::resolveResume;
+using SleepWakePolicy::Resume;
 using SleepWakePolicy::shouldInitializeSeamlessly;
 
 constexpr size_t EXPECTED_FRAME_BYTES = 52272U;
