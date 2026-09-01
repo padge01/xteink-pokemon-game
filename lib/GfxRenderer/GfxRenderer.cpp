@@ -2058,8 +2058,7 @@ bool GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
       const uint8_t val = outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8)) & 0x3;
 
       if (renderMode == BW) {
-        const bool drawBlack =
-            useBwDither ? ditherNativeGrayTo1Bit(val, screenX, screenY) == 0 : val < 3;
+        const bool drawBlack = useBwDither ? ditherNativeGrayTo1Bit(val, screenX, screenY) == 0 : val < 3;
         if (drawBlack) drawPixel(screenX, screenY);
       } else if (renderMode == GRAYSCALE_MSB && (val == 1 || val == 2)) {
         drawPixel(screenX, screenY, false);
