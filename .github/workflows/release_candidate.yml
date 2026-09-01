@@ -78,8 +78,11 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: RC ${{ env.RC_BRANCH_SAFE }} ${{ env.RC_HASH_SHORT }}
           body: |
-            Draft release candidate build from `release/${{ env.RC_BRANCH_RAW }}` at `${{ env.RC_HASH_SHORT }}`.
-          draft: true
+            Hardware-test candidate from `release/${{ env.RC_BRANCH_RAW }}` at `${{ env.RC_HASH_SHORT }}`.
+
+            Install this exact candidate:
+            https://padge01.github.io/xteink-pokemon-game/install.html?release=${{ env.RC_TAG }}
+          draft: false
           prerelease: true
           files: |
             dist/xteink-pokemon-x3-v${{ env.VERSION }}.bin

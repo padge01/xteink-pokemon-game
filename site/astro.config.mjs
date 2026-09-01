@@ -52,6 +52,7 @@ function visit(node, visitor) {
 }
 
 export default defineConfig({
+  base: "/xteink-pokemon-game",
   build: {
     format: "file",
   },
@@ -61,5 +62,5 @@ export default defineConfig({
   vite: {
     plugins: [watchExternalDocs()],
   },
-  site: "https://www.crossink.dev",
+  site: "https://padge01.github.io",
 });

@@ -4,7 +4,7 @@
 
 **Goal:** Publish a tested X3 firmware binary through this repository's own installer and provide one-button browser artwork installation from the X3 file-transfer website.
 
-**Architecture:** GitHub Actions builds the `pokemon-x3` firmware and publishes a checksum alongside it. The existing Astro site becomes the independent installer and vendors only the X3 OTA flashing portion of the MIT CrossPoint Tools flasher. The Pokémon firmware adds a gated `/pokemon-setup` page; its JavaScript fetches CORS-enabled PokeAPI data and sprites, renders one-bit BMP files in the browser, uploads them through the existing X3 WebSocket/HTTP file-transfer protocol, and writes `manifest.json` last.
+**Architecture:** GitHub Actions builds the `pokemon-x3` firmware and publishes a checksum alongside it. The existing Astro site becomes the independent installer and vendors CrossPoint Tools' MIT-licensed `flasher.js` and `esptool.bundle.js` unchanged. A small X3-only wrapper supplies this project's release binary and hides every unrelated CrossPoint tool. The Pokémon firmware adds a gated `/pokemon-setup` page; its JavaScript fetches CORS-enabled PokeAPI data and sprites, renders one-bit BMP files in the browser, uploads them through the existing X3 WebSocket/HTTP file-transfer protocol, and writes `manifest.json` last.
 
 **Tech Stack:** PlatformIO/pioarduino, C++17/Arduino-ESP32, Astro 5, browser JavaScript, Canvas 2D, WebSerial/esptool-js, Node built-in test runner, Python unittest for release packaging.
 
@@ -232,7 +232,8 @@ git commit -m "feat: add independent X3 installer page"
 ### Task 3: X3-only WebSerial flashing
 
 **Files:**
-- Create: `site/src/lib/installer/x3-flasher.js`
+- Create: `site/src/lib/installer/x3-flasher.mjs`
+- Create: `site/public/vendor/crosspoint/flasher.js`
 - Create: `site/public/vendor/crosspoint/esptool.bundle.js`
 - Create: `site/public/vendor/crosspoint/LICENSE`
 - Create: `site/test/x3-flasher.test.mjs`
@@ -242,7 +243,7 @@ git commit -m "feat: add independent X3 installer page"
 **Interfaces:**
 - Consumes: `Uint8Array` firmware downloaded from this project's release.
 - Produces: `flashX3Firmware(firmware, callbacks) -> Promise<{ partition: string, success: true }>`.
-- Wraps: the partition parser and OTA writer adapted from CrossPoint Tools `src/lib/flasher.js`.
+- Wraps: the unchanged CrossPoint Tools `CrossPointFlasher` API.
 
 - [ ] **Step 1: Write tests for browser and firmware safety gates**
 
@@ -251,13 +252,14 @@ test('requires WebSerial before downloading firmware', async () => {
   await assert.rejects(() => assertWebSerial({}), /Chrome or Edge/);
 });
 
-test('rejects a non-ESP image before opening the serial port', async () => {
-  await assert.rejects(() => validateFirmwareImage(new Uint8Array([0, 1, 2])), /invalid firmware/);
-});
-
-test('accepts only the X3 CrossPoint partition layout', () => {
-  assert.equal(assertX3Layout(X3_PARTITIONS).device, 'X3');
-  assert.throws(() => assertX3Layout(X4_PARTITIONS), /X3/);
+test('requests the serial port before awaiting the firmware download', async () => {
+  const events = [];
+  await beginX3Flash({
+    requestPort: () => { events.push('port'); return Promise.resolve({}); },
+    downloadFirmware: async () => { events.push('download'); return new Uint8Array(); },
+    createFlasher: () => ({ flashFirmware: async () => ({ success: true }) }),
+  });
+  assert.deepEqual(events, ['port', 'download']);
 });
 ```
 
@@ -267,29 +269,30 @@ Run: `node --test site/test/x3-flasher.test.mjs`
 
 Expected: FAIL because `x3-flasher.js` is missing.
 
-- [ ] **Step 3: Adapt only the required CrossPoint Tools code**
+- [ ] **Step 3: Vendor the proven CrossPoint Tools flashing engine unchanged**
 
-Copy the MIT notice verbatim. Retain only:
+Copy these files byte-for-byte from CrossPoint Tools and retain its MIT licence:
 
-- WebSerial connection and disconnect.
-- ESP image-shape validation.
-- Partition-table parsing.
-- X3/CrossPoint layout validation.
-- OTA inactive-slot selection.
-- Firmware write and otadata switch verification.
+- `src/lib/flasher.js`
+- `src/lib/esptool.bundle.js`
+- `LICENSE`
 
-Exclude stock firmware, repair, full-flash backup, font builds, beta catalogs, analytics, admin APIs, and non-X3 device definitions.
+Do not copy the CrossPoint React UI, firmware catalogs, stock firmware, repair controls, backups, font builds, beta tools, analytics, admin APIs, or device-selection screens. Preserve the upstream flasher's image validation, partition parsing, inactive-slot selection, firmware write, otadata update, and verification without reimplementation.
 
 Expose this narrow wrapper:
 
 ```js
 export async function flashX3Firmware(firmware, callbacks = {}) {
-  assertWebSerial(globalThis.navigator);
-  await validateFirmwareImage(firmware);
-  const flasher = new CrossPointFlasher({ expectedDevice: 'x3' });
+  const port = await CrossPointFlasher.requestPort();
+  const flasher = new CrossPointFlasher(port, {
+    expectedChip: 'ESP32-C3',
+    deviceName: 'Xteink X3',
+  });
   return flasher.flashFirmware(firmware, callbacks);
 }
 ```
+
+The actual browser click handler must call `requestPort()` before its first `await`; otherwise Chrome can reject the chooser because the user gesture has expired.
 
 - [ ] **Step 4: Connect the USB button to the latest release binary**
 
@@ -308,7 +311,7 @@ Expected: PASS and the bundled installer contains no CrossPoint network API URLs
 - [ ] **Step 6: Commit the USB flasher**
 
 ```bash
-git add site/src/lib/installer/x3-flasher.js site/public/vendor/crosspoint site/test site/src/pages/install.astro NOTICE.md
+git add site/src/lib/installer/x3-flasher.mjs site/public/vendor/crosspoint site/test site/src/pages/install.astro NOTICE.md
 git commit -m "feat: flash X3 releases from the project site"
 ```
 
