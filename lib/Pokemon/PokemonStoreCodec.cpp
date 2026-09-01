@@ -23,15 +23,12 @@ void write32(uint8_t* bytes, const size_t offset, const uint32_t value) {
 }
 
 uint16_t read16(const uint8_t* bytes, const size_t offset) {
-  return static_cast<uint16_t>(bytes[offset]) |
-         static_cast<uint16_t>(static_cast<uint16_t>(bytes[offset + 1]) << 8U);
+  return static_cast<uint16_t>(bytes[offset]) | static_cast<uint16_t>(static_cast<uint16_t>(bytes[offset + 1]) << 8U);
 }
 
 uint32_t read32(const uint8_t* bytes, const size_t offset) {
-  return static_cast<uint32_t>(bytes[offset]) |
-         (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
-         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) |
-         (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
+  return static_cast<uint32_t>(bytes[offset]) | (static_cast<uint32_t>(bytes[offset + 1]) << 8U) |
+         (static_cast<uint32_t>(bytes[offset + 2]) << 16U) | (static_cast<uint32_t>(bytes[offset + 3]) << 24U);
 }
 
 }  // namespace
@@ -42,8 +39,7 @@ uint64_t snapshotFileBytes(const SnapshotHeader& header) {
 }
 
 bool encodeSnapshotHeader(const SnapshotHeader& header, HeaderBytes& output) {
-  const uint64_t payloadBytes =
-      POKEMON_STATE_BYTES + static_cast<uint64_t>(header.recordCount) * POKEMON_RECORD_BYTES;
+  const uint64_t payloadBytes = POKEMON_STATE_BYTES + static_cast<uint64_t>(header.recordCount) * POKEMON_RECORD_BYTES;
   if (header.sequence == 0 || payloadBytes > std::numeric_limits<uint32_t>::max()) return false;
 
   HeaderBytes candidate{};
@@ -70,7 +66,8 @@ HeaderDecodeResult decodeSnapshotHeader(const HeaderBytes& bytes, SnapshotHeader
   SnapshotHeader candidate{};
   candidate.sequence = read32(bytes.data(), 8);
   candidate.recordCount = read32(bytes.data(), 16);
-  const uint64_t payloadBytes = POKEMON_STATE_BYTES + static_cast<uint64_t>(candidate.recordCount) * POKEMON_RECORD_BYTES;
+  const uint64_t payloadBytes =
+      POKEMON_STATE_BYTES + static_cast<uint64_t>(candidate.recordCount) * POKEMON_RECORD_BYTES;
   if (candidate.sequence == 0 || read16(bytes.data(), 6) != POKEMON_SNAPSHOT_HEADER_BYTES ||
       read16(bytes.data(), 12) != POKEMON_STATE_BYTES || read16(bytes.data(), 14) != POKEMON_RECORD_BYTES ||
       payloadBytes > std::numeric_limits<uint32_t>::max() || read32(bytes.data(), 20) != payloadBytes) {
