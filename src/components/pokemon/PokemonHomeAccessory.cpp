@@ -41,15 +41,14 @@ bool pokemonHomeAccessorySupported(const uint8_t theme) {
 }
 
 void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboardSnapshot& snapshot,
-                               const Rect bounds) {
+                              const Rect bounds) {
   const DashboardLayout layout = pokemonDashboardLayout(bounds.width, bounds.height);
   if (snapshot.leader.recordId == 0 || !layout.valid) return;
   renderer.fillRect(bounds.x, bounds.y, bounds.width, bounds.height, false);
   const int spriteWidth = std::min(layout.sprite.width, layout.sprite.height * 4 / 3);
   const int spriteX = layout.sprite.x + (layout.sprite.width - spriteWidth) / 2;
   drawPokemonSpeciesArt(renderer, snapshot.leader.speciesId, true,
-                        Rect{bounds.x + spriteX, bounds.y + layout.sprite.y, spriteWidth,
-                             layout.sprite.height});
+                        Rect{bounds.x + spriteX, bounds.y + layout.sprite.y, spriteWidth, layout.sprite.height});
 
   const SpeciesData* species = speciesData(snapshot.leader.speciesId);
   const char* speciesLabel = species == nullptr ? "???" : species->name;
@@ -68,13 +67,12 @@ void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboar
   const int bottom = bounds.y + bounds.height / 2 + 1;
   char speciesFit[40], nicknameFit[40], levelFit[24], xpFit[40];
   renderer.drawText(UI_12_FONT_ID, bounds.x + layout.identity.x, top,
-                    fit(renderer, UI_12_FONT_ID, speciesLabel, layout.identity.width, speciesFit,
-                        EpdFontFamily::BOLD),
+                    fit(renderer, UI_12_FONT_ID, speciesLabel, layout.identity.width, speciesFit, EpdFontFamily::BOLD),
                     true, EpdFontFamily::BOLD);
   if (snapshot.leader.nickname[0] != '\0') {
-    renderer.drawText(UI_10_FONT_ID, bounds.x + layout.identity.x, bottom,
-                      fit(renderer, UI_10_FONT_ID, snapshot.leader.nickname.data(), layout.identity.width,
-                          nicknameFit));
+    renderer.drawText(
+        UI_10_FONT_ID, bounds.x + layout.identity.x, bottom,
+        fit(renderer, UI_10_FONT_ID, snapshot.leader.nickname.data(), layout.identity.width, nicknameFit));
   }
   renderer.drawText(UI_10_FONT_ID, bounds.x + layout.level.x, top,
                     fit(renderer, UI_10_FONT_ID, levelText, layout.level.width, levelFit));
@@ -82,10 +80,9 @@ void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboar
                     fit(renderer, UI_10_FONT_ID, xpText, layout.xp.width, xpFit));
   if (snapshot.notice != DashboardNotice::None) {
     constexpr const char* indicator = "!";
-    const int noticeX = bounds.x + layout.notice.x +
-                        (layout.notice.width - renderer.getTextWidth(UI_12_FONT_ID, indicator,
-                                                                     EpdFontFamily::BOLD)) /
-                            2;
+    const int noticeX =
+        bounds.x + layout.notice.x +
+        (layout.notice.width - renderer.getTextWidth(UI_12_FONT_ID, indicator, EpdFontFamily::BOLD)) / 2;
     const int noticeY = bounds.y + (bounds.height - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
     renderer.drawText(UI_12_FONT_ID, noticeX, noticeY, indicator, true, EpdFontFamily::BOLD);
   }
