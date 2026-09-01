@@ -147,9 +147,10 @@ The repository states:
 
 - Firmware downloads include a SHA-256 checksum.
 - The USB flasher validates the X3 partition layout before writing.
-- Failed artwork uploads leave the manifest absent or invalid, so incomplete
-  packs are never reported as installed.
-- Uploads can resume by skipping files whose path and checksum already match.
+- Failed artwork uploads leave the manifest absent, so incomplete packs are
+  never reported as installed.
+- Retrying artwork setup safely regenerates and overwrites the expected files.
+  The first release does not maintain per-file resume state.
 - Artwork setup never edits books, reading progress, or Pokémon save snapshots.
 - Rollback instructions always link to a known-good X3 firmware source.
 
