@@ -64,8 +64,7 @@ int main() {
   }
 
   if (!check(!TokenBoundary::allowsBreakAfterExplicitHyphen(0x00AD), "Soft hyphen was treated as visible")) return 1;
-  if (!check(!TokenBoundary::allowsBreakAfterExplicitHyphen(0x2011), "Non-breaking hyphen allowed a break"))
-    return 1;
+  if (!check(!TokenBoundary::allowsBreakAfterExplicitHyphen(0x2011), "Non-breaking hyphen allowed a break")) return 1;
   if (!check(!TokenBoundary::allowsBreakAfterExplicitHyphen('.'), "Non-hyphen punctuation allowed a break")) return 1;
 
   return 0;
