@@ -9,7 +9,7 @@ import '../styles/installer.css';
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Install Pokémon for Xteink X3 by Wi-Fi or desktop USB."
+      content="Install Pokémon for Xteink X3 by Wi-Fi or SD card reader."
     />
     <title>Install Pokémon for Xteink X3</title>
   </head>
@@ -18,33 +18,39 @@ import '../styles/installer.css';
       <header>
         <p class="label">Xteink X3 only</p>
         <h1>Pokémon for Xteink X3</h1>
-        <p class="intro">Insert the SD card, then choose how to install the firmware.</p>
+        <p class="intro">Download the firmware, then copy it to the X3's SD card.</p>
       </header>
 
       <p class="release-status" id="release-status" role="status">Finding the latest release…</p>
+      <a class="action" id="download-firmware" aria-disabled="true">Download X3 firmware (.bin)</a>
 
       <section class="install-card primary-route" aria-labelledby="wifi-title">
         <div>
           <p class="step">Recommended</p>
           <h2 id="wifi-title">Wi-Fi update</h2>
         </div>
-        <a class="action" id="download-firmware" aria-disabled="true">Download firmware</a>
         <ol>
-          <li>On the X3, open <strong>File Transfer</strong>.</li>
-          <li>Upload the downloaded <strong>.bin</strong> file.</li>
+          <li>Leave the SD card inside the X3 and open <strong>File Transfer</strong>.</li>
+          <li>Open the address shown by the X3 and upload the downloaded <strong>.bin</strong> file to the card root.</li>
+          <li>Exit File Transfer.</li>
           <li>Open <strong>Settings → System → SD Card Firmware Update</strong>.</li>
           <li>Select the file and confirm.</li>
         </ol>
       </section>
 
-      <section class="install-card" aria-labelledby="usb-title">
+      <section class="install-card" aria-labelledby="reader-title">
         <div>
-          <p class="step">Desktop Chrome or Edge</p>
-          <h2 id="usb-title">USB flash</h2>
+          <p class="step">Computer</p>
+          <h2 id="reader-title">SD card reader</h2>
         </div>
-        <button class="action secondary" id="flash-usb" type="button" disabled>Flash over USB</button>
-        <p>Connect the X3 with its SD card inserted. The browser writes the update to the inactive firmware slot.</p>
-        <div id="flash-progress" class="flash-progress" aria-live="polite" hidden></div>
+        <ol>
+          <li>Power off the X3 and put its SD card in the reader.</li>
+          <li>Back up <strong>/.crosspoint/pokemon-v2-a.bin</strong> and <strong>pokemon-v2-b.bin</strong>.</li>
+          <li>Copy the downloaded <strong>.bin</strong> file to the card root.</li>
+          <li>Safely eject the card and return it to the X3.</li>
+          <li>Open <strong>Settings → System → SD Card Firmware Update</strong>, select the file, and confirm.</li>
+        </ol>
+        <p>An SD card reader is storage, not a flashing device. The firmware update runs on the X3.</p>
       </section>
 
       <footer>
@@ -54,97 +60,24 @@ import '../styles/installer.css';
     </main>
 
     <script>
-      import {
-        fetchRelease,
-        verifyReleaseChecksum,
-      } from '../lib/installer/release-client.mjs';
-      import { beginX3Flash } from '../lib/installer/x3-flasher.mjs';
+      import { fetchRelease } from '../lib/installer/release-client.mjs';
 
       const status = document.querySelector('#release-status');
       const download = document.querySelector('#download-firmware');
-      const usb = document.querySelector('#flash-usb');
-      const progress = document.querySelector('#flash-progress');
-      const baseUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
-      const flasherUrl = `${baseUrl}vendor/crosspoint/flasher.js`;
-      const flasherModule = import(/* @vite-ignore */ flasherUrl);
-      let releaseInfo;
-      let CrossPointFlasherClass;
-      let validateCrossPointFirmware;
       const requestedRelease = new URLSearchParams(location.search).get('release') ?? '';
-
-      flasherModule.then(({ CrossPointFlasher, validateFirmwareImage }) => {
-        CrossPointFlasherClass = CrossPointFlasher;
-        validateCrossPointFirmware = validateFirmwareImage;
-        if (releaseInfo && 'serial' in navigator) usb.disabled = false;
-      });
 
       fetchRelease(requestedRelease)
         .then((release) => {
-          releaseInfo = release;
           status.textContent = requestedRelease
             ? `Release candidate: ${release.version}`
             : `Latest release: v${release.version}`;
           download.href = release.firmwareUrl;
           download.removeAttribute('aria-disabled');
-          if ('serial' in navigator && CrossPointFlasherClass) {
-            usb.disabled = false;
-          } else {
-            usb.title = 'USB flashing requires desktop Chrome or Edge.';
-          }
         })
         .catch((error) => {
           status.textContent = 'The latest release could not be loaded. Use the releases link below.';
           console.error(error);
         });
-
-      usb.addEventListener('click', () => {
-        if (!releaseInfo || usb.disabled) return;
-
-        usb.disabled = true;
-        progress.hidden = false;
-        progress.textContent = 'Choose the X3 serial port…';
-
-        // beginX3Flash calls requestPort immediately. Do not await anything
-        // before this call or Chrome will discard the click's user gesture.
-        beginX3Flash({
-          CrossPointFlasher: CrossPointFlasherClass,
-          validateFirmwareImage: validateCrossPointFirmware,
-          downloadFirmware: async () => {
-            progress.textContent = 'Downloading firmware…';
-            const [firmwareResponse, checksumResponse] = await Promise.all([
-              fetch(releaseInfo.firmwareUrl),
-              fetch(releaseInfo.checksumUrl),
-            ]);
-            if (!firmwareResponse.ok) {
-              throw new Error(`Firmware download failed (${firmwareResponse.status}).`);
-            }
-            if (!checksumResponse.ok) {
-              throw new Error(`Checksum download failed (${checksumResponse.status}).`);
-            }
-            const firmware = new Uint8Array(await firmwareResponse.arrayBuffer());
-            progress.textContent = 'Verifying firmware…';
-            await verifyReleaseChecksum(firmware, await checksumResponse.text());
-            return firmware;
-          },
-          onStepChange: (_index, name, stepStatus) => {
-            if (stepStatus === 'running') progress.textContent = `${name}…`;
-          },
-          onProgress: (name, current, total) => {
-            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-            progress.textContent = `${name}: ${percent}%`;
-          },
-        })
-          .then(() => {
-            progress.textContent = 'Flash complete. Unplug and reconnect the X3 to restart it.';
-          })
-          .catch((error) => {
-            progress.textContent =
-              error?.name === 'NotFoundError' ? 'No serial port selected.' : `Flash stopped: ${error.message}`;
-          })
-          .finally(() => {
-            usb.disabled = false;
-          });
-      });
     </script>
   </body>
 </html>

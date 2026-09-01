@@ -7,65 +7,36 @@ nav_order: 2
 
 ## Supported Devices
 
-- Xteink X3, X4
-- Seeed Studio Sticky
+- Xteink X3 only
 
-## Web Installation via USB
+Do not install this build on an X4, X4 Pro, Sticky, or another device.
 
-#### For new installs and updates.
+Download the current X3 `.bin` from the
+[project install guide](https://padge01.github.io/xteink-pokemon-game/install.html)
+or the [GitHub releases page](https://github.com/padge01/xteink-pokemon-game/releases).
 
-1. Navigate to [https://inky.crossink.dev/#flash-tools](https://inky.crossink.dev/#flash-tools) and select your device model.
-2. The latest version will be automatically selected, but if you ever want to revert to an earlier build, you can select it from the dropdown.
-3. Choose the firmware option you want to install.
-4. Click on the "Flash Firmware" button
+## Wi-Fi update
 
-## SD Card Firmware Update
+1. Leave the SD card inside the X3 and open **File Transfer**.
+2. Open the address displayed by the X3 in a browser.
+3. Upload the downloaded `.bin` to the SD-card root.
+4. Exit File Transfer.
+5. Open **Settings → System → SD Card Firmware Update**.
+6. Select the `.bin` and confirm.
 
-#### For installing newer versions of CrossInk. Can be used by USB locked devices.
+## SD card reader
 
-1. Follow the same steps from the Web Installation method above. There will be an option to download the firmware instead of USB flashing.
-2. Place the downloaded `firmware-*.bin` file on your SD card. You can place this file anywhere.
-3. Go to `Settings > System > SD Card Firmware Update` and navigate to the `.bin` file and update.
+1. Power off the X3 and remove its SD card.
+2. Insert the card in the computer.
+3. Back up `/.crosspoint/pokemon-v2-a.bin` and `pokemon-v2-b.bin`.
+4. Copy the downloaded `.bin` to the card root.
+5. Safely eject the card and return it to the X3.
+6. Open **Settings → System → SD Card Firmware Update**, select the file, and confirm.
 
-## USB Locked Devices
+The card reader is only used to copy files. The firmware update runs on the X3.
 
-If your device has USB data transfer disabled:
+## Artwork
 
-1. Navigate to [https://inky.crossink.dev/#flash-tools](https://inky.crossink.dev/#flash-tools) and check the box for "I have a locked device" at the top.
-2. The latest version will be automatically selected, but if you ever want to revert to an earlier build, you can select it from the dropdown.
-3. Choose the firmware option you want to download.
-4. Click on the "Download update.bin" button and follow the instructions.
-
-## Command Line
-
-These instructions are for macOS and Linux. Windows users should use the web installer.
-
-Install `esptool`:
-
-```sh
-pip3 install esptool
-```
-
-Download the `firmware-*.bin` file from the [releases page](https://github.com/uxjulia/CrossInk/releases), then connect your device with USB-C.
-
-Find the device port:
-
-```sh
-# Linux
-dmesg | grep tty
-
-# macOS
-ls /dev/cu.*
-```
-
-Flash the firmware:
-
-```sh
-# Linux
-esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-
-# macOS
-esptool.py --chip esp32c3 --port /dev/cu.usbmodem2101 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-```
-
-Replace the port and firmware path with your actual values.
+Firmware releases do not include Pokémon artwork. Preserve an existing
+`/.crosspoint/pokemon/` folder during updates. For a new installation, follow
+[Artwork setup](artwork-setup.md).

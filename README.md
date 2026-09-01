@@ -2,7 +2,7 @@
 
 Reading-powered Pokémon collection for the Xteink X3.
 
-[Install the latest release](https://padge01.github.io/xteink-pokemon-game/install.html)
+[Open the install guide](https://padge01.github.io/xteink-pokemon-game/install.html)
 
 ## Requirements
 
@@ -27,12 +27,15 @@ No battles, moves, breeding, trading, or combat statistics are included.
 
 ## Install
 
-The installer provides two routes:
+The install guide provides two routes:
 
 - **Wi-Fi update:** download the firmware, upload it through the X3 File Transfer page, then open **Settings → System → SD Card Firmware Update**.
-- **Desktop USB:** connect the X3 with its SD card inserted and use Chrome or Edge.
+- **SD card reader:** download the firmware, copy it to the card root, return the card to the X3, then open **Settings → System → SD Card Firmware Update**.
 
-After updating, open **File Transfer → Pokémon Setup** to create and install the artwork directly from the browser. Users do not need Python, a build environment, or a separate artwork archive.
+The public firmware release does not contain Pokémon artwork, and the install
+guide does not download it. Keep an existing `/.crosspoint/pokemon/` folder when
+updating. New installations must prepare the local artwork pack described in
+[Artwork setup](docs/artwork-setup.md).
 
 ## Firmware base
 
@@ -44,7 +47,6 @@ After updating, open **File Transfer → Pokémon Setup** to create and install 
 ## Credits
 
 - [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader): original firmware and upstream improvements.
-- [CrossPoint Tools](https://github.com/crosspoint-reader/crosspoint-tools): MIT-licensed browser flasher.
 - [Joshua Miller's CrossPoint Reader Companion](https://github.com/JoshuaMillerCode/crosspoint-reader-companion): reading-companion concept and real-reading behavior.
 - [PokeAPI Sprites](https://github.com/PokeAPI/sprites): Pokémon sprite source used during browser artwork setup.
 - [Tesserae](https://github.com/dmellok/tesserae) and [u/xDaftTurtle's Pokédex cards](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3): Pokédex-card reference.

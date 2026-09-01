@@ -13,14 +13,6 @@ The inherited `LICENSE` and copyright notice must remain with copies or
 substantial portions of the software. This notice supplements that licence; it
 does not replace it.
 
-## Browser flasher
-
-The installer vendors `flasher.js` and `esptool.bundle.js` unchanged from
-[CrossPoint Tools](https://github.com/crosspoint-reader/crosspoint-tools) commit
-`8bf36ff24c3fa3785b5b07ac02407fa98691092c`. CrossPoint Tools is distributed
-under the MIT License. Its complete licence is included beside the vendored
-files at `site/public/vendor/crosspoint/LICENSE`.
-
 ## Reading-companion reference
 
 [Joshua Miller's CrossPoint Reader Companion](https://github.com/JoshuaMillerCode/crosspoint-reader-companion)
