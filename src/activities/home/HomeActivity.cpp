@@ -38,9 +38,9 @@
 #include "components/themes/minimal/MinimalTheme.h"
 #include "fontIds.h"
 #if defined(CROSSINK_ENABLE_POKEMON)
+#include "Memory.h"
 #include "activities/pokemon/PokemonActivity.h"
 #include "components/pokemon/PokemonHomeAccessory.h"
-#include "Memory.h"
 #endif
 
 namespace {
