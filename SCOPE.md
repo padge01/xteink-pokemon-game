@@ -1,55 +1,24 @@
-# Project Vision & Scope: CrossInk
+# Scope
 
-The goal of this CrossPoint fork is to provide useful enhancements while still adhering to the core principles of Crosspoint. If you have a major feature request, it should first be directed at the main project since this is a downstream project that consumes their updates.
+Xteink Pokémon Game is a lightweight reading companion for the Xteink X3. It extends CrossInk without replacing its main job as an e-reader.
 
-The content below is taken directly from Crosspoint and aligns with CrossInk's vision as well.
+## In scope
 
-## 1. Core Mission
+- Award progress from CrossInk's existing verified reading sessions
+- One lead Pokémon, a Party of six, PC storage, items, evolution, and the original-151 Pokédex
+- Small, offline menus designed for the X3's buttons, e-ink display, and limited memory
+- Preprocessed artwork streamed from the SD card
+- Save files kept separate from books and reading statistics
+- X3 stability fixes and compatible upstream CrossPoint/CrossInk improvements
 
-To provide a lightweight, high-performance firmware that maximizes the potential of the X4, prioritizing legibility and usability over "swiss-army-knife" functionality.
+## Out of scope
 
-## 2. Scope
+- Battles, moves, combat statistics, breeding, or online trading
+- Background networking, timers, or work while the device is idle
+- A second framebuffer or large in-memory artwork
+- Features that duplicate CrossInk's reader, reading-session, library, or file-transfer systems
+- X4, X4 Pro, Sticky, or other device support until each target has its own design and hardware validation
 
-### In-Scope
+## Gate for new work
 
-*These are features that directly improve the primary purpose of the device.*
-
-* **User Experience:** E.g. User-friendly interfaces, and interactions, both inside the reader and navigating the
-  firmware. This includes things like button mapping, book loading, and book navigation like bookmarks.
-* **Document Rendering:** E.g. Support for rendering documents (primarily EPUB) and improvements to the rendering
-  engine.
-* **Format Optimization:** E.g. Efficiently parsing EPUB (CSS/Images) and other documents within the device's
-  capabilities.
-* **Typography & Legibility:** E.g. Custom font support, hyphenation engines, and adjustable line spacing.
-* **E-Ink Driver Refinement:** E.g. Reducing full-screen flashes (ghosting management) and improving general rendering.
-* **Library Management:** E.g. Simple, intuitive ways to organize and navigate a collection of books.
-* **Local Transfer:** E.g. Simple, "pull" based book loading via a basic web-server or public and widely-used standards.
-* **Language Support:** E.g. Support for multiple languages both in the reader and in the interfaces.
-* **Reference Tools:** E.g. Local dictionary lookup. Providing quick, offline definitions to enhance comprehension
-  without breaking focus.
-* **Clock Display (device dependent):**
-
-| Device | Scope |
-| -- | -- |
-| X3 | The X3 uses a dedicated DS3231 RTC, which maintains accurate time across sleep cycles and can be treated as a reliable wall clock. |
-| X4 | The X4 relies on the ESP32-C3's internal RTC, which drifts significantly during deep sleep. NTP sync could correct this, with an appropriate user experience around connecting to the internet on wake or on demand. This causes some tension with the **Active Connectivity** section below, so please open a discussion about this UX if it's a feature you would find useful. |
-
-### Out-of-Scope
-
-*These items are rejected because they compromise the device's stability or mission.*
-
-* **Interactive Apps:** No Notepads, Calculators, or Games. This is a reader, not a PDA.
-* **Active Connectivity:** No RSS readers, News aggregators, or Web browsers. Background Wi-Fi tasks drain the battery and complicate the single-core CPU's execution.
-* **Media Playback:** No Audio players or Audiobooks.
-* **Complex Annotation:** No typed out notes. These features are better suited for devices with better input capabilities and more powerful chips.
-
-### In-scope — Technically Unsupported
-
-*These features align with Crosspoint's goals but are impractical on the current hardware or produce poor UX.*
-
-* **PDF Rendering:** PDFs are fixed-layout documents, so rendering them requires displaying pages as images rather than reflowable text — resulting in constant panning and zooming that makes for a poor reading experience on e-ink.
-
-## 3. Idea Evaluation
-
-While I appreciate the desire to add new and exciting features to Crosspoint Reader, Crosspoint Reader is designed to be a lightweight, reliable, and performant e-reader. Things which distract or compromise the device's core mission will not be accepted. As a guiding question, consider if your idea improve the "core reading experience" for the average user,
-and, critically, not distract from that reading experience.
+A change should reuse an existing CrossInk mechanism, remain safe on the ESP32-C3, and improve the reading companion directly. New screens, settings, dependencies, and persistent fields need a concrete user benefit and hardware validation.
