@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta
+      name="description"
+      content="Download and install Xteink Pokémon Game for the Xteink X3."
+    >
+    <link rel="stylesheet" href="./style.css">
+    <title>Install Xteink Pokémon Game</title>
+  </head>
+  <body>
+    <main class="installer">
+      <header>
+        <p class="label">Xteink X3 only</p>
+        <h1>Xteink Pokémon Game</h1>
+        <p class="intro">One ZIP contains the firmware and all required artwork.</p>
+      </header>
+
+      <p class="release-status" id="release-status" role="status">Finding the current beta…</p>
+      <div class="download-actions">
+        <a class="action" id="download-full" aria-disabled="true">Download full install (.zip)</a>
+        <a class="action secondary" id="download-firmware" aria-disabled="true">Firmware only (.bin)</a>
+      </div>
+
+      <section class="install-card primary-route" aria-labelledby="reader-title">
+        <div>
+          <p class="step">Recommended</p>
+          <h2 id="reader-title">Full install</h2>
+        </div>
+        <ol>
+          <li>Download the full-install ZIP to a computer.</li>
+          <li>Open or extract the ZIP. <strong>Do not copy the ZIP file itself to the SD card.</strong></li>
+          <li>Power off the X3 and put its SD card in the computer.</li>
+          <li>Back up <strong>/.crosspoint/pokemon-v2-a.bin</strong> and <strong>/.crosspoint/pokemon-v2-b.bin</strong> if present.</li>
+          <li>Copy the extracted <strong>update.bin</strong> and <strong>.crosspoint</strong> folder to the SD-card root. Merge <strong>.crosspoint</strong>; do not replace or delete the existing folder.</li>
+          <li>Confirm <strong>update.bin</strong> and <strong>.crosspoint</strong> are directly at the SD-card root, safely eject the card, and return it to the X3.</li>
+          <li>Open <strong>Settings → System → SD Card Firmware Update</strong>, select <strong>update.bin</strong>, and confirm.</li>
+        </ol>
+        <p>The package does not contain or replace Pokémon saves, books, or reading data.</p>
+      </section>
+
+      <section class="install-card" aria-labelledby="wifi-title">
+        <div>
+          <p class="step">Updates after the full install</p>
+          <h2 id="wifi-title">Firmware-only Wi-Fi update</h2>
+        </div>
+        <ol>
+          <li>Use this route only if <strong>/.crosspoint/pokemon/</strong> is already installed.</li>
+          <li>Download <strong>Firmware only</strong>.</li>
+          <li>Leave the SD card inside the X3 and open <strong>File Transfer</strong>.</li>
+          <li>Open the address shown by the X3 and upload the downloaded <strong>.bin</strong> file to the SD-card root.</li>
+          <li>Exit File Transfer, open <strong>Settings → System → SD Card Firmware Update</strong>, select the file, and confirm.</li>
+        </ol>
+      </section>
+
+      <footer>
+        <p>Back up the SD card first. Do not install this build on an X4, X4 Pro, Sticky, or another device.</p>
+        <div class="footer-links">
+          <a id="download-checksums" href="https://github.com/padge01/xteink-pokemon-game/releases">Checksums</a>
+          <a href="https://github.com/padge01/xteink-pokemon-game/releases">All releases</a>
+        </div>
+      </footer>
+    </main>
+
+    <script type="module">
+      import { fetchRelease } from './release-client.js';
+
+      const status = document.querySelector('#release-status');
+      const fullDownload = document.querySelector('#download-full');
+      const firmwareDownload = document.querySelector('#download-firmware');
+      const checksumDownload = document.querySelector('#download-checksums');
+      const requestedRelease = new URLSearchParams(location.search).get('release') ?? '';
+
+      fetchRelease(requestedRelease)
+        .then((release) => {
+          status.textContent = requestedRelease
+            ? 'Selected release: ' + release.version
+            : 'Current beta: ' + release.version;
+          firmwareDownload.href = release.firmwareUrl;
+          firmwareDownload.removeAttribute('aria-disabled');
+          checksumDownload.href = release.checksumUrl;
+          if (release.fullInstallUrl) {
+            fullDownload.href = release.fullInstallUrl;
+            fullDownload.removeAttribute('aria-disabled');
+          } else {
+            fullDownload.textContent = 'Full install is not available for this release';
+          }
+        })
+        .catch((error) => {
+          status.textContent = 'Release downloads could not be loaded. Use the releases link below.';
+          console.error(error);
+        });
+    </script>
+  </body>
+</html>
