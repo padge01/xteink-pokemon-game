@@ -318,16 +318,15 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
       requestUpdate();
       return true;
     }
-    startActivityForResult(std::move(readerOptions),
-                           [this, before](const ActivityResult& result) {
-                             settingsChanged = settingsChanged || haveReaderLayoutSettingsChanged(before);
-                             pendingOrientation = SETTINGS.orientation;  // sync in case orientation changed
-                             if (result.isCancelled) {
-                               finishCancelled();
-                               return;
-                             }
-                             requestUpdate();
-                           });
+    startActivityForResult(std::move(readerOptions), [this, before](const ActivityResult& result) {
+      settingsChanged = settingsChanged || haveReaderLayoutSettingsChanged(before);
+      pendingOrientation = SETTINGS.orientation;  // sync in case orientation changed
+      if (result.isCancelled) {
+        finishCancelled();
+        return;
+      }
+      requestUpdate();
+    });
     return true;
   }
 
@@ -342,14 +341,13 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
       requestUpdate();
       return true;
     }
-    startActivityForResult(std::move(controlsOptions),
-                           [this](const ActivityResult&) {
-                             ActivityResult result;
-                             result.isCancelled = true;
-                             result.data = MenuResult{-1, pendingOrientation, settingsChanged};
-                             setResult(std::move(result));
-                             finish();
-                           });
+    startActivityForResult(std::move(controlsOptions), [this](const ActivityResult&) {
+      ActivityResult result;
+      result.isCancelled = true;
+      result.data = MenuResult{-1, pendingOrientation, settingsChanged};
+      setResult(std::move(result));
+      finish();
+    });
     return true;
   }
 
@@ -357,33 +355,31 @@ bool EpubReaderMenuActivity::activateSelectedItem() {
     auto clippingList = makeUniqueNoThrow<EpubReaderClippingListActivity>(renderer, mappedInput);
     if (!clippingList) {
       LOG_ERR("RMENU", "OOM: EpubReaderClippingListActivity (size=%u free=%u maxAlloc=%u)",
-              static_cast<unsigned>(sizeof(EpubReaderClippingListActivity)), ESP.getFreeHeap(),
-              ESP.getMaxAllocHeap());
+              static_cast<unsigned>(sizeof(EpubReaderClippingListActivity)), ESP.getFreeHeap(), ESP.getMaxAllocHeap());
       GUI.drawPopup(renderer, tr(STR_MEMORY_ERROR));
       renderer.displayBuffer();
       delay(1000);
       requestUpdate();
       return true;
     }
-    startActivityForResult(std::move(clippingList),
-                           [this](const ActivityResult& result) {
-                             if (result.isCancelled) {
-                               requestUpdate();
-                               return;
-                             }
+    startActivityForResult(std::move(clippingList), [this](const ActivityResult& result) {
+      if (result.isCancelled) {
+        requestUpdate();
+        return;
+      }
 
-                             const auto* clipping = std::get_if<ClippingJumpResult>(&result.data);
-                             if (clipping == nullptr) {
-                               requestUpdate();
-                               return;
-                             }
+      const auto* clipping = std::get_if<ClippingJumpResult>(&result.data);
+      if (clipping == nullptr) {
+        requestUpdate();
+        return;
+      }
 
-                             ClippingJumpResult menuResult = *clipping;
-                             menuResult.orientation = pendingOrientation;
-                             menuResult.settingsChanged = settingsChanged;
-                             setResult(std::move(menuResult));
-                             finish();
-                           });
+      ClippingJumpResult menuResult = *clipping;
+      menuResult.orientation = pendingOrientation;
+      menuResult.settingsChanged = settingsChanged;
+      setResult(std::move(menuResult));
+      finish();
+    });
     return true;
   }
 
@@ -604,8 +600,7 @@ void EpubReaderMenuActivity::buildMenuScreen(UiApp::ScreenType& screen) {
       item.value = I18N.get(orientationLabels[pendingOrientation]);
     } else if (menuItem.action == MenuAction::AUTO_PAGE_TURN) {
       if (autoPageTurnActive) {
-        std::snprintf(autoTurnValue, sizeof(autoTurnValue), "%u",
-                      static_cast<unsigned>(autoPageTurnIntervalSeconds));
+        std::snprintf(autoTurnValue, sizeof(autoTurnValue), "%u", static_cast<unsigned>(autoPageTurnIntervalSeconds));
         item.value = autoTurnValue;
       }
     }
