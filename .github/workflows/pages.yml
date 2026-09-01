@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - "docs/**"
       - "site/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -26,24 +25,22 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-
       - uses: actions/configure-pages@v6
-
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: site/package-lock.json
 
-      - run: npm ci
-        working-directory: site
+      - name: Test release downloads
+        run: node --test site/test/*.test.mjs
 
-      - run: npm run build
-        working-directory: site
+      - name: Stage static site
+        run: |
+          mkdir _site
+          cp site/index.html site/install.html site/style.css site/release-client.js _site/
 
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: ./site/dist
+          path: ./_site
 
       - name: Deploy to GitHub Pages
         id: deployment
