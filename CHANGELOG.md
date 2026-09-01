@@ -2,12 +2,12 @@
 
 ### Added
 
-- Release tooling now produces an installable X3 firmware binary with a SHA-256 checksum for the project installer.
-- Private Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
-- Private Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
-- Private Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
+- Release tooling now produces an installable X3 firmware binary with a SHA-256 checksum for the download page.
+- Pokémon companion builds can persist progress and an SD-card-sized PC through alternating, CRC-verified snapshots that recover from interrupted writes.
+- Pokémon companion builds award progress from successful manual page turns, checkpoint every five credited minutes, and ignore idle-open or automatic page turns.
+- Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
 - Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff themes can show the lead Pokémon in a compact, borderless status band.
-- A verified private-demo packager now bundles the X3/X4 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
+- The release packager now bundles the X3 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
 - Complete X3 installation archives now include the tested firmware and all required Pokémon artwork in one SD-card ZIP.
 - Added a public rights and attribution request process for artwork removal, replacement, or corrected credit.
 
@@ -29,8 +29,8 @@
 - EPUBs with padding after `</html>` now finish parsing normally, and ZIP read errors can no longer underflow into unsafe buffer lengths.
 - KOReader authentication and sync now keep Wi-Fi awake for the transaction and skip a redundant NTP wait.
 - Clean WSL builds now apply the pinned JPEGDEC safety patches when an NTFS checkout changes only whitespace or file mode.
-- The private firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
-- Private Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
+- The X3 firmware target now exposes the Pokémon core through PlatformIO's library dependency finder.
+- Pokémon firmware builds now generate their pinned Kanto species table inside the PlatformIO build directory.
 - Standard CrossInk builds now compile the private Pokémon core out completely and no longer require generated species data.
 - Pokémon evolution and prompt-toggle saves now identify the record being replaced for atomic persistence.
 - Pokémon reading credit now waits for a rendered page, retries failed exit saves with the original book progress without double-crediting, and preserves pending-event priority at hourly level-up boundaries.
@@ -197,8 +197,7 @@
 - File Browser now indexes large SD-card folders so directories with many books can be browsed without loading every filename into memory at once.
 - EPUB text clipping with saved highlights, clipping lists, and Kindle-style `/My Clippings.txt` export.
 - `Create Clipping` is now available as a reader shortcut for short/long Power, long-press Menu, and long-press Back actions.
-- Per-book EPUB options for font, layout, styling, reading aids, and render modes, including `CrossInk Default`, `Balanced`, and `Light` modes for difficult books.
-- Arena allocator (`lib/Memory/Arena.h`) for burst-then-discard allocation patterns - reduces heap fragmentation during EPUB parsing and page layout over long reading sessions.
+- Per-book EPUB options for font, layout, styling, reading aids, and render modes, including `CrossInk Default`, `Balanced`, and `Light` modes for difficult books.- Arena allocator (`lib/Memory/Arena.h`) for burst-then-discard allocation patterns - reduces heap fragmentation during EPUB parsing and page layout over long reading sessions.
 - Optimized EPUBs now store location metadata at `META-INF/x-locations.json`.
 - X3 SD-card writes now use the RTC for file timestamps when the clock is available.
 
