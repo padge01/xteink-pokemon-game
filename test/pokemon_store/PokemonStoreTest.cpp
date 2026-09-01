@@ -1,7 +1,9 @@
 #include <HalStorage.h>
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 #include "pokemon/PokemonStore.h"
 
@@ -16,6 +18,83 @@ int failures = 0;
       ++failures;                                                                       \
     }                                                                                   \
   } while (false)
+
+void write16(uint8_t* bytes, const size_t offset, const uint16_t value) {
+  bytes[offset] = static_cast<uint8_t>(value);
+  bytes[offset + 1] = static_cast<uint8_t>(value >> 8U);
+}
+
+void write32(uint8_t* bytes, const size_t offset, const uint32_t value) {
+  bytes[offset] = static_cast<uint8_t>(value);
+  bytes[offset + 1] = static_cast<uint8_t>(value >> 8U);
+  bytes[offset + 2] = static_cast<uint8_t>(value >> 16U);
+  bytes[offset + 3] = static_cast<uint8_t>(value >> 24U);
+}
+
+bool encodeLegacyState(const pokemon::PokemonState& state,
+                       std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES>& output) {
+  if (!pokemon::validateState(state) || pokemon::pendingEventCount(state) > 1) return false;
+  output = {};
+  for (size_t slot = 0; slot < pokemon::PARTY_SIZE; ++slot) write32(output.data(), slot * 4U, state.partyRecordIds[slot]);
+  const pokemon::PendingEvent* pending = pokemon::pendingEventFront(state);
+  if (pending != nullptr) {
+    write32(output.data(), 24, pending->recordId);
+    write16(output.data(), 28, pending->speciesId);
+    output[30] = pending->level;
+    output[31] = static_cast<uint8_t>(pending->gender);
+    output[32] = static_cast<uint8_t>(pending->item);
+    output[33] = static_cast<uint8_t>(pending->kind);
+  }
+  for (size_t index = 0; index < pokemon::EVOLUTION_ITEM_COUNT; ++index) {
+    write16(output.data(), 34U + index * 2U, state.itemCounts[index]);
+  }
+  std::memcpy(output.data() + 46, state.seenSpecies.data(), state.seenSpecies.size());
+  std::memcpy(output.data() + 65, state.caughtSpecies.data(), state.caughtSpecies.size());
+  write32(output.data(), 84, state.lifetimeMinutes);
+  write32(output.data(), 88, state.sequence);
+  output[92] = state.readingMinuteRemainder;
+  output[93] = state.encounterMisses;
+  output[94] = state.itemMisses;
+  output[95] = static_cast<uint8_t>(state.dashboardNotice);
+  return true;
+}
+
+bool writeLegacySnapshot(const char* path, const pokemon::PokemonState& state,
+                         const pokemon::PokemonRecord& record) {
+  pokemon::HeaderBytes headerBytes{};
+  const pokemon::SnapshotHeader header{pokemon::POKEMON_SNAPSHOT_VERSION_V1, state.sequence, 1};
+  std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES> stateBytes{};
+  pokemon::RecordBytes recordBytes{};
+  if (!pokemon::encodeSnapshotHeader(header, headerBytes) || !encodeLegacyState(state, stateBytes) ||
+      !pokemon::encodeRecord(record, recordBytes)) {
+    return false;
+  }
+  uint32_t crc = pokemon::updateSnapshotCrc32(pokemon::POKEMON_SNAPSHOT_CRC32_INITIAL, headerBytes.data(),
+                                               headerBytes.size());
+  crc = pokemon::updateSnapshotCrc32(crc, stateBytes.data(), stateBytes.size());
+  crc = pokemon::updateSnapshotCrc32(crc, recordBytes.data(), recordBytes.size());
+  uint8_t crcBytes[pokemon::POKEMON_SNAPSHOT_CRC_BYTES]{};
+  write32(crcBytes, 0, pokemon::finishSnapshotCrc32(crc));
+
+  FsFile file = Storage.open(path, O_WRONLY | O_CREAT | O_TRUNC);
+  if (!file) return false;
+  const bool written = file.write(headerBytes.data(), headerBytes.size()) == headerBytes.size() &&
+                       file.write(stateBytes.data(), stateBytes.size()) == stateBytes.size() &&
+                       file.write(recordBytes.data(), recordBytes.size()) == recordBytes.size() &&
+                       file.write(crcBytes, sizeof(crcBytes)) == sizeof(crcBytes);
+  return written && file.close();
+}
+
+bool readStoredHeader(const char* path, pokemon::SnapshotHeader& output) {
+  FsFile file = Storage.open(path, O_RDONLY);
+  pokemon::HeaderBytes bytes{};
+  if (!file || file.read(bytes.data(), bytes.size()) != static_cast<int>(bytes.size())) {
+    file.close();
+    return false;
+  }
+  file.close();
+  return pokemon::decodeSnapshotHeader(bytes, output) == pokemon::HeaderDecodeResult::Ready;
+}
 
 pokemon::PokemonRecord starterPikachu() {
   pokemon::PokemonRecord record{};
@@ -311,7 +390,8 @@ void everyInterruptedResetByteLeavesThePreviousSnapshotBootable() {
 }
 
 void everyInterruptedWriteByteLeavesThePreviousSnapshotBootable() {
-  constexpr size_t oneRecordSnapshotBytes = 172;
+  constexpr size_t oneRecordSnapshotBytes = pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + pokemon::POKEMON_STATE_BYTES +
+                                            pokemon::POKEMON_RECORD_BYTES + pokemon::POKEMON_SNAPSHOT_CRC_BYTES;
   for (size_t cut = 0; cut < oneRecordSnapshotBytes; ++cut) {
     Storage.clear();
     pokemon::PokemonStore store;
@@ -352,16 +432,16 @@ void unwritableAppendPreservesThePendingEncounterAndRoster() {
   state.partyRecordIds[0] = pikachu.recordId;
   CHECK(pokemon::markSpecies(state.seenSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(state.caughtSpecies, pikachu.speciesId));
-  state.pending.kind = pokemon::PendingEventKind::Encounter;
-  state.pending.speciesId = bulbasaur.speciesId;
-  state.pending.level = bulbasaur.caughtLevel;
-  state.pending.gender = bulbasaur.gender;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Encounter;
+  state.pendingEvents[0].speciesId = bulbasaur.speciesId;
+  state.pendingEvents[0].level = bulbasaur.caughtLevel;
+  state.pendingEvents[0].gender = bulbasaur.gender;
   CHECK(pokemon::markSpecies(state.seenSpecies, bulbasaur.speciesId));
   const pokemon::RecordMutation starter{pikachu.recordId, pikachu, pokemon::RecordMutationKind::Append};
   CHECK(store.commit(state, starter));
 
   pokemon::PokemonState caught = state;
-  caught.pending = {};
+  caught.pendingEvents = {};
   caught.dashboardNotice = pokemon::DashboardNotice::None;
   caught.partyRecordIds[1] = bulbasaur.recordId;
   CHECK(pokemon::markSpecies(caught.caughtSpecies, bulbasaur.speciesId));
@@ -374,7 +454,7 @@ void unwritableAppendPreservesThePendingEncounterAndRoster() {
   CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
   pokemon::PokemonState loaded{};
   CHECK(reopened.loadState(loaded));
-  CHECK(loaded.pending == state.pending);
+  CHECK(loaded.pendingEvents == state.pendingEvents);
   CHECK(loaded.partyRecordIds[1] == 0);
   pokemon::PokemonRecord missing{};
   CHECK(!reopened.readRecord(bulbasaur.recordId, missing));
@@ -390,18 +470,18 @@ void interruptedAppendPreservesThePendingEncounterAndRoster() {
   state.partyRecordIds[0] = pikachu.recordId;
   CHECK(pokemon::markSpecies(state.seenSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(state.caughtSpecies, pikachu.speciesId));
-  state.pending.kind = pokemon::PendingEventKind::Encounter;
-  state.pending.speciesId = bulbasaur.speciesId;
-  state.pending.level = bulbasaur.caughtLevel;
-  state.pending.gender = bulbasaur.gender;
+  state.pendingEvents[0].kind = pokemon::PendingEventKind::Encounter;
+  state.pendingEvents[0].speciesId = bulbasaur.speciesId;
+  state.pendingEvents[0].level = bulbasaur.caughtLevel;
+  state.pendingEvents[0].gender = bulbasaur.gender;
   CHECK(pokemon::markSpecies(state.seenSpecies, bulbasaur.speciesId));
   CHECK(store.commit(state, {pikachu.recordId, pikachu, pokemon::RecordMutationKind::Append}));
 
   pokemon::PokemonState caught = state;
-  caught.pending = {};
+  caught.pendingEvents = {};
   caught.partyRecordIds[1] = bulbasaur.recordId;
   CHECK(pokemon::markSpecies(caught.caughtSpecies, bulbasaur.speciesId));
-  Storage.setWriteLimit(180);  // Ten bytes into the appended record.
+  Storage.setWriteLimit(200);  // Twelve bytes into the appended record.
   CHECK(!store.commit(caught, {bulbasaur.recordId, bulbasaur, pokemon::RecordMutationKind::Append}));
   Storage.clearWriteLimit();
 
@@ -409,7 +489,7 @@ void interruptedAppendPreservesThePendingEncounterAndRoster() {
   CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
   pokemon::PokemonState loaded{};
   CHECK(reopened.loadState(loaded));
-  CHECK(loaded.pending == state.pending);
+  CHECK(loaded.pendingEvents == state.pendingEvents);
   CHECK(loaded.partyRecordIds[1] == 0);
   pokemon::PokemonRecord missing{};
   CHECK(!reopened.readRecord(bulbasaur.recordId, missing));
@@ -440,6 +520,54 @@ void failedSyncKeepsTheLiveStoreOldButAllowsACompleteSnapshotAfterRestart() {
   CHECK(loaded.lifetimeMinutes == 20);
 }
 
+void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
+  Storage.clear();
+  const pokemon::PokemonRecord pikachu = starterPikachu();
+  pokemon::PokemonState legacy{};
+  legacy.partyRecordIds[0] = pikachu.recordId;
+  legacy.sequence = 7;
+  legacy.lifetimeMinutes = 123;
+  legacy.pendingEvents[0] = {0, 1, 8, pokemon::Gender::Female, pokemon::EvolutionItem::None,
+                             pokemon::PendingEventKind::Encounter};
+  legacy.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
+  CHECK(pokemon::markSpecies(legacy.seenSpecies, pikachu.speciesId));
+  CHECK(pokemon::markSpecies(legacy.caughtSpecies, pikachu.speciesId));
+  CHECK(pokemon::markSpecies(legacy.seenSpecies, 1));
+  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-v2-a.bin", legacy, pikachu));
+
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
+  pokemon::PokemonState loaded{};
+  CHECK(store.loadState(loaded));
+  CHECK(loaded == legacy);
+  pokemon::PokemonRecord loadedRecord{};
+  CHECK(store.readRecord(pikachu.recordId, loadedRecord));
+  CHECK(loadedRecord == pikachu);
+
+  CHECK(store.commit(loaded));
+  pokemon::SnapshotHeader migratedHeader{};
+  CHECK(readStoredHeader("/.crosspoint/pokemon-v2-b.bin", migratedHeader));
+  CHECK(migratedHeader.version == pokemon::POKEMON_SNAPSHOT_VERSION);
+  CHECK(migratedHeader.sequence == 8);
+
+  pokemon::PokemonStore migrated;
+  CHECK(migrated.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(migrated.loadState(loaded));
+  CHECK(loaded.sequence == 8);
+  CHECK(loaded.lifetimeMinutes == legacy.lifetimeMinutes);
+  CHECK(loaded.pendingEvents == legacy.pendingEvents);
+  CHECK(migrated.readRecord(pikachu.recordId, loadedRecord));
+  CHECK(loadedRecord == pikachu);
+
+  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + 104, 0xFF);
+  pokemon::PokemonStore fallback;
+  CHECK(fallback.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(fallback.loadState(loaded));
+  CHECK(loaded == legacy);
+  CHECK(fallback.readRecord(pikachu.recordId, loadedRecord));
+  CHECK(loadedRecord == pikachu);
+}
+
 void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData() {
   Storage.clear();
   pokemon::PokemonStore store;
@@ -447,14 +575,14 @@ void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData
   pokemon::PokemonState state{};
   state.lifetimeMinutes = 10;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 24 + 84, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 24 + 104, 0xFF);
   pokemon::PokemonStore corrupt;
   CHECK(corrupt.begin() == pokemon::StoreBeginResult::Corrupt);
 
   Storage.clear();
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 4, 2);
+  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 4, 3);
   pokemon::PokemonStore unsupported;
   CHECK(unsupported.begin() == pokemon::StoreBeginResult::Unsupported);
 
@@ -463,7 +591,7 @@ void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData
   CHECK(store.commit(state));
   state.lifetimeMinutes = 20;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", 24 + 84, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", 24 + 104, 0xFF);
   pokemon::PokemonStore fallback;
   CHECK(fallback.begin() == pokemon::StoreBeginResult::Ready);
   pokemon::PokemonState loaded{};
@@ -481,13 +609,13 @@ void startupBlocksDowngradesAndMixedUnsupportedCorruption() {
   CHECK(store.commit(state));
   state.lifetimeMinutes = 20;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", 4, 2);
+  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", 4, 3);
 
   pokemon::PokemonStore downgraded;
   CHECK(downgraded.begin() == pokemon::StoreBeginResult::Unsupported);
   CHECK(!downgraded.commit(state));
 
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 24 + 84, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 24 + 104, 0xFF);
   pokemon::PokemonStore mixed;
   CHECK(mixed.begin() == pokemon::StoreBeginResult::Corrupt);
   CHECK(!mixed.commit(state));
@@ -499,7 +627,7 @@ void failedResetDoesNotBypassProtectedStoreGating() {
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   pokemon::PokemonState state{};
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 4, 2);
+  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 4, 3);
 
   pokemon::PokemonStore protectedStore;
   CHECK(protectedStore.begin() == pokemon::StoreBeginResult::Unsupported);
@@ -526,6 +654,7 @@ int main() {
   unwritableAppendPreservesThePendingEncounterAndRoster();
   interruptedAppendPreservesThePendingEncounterAndRoster();
   failedSyncKeepsTheLiveStoreOldButAllowsACompleteSnapshotAfterRestart();
+  legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback();
   startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData();
   startupBlocksDowngradesAndMixedUnsupportedCorruption();
   failedResetDoesNotBypassProtectedStoreGating();

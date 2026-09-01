@@ -14,7 +14,6 @@ namespace {
 constexpr const char* STORE_DIRECTORY = "/.crosspoint";
 constexpr const char* STORE_PATH_A = "/.crosspoint/pokemon-v2-a.bin";
 constexpr const char* STORE_PATH_B = "/.crosspoint/pokemon-v2-b.bin";
-constexpr size_t RECORDS_OFFSET = POKEMON_SNAPSHOT_HEADER_BYTES + POKEMON_STATE_BYTES;
 
 enum class InspectionResult : uint8_t {
   Missing,
@@ -39,6 +38,10 @@ void write32(uint8_t* bytes, const uint32_t value) {
   bytes[1] = static_cast<uint8_t>(value >> 8U);
   bytes[2] = static_cast<uint8_t>(value >> 16U);
   bytes[3] = static_cast<uint8_t>(value >> 24U);
+}
+
+size_t recordsOffset(const SnapshotHeader& header) {
+  return POKEMON_SNAPSHOT_HEADER_BYTES + snapshotStateBytes(header.version);
 }
 
 InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader) {
@@ -68,22 +71,29 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
   }
 
   StateBytes stateBytes{};
-  if (!readExact(file, stateBytes.data(), stateBytes.size())) {
+  const size_t stateSize = snapshotStateBytes(header.version);
+  if (stateSize == 0 || !readExact(file, stateBytes.data(), stateSize)) {
     LOG_ERR("PokemonStore", "Short payload in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
   PokemonState state{};
-  if (!decodeState(stateBytes, state) || state.sequence != header.sequence) {
+  if (!decodeState(stateBytes.data(), stateSize, header.version, state) || state.sequence != header.sequence) {
     LOG_ERR("PokemonStore", "Invalid state in %s", path);
     file.close();
     return InspectionResult::Corrupt;
   }
   uint32_t crc = updateSnapshotCrc32(POKEMON_SNAPSHOT_CRC32_INITIAL, headerBytes.data(), headerBytes.size());
-  crc = updateSnapshotCrc32(crc, stateBytes.data(), stateBytes.size());
+  crc = updateSnapshotCrc32(crc, stateBytes.data(), stateSize);
   uint32_t previousRecordId = 0;
   uint8_t foundPartySlots = 0;
-  bool foundPendingRecord = state.pending.kind != PendingEventKind::Evolution;
+  uint8_t requiredPendingRecords = 0;
+  uint8_t foundPendingRecords = 0;
+  for (size_t eventIndex = 0; eventIndex < state.pendingEvents.size(); ++eventIndex) {
+    if (state.pendingEvents[eventIndex].kind == PendingEventKind::Evolution) {
+      requiredPendingRecords |= static_cast<uint8_t>(1U << eventIndex);
+    }
+  }
   for (uint32_t index = 0; index < header.recordCount; ++index) {
     RecordBytes recordBytes{};
     PokemonRecord record{};
@@ -98,8 +108,11 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
     for (size_t slot = 0; slot < PARTY_SIZE; ++slot) {
       if (state.partyRecordIds[slot] == record.recordId) foundPartySlots |= static_cast<uint8_t>(1U << slot);
     }
-    if (state.pending.kind == PendingEventKind::Evolution && state.pending.recordId == record.recordId) {
-      foundPendingRecord = true;
+    for (size_t eventIndex = 0; eventIndex < state.pendingEvents.size(); ++eventIndex) {
+      if (state.pendingEvents[eventIndex].kind == PendingEventKind::Evolution &&
+          state.pendingEvents[eventIndex].recordId == record.recordId) {
+        foundPendingRecords |= static_cast<uint8_t>(1U << eventIndex);
+      }
     }
   }
 
@@ -108,7 +121,8 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
     requiredPartySlots |= static_cast<uint8_t>(1U << slot);
   }
   uint8_t crcBytes[POKEMON_SNAPSHOT_CRC_BYTES]{};
-  if (foundPartySlots != requiredPartySlots || !foundPendingRecord || !readExact(file, crcBytes, sizeof(crcBytes))) {
+  if (foundPartySlots != requiredPartySlots || foundPendingRecords != requiredPendingRecords ||
+      !readExact(file, crcBytes, sizeof(crcBytes))) {
     LOG_ERR("PokemonStore", "Unresolved state reference in %s", path);
     file.close();
     return InspectionResult::Corrupt;
@@ -181,9 +195,10 @@ bool PokemonStore::loadState(PokemonState& output) const {
     return false;
   }
   StateBytes bytes{};
-  const bool readOk = readExact(file, bytes.data(), bytes.size());
+  const size_t stateSize = snapshotStateBytes(activeHeader_.version);
+  const bool readOk = stateSize != 0 && readExact(file, bytes.data(), stateSize);
   file.close();
-  if (!readOk || !decodeState(bytes, output)) {
+  if (!readOk || !decodeState(bytes.data(), stateSize, activeHeader_.version, output)) {
     LOG_ERR("PokemonStore", "Failed to decode active state");
     return false;
   }
@@ -215,7 +230,7 @@ bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation
   const SnapshotHeader header{nextSequence, currentRecordCount + (appending ? 1U : 0U)};
   HeaderBytes headerBytes{};
   if (!encodeState(state, stateBytes) || !encodeSnapshotHeader(header, headerBytes)) return false;
-  write32(stateBytes.data() + 88, nextSequence);
+  write32(stateBytes.data() + 108, nextSequence);
   RecordBytes mutationRecordBytes{};
   if ((appending || replacing) && !encodeRecord(mutation.record, mutationRecordBytes)) return false;
 
@@ -225,7 +240,7 @@ bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation
   if (preserveRecords) {
     const char* sourcePath = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
     source = Storage.open(sourcePath, O_RDONLY);
-    if (!source || !source.seek(POKEMON_SNAPSHOT_HEADER_BYTES + POKEMON_STATE_BYTES)) {
+    if (!source || !source.seek(recordsOffset(activeHeader_))) {
       LOG_ERR("PokemonStore", "Failed to open active snapshot records");
       source.close();
       return false;
@@ -289,7 +304,7 @@ bool PokemonStore::readRecord(const uint32_t recordId, PokemonRecord& output) co
   if (!ready_ || recordId == 0) return false;
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
-  if (!file || !file.seek(POKEMON_SNAPSHOT_HEADER_BYTES + POKEMON_STATE_BYTES)) {
+  if (!file || !file.seek(recordsOffset(activeHeader_))) {
     LOG_ERR("PokemonStore", "Failed to open active records");
     file.close();
     return false;
@@ -319,7 +334,7 @@ bool PokemonStore::loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const {
 
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
-  if (!file || !file.seek(RECORDS_OFFSET)) {
+  if (!file || !file.seek(recordsOffset(activeHeader_))) {
     LOG_ERR("PokemonStore", "Failed to open owned records");
     file.close();
     return false;
@@ -351,7 +366,8 @@ bool PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::spa
   if (!loadState(state)) return false;
   const char* path = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
   FsFile file = Storage.open(path, O_RDONLY);
-  if (!file || !file.seek(RECORDS_OFFSET)) {
+  const size_t activeRecordsOffset = recordsOffset(activeHeader_);
+  if (!file || !file.seek(activeRecordsOffset)) {
     LOG_ERR("PokemonStore", "Failed to open PC records");
     file.close();
     return false;
@@ -396,7 +412,7 @@ bool PokemonStore::readPcPage(const PcOrder order, size_t offset, const std::spa
   }
 
   const auto appendSpecies = [&](const uint16_t speciesId) {
-    if (!file.seek(RECORDS_OFFSET)) return false;
+    if (!file.seek(activeRecordsOffset)) return false;
     for (uint32_t index = 0; index < activeHeader_.recordCount; ++index) {
       RecordBytes bytes{};
       PokemonRecord record{};
