@@ -2,10 +2,9 @@
 
 #include "PokemonStore.h"
 
-#include <PokemonSpecies.h>
-
 #include <HalStorage.h>
 #include <Logging.h>
+#include <PokemonSpecies.h>
 
 #include <cstring>
 
@@ -60,8 +59,7 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
   const HeaderDecodeResult headerResult = decodeSnapshotHeader(headerBytes, header);
   if (headerResult != HeaderDecodeResult::Ready) {
     file.close();
-    return headerResult == HeaderDecodeResult::Unsupported ? InspectionResult::Unsupported
-                                                           : InspectionResult::Corrupt;
+    return headerResult == HeaderDecodeResult::Unsupported ? InspectionResult::Unsupported : InspectionResult::Corrupt;
   }
   if (file.fileSize64() != snapshotFileBytes(header)) {
     LOG_ERR("PokemonStore", "Invalid snapshot size in %s", path);
@@ -196,12 +194,10 @@ bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutat
   return writeSnapshot(state, mutation, false);
 }
 
-bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation& mutation,
-                                 const bool discardRecords) {
+bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation& mutation, const bool discardRecords) {
   const bool appending = mutation.kind == RecordMutationKind::Append;
   const bool replacing = mutation.kind == RecordMutationKind::Replace;
-  if (!writable_ || !validateState(state) ||
-      (discardRecords && mutation.kind != RecordMutationKind::None) ||
+  if (!writable_ || !validateState(state) || (discardRecords && mutation.kind != RecordMutationKind::None) ||
       ((appending || replacing) &&
        (mutation.requestedRecordId != mutation.record.recordId || !validateRecord(mutation.record))) ||
       (replacing && (!ready_ || discardRecords)) ||
@@ -213,7 +209,8 @@ bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation
   const uint32_t currentRecordCount = preserveRecords ? activeHeader_.recordCount : 0;
   if (appending && currentRecordCount == UINT32_MAX) return false;
 
-  const uint32_t nextSequence = !ready_ ? 1U : (activeHeader_.sequence == UINT32_MAX ? 1U : activeHeader_.sequence + 1U);
+  const uint32_t nextSequence =
+      !ready_ ? 1U : (activeHeader_.sequence == UINT32_MAX ? 1U : activeHeader_.sequence + 1U);
   StateBytes stateBytes{};
   const SnapshotHeader header{nextSequence, currentRecordCount + (appending ? 1U : 0U)};
   HeaderBytes headerBytes{};
