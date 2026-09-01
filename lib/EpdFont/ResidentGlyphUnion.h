@@ -1,8 +1,8 @@
 #pragma once
 
-#include "EpdFontData.h"
-
 #include <cstdint>
+
+#include "EpdFontData.h"
 
 namespace ResidentGlyphUnion {
 
