@@ -297,8 +297,7 @@ device model and build.
 
 - **Time to Sleep**: Set the duration of inactivity before the device automatically goes to sleep. Values are in minutes, with a "Never" option at the end of the range.
 
-- **Device**: Set the device name and time-to-sleep timeout. Devices with a
-  real-time clock also expose clock format, UTC offset, and a sync action.
+- **Device**: Set the device name and time-to-sleep timeout. Devices with a  real-time clock also expose clock format, UTC offset, and a sync action.
 
 - **Files & Cache**: Configure hidden files, file extensions, file-browser view,
   finished-book behavior, and clear the reading cache.
@@ -597,8 +596,7 @@ Turn **Touch Reader Controls** off in **Reader Options** to disable these
 page-turn and gesture controls. **Disable Touchscreen** prevents touch input
 while a book is open but keeps it available in reader menus. For the different
 touch selection gestures used by [dictionary lookup](./dictionary.md#looking-up-a-word)
-and [clippings](./reader-features.md#clippings-and-highlights), see those
-feature guides.
+and [clippings](./reader-features.md#clippings-and-highlights), see thosefeature guides.
 
 ### Footnote Navigation
 
@@ -735,4 +733,4 @@ Press **Ctrl-C** or close the graph window to exit.
 
 If the device is stuck in a bootloop, press and release the Reset button. Then, press and hold on to the configured Back button and the Power Button to boot to the Home Screen.
 
-There can be issues with broken cache or config. In this case, delete the `.crosspoint` directory on your SD card (or consider deleting only `settings.json`, `state.json`, or `epub_*` cache directories in the `.crosspoint/` folder).
+Broken cache or configuration can cause startup problems. Back up the SD card first, then remove only the specific cache or configuration file identified during troubleshooting. Do not delete the entire `.crosspoint` folder: it also contains Pokémon saves, artwork, reader settings, and other user data.
