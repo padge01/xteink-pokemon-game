@@ -159,23 +159,23 @@ void BaseTheme::drawProgressBar(const GfxRenderer& renderer, Rect rect, const si
   renderer.drawCenteredText(UI_10_FONT_ID, rect.y + rect.height + 15, percentText.c_str());
 }
 
-void BaseTheme::drawHintLabel(const GfxRenderer& renderer, const int fontId,
-                              const EpdFontFamily::Style fontStyle, const char* label, const Rect contentRect,
-                              const int singleLineYOffset, const ButtonHintLayout::Alignment alignment,
-                              const int horizontalPadding, const bool black) {
+void BaseTheme::drawHintLabel(const GfxRenderer& renderer, const int fontId, const EpdFontFamily::Style fontStyle,
+                              const char* label, const Rect contentRect, const int singleLineYOffset,
+                              const ButtonHintLayout::Alignment alignment, const int horizontalPadding,
+                              const bool black) {
   if (label == nullptr || label[0] == '\0') return;
 
   const int maxTextWidth = ButtonHintLayout::maxTextWidth(contentRect.width, horizontalPadding);
   const int textWidth = renderer.getTextWidth(fontId, label, fontStyle);
   if (textWidth <= maxTextWidth) {
-    const int textX = ButtonHintLayout::textX(contentRect.x, contentRect.width, textWidth, alignment, horizontalPadding);
+    const int textX =
+        ButtonHintLayout::textX(contentRect.x, contentRect.width, textWidth, alignment, horizontalPadding);
     renderer.drawText(fontId, textX, contentRect.y + singleLineYOffset, label, black, fontStyle);
     return;
   }
 
   constexpr int lineGap = 2;
-  const int overflowMaxWidth =
-      ButtonHintLayout::overflowMaxTextWidth(contentRect.width, horizontalPadding, alignment);
+  const int overflowMaxWidth = ButtonHintLayout::overflowMaxTextWidth(contentRect.width, horizontalPadding, alignment);
   const int pixelHeight = renderer.getTextPixelHeight(fontId, label, fontStyle);
   const int maxLines = ButtonHintLayout::maxVisibleLines(contentRect.height, pixelHeight, 2, lineGap);
   if (maxLines == 1) {
