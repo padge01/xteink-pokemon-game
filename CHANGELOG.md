@@ -8,6 +8,8 @@
 - Private Pokémon companion builds now include a lightweight collection activity with starter choice, Party and PC management, item and evolution prompts, the original 151 Pokédex, and optional nicknames.
 - Dashboard, Lyra, Lyra 3 Covers, and Rounded Raff themes can show the lead Pokémon in a compact, borderless status band.
 - A verified private-demo packager now bundles the X3/X4 firmware with exactly 151 wide Pokémon icons, presentation sprites, dedicated portrait and landscape Pokédex cards, five evolution-stone images, attribution, and SHA-256 checksums.
+- Complete X3 installation archives now include the tested firmware and all required Pokémon artwork in one SD-card ZIP.
+- Added a public rights and attribution request process for artwork removal, replacement, or corrected credit.
 
 ### Changed
 

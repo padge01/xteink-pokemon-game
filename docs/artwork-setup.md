@@ -1,10 +1,11 @@
 # Artwork setup
 
-The firmware reads Pokémon artwork from the SD card. This repository does not
-contain the images and does not download them automatically.
+The firmware reads Pokémon artwork from the SD card. Normal users should
+download the complete X3 installation ZIP from the project release page; it
+already contains the converted artwork in the correct folders.
 
-Use the tools below only with source files you have obtained yourself. Keep the
-source files, converted files, and personal installation archive outside Git.
+The tools below are for maintainers rebuilding or validating that public
+package. Keep source and converted working files outside normal Git history.
 
 ## Requirements
 
@@ -67,9 +68,10 @@ Pokédex prefix:
 151-mew.bmp
 ```
 
-The creator publicly provided the download but did not provide this project
-with explicit permission to rehost it. Do not add the archive or converted
-cards to GitHub.
+The creator publicly provided the download but did not attach an explicit
+redistribution licence. Complete release archives include adapted cards with
+direct credit and the removal process documented in
+[`RIGHTS_AND_ATTRIBUTION.md`](../RIGHTS_AND_ATTRIBUTION.md).
 
 ## 2. Prepare ignored local folders
 
@@ -130,7 +132,7 @@ pokemon-art-output/pokedex/landscape/001.bmp–151.bmp   # 288×432
 All output is one-bit BMP data prepared on the computer so the X3 can stream it
 without allocating another framebuffer.
 
-## 5. Build and validate a personal installation archive
+## 5. Build and validate the public installation archive
 
 Build the X3 firmware:
 
@@ -144,20 +146,24 @@ Then package the exact firmware and local artwork:
 python scripts/package_pokemon_v2_release.py \
   --source-pack pokemon-art-output \
   --firmware .pio/build/pokemon-x3/firmware.bin \
-  --output pokemon-release-local
+  --notice RIGHTS_AND_ATTRIBUTION.md \
+  --version 0.1.0 \
+  --output dist
 ```
 
-The packager rejects missing files, extra BMPs, incorrect dimensions, and
-non-one-bit images. It produces a personal archive containing:
+The packager rejects missing files, incorrect dimensions, non-one-bit images,
+unsafe archive paths, firmware mismatches, and manifest/checksum mismatches. It
+produces:
 
 ```text
-update.bin
-.crosspoint/pokemon/
-POKEMON_ASSET_LICENSES.md
+xteink-pokemon-x3-full-v0.1.0.zip
+xteink-pokemon-x3-firmware-v0.1.0.bin
 SHA256SUMS.txt
 ```
 
-Do not upload this archive or its artwork folder to GitHub.
+The full ZIP contains `update.bin`, `.crosspoint/pokemon/`,
+`RIGHTS_AND_ATTRIBUTION.md`, and internal checksums. Publish it as a GitHub
+Release asset, not as hundreds of tracked binary files.
 
 ## SD-card paths
 
@@ -174,6 +180,7 @@ paths are:
 /.crosspoint/pokemon/manifest.json
 ```
 
-See [Third-party assets](third-party-assets.md) for provenance and rights
-notices. Attribution does not grant permission to redistribute the source or
-converted Pokémon artwork.
+See [Third-party assets](third-party-assets.md) and
+[Rights and attribution](../RIGHTS_AND_ATTRIBUTION.md) for provenance,
+ownership, and removal information. Attribution records provenance; it does not
+grant permission or guarantee that a release cannot be removed.

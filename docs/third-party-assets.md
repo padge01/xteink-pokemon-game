@@ -5,9 +5,9 @@ nav_order: 20
 
 # Third-party assets
 
-No Pokémon artwork, rendered Pokédex cards, or generated artwork pack is
-included in the public source repository or a public firmware release. Users
-obtain source files themselves and run the local conversion tools described in
+Converted artwork remains outside normal Git history. Complete GitHub Release
+archives include the tested firmware and the X3-adapted artwork required by the
+game. Maintainers rebuild that package with the tools described in
 [Artwork setup](artwork-setup.md).
 
 Attribution records where material came from. It does not grant permission to
@@ -47,10 +47,11 @@ publicly shared X3 files in
 [this Reddit post](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3).
 The post states that the cards use PokéAPI data and sprites.
 
-The public download is the design and conversion reference for this project,
-but it does not state a licence allowing this project to rehost the archive.
-The source and converted cards remain user-supplied local files unless the
-creator and other applicable rights holders provide explicit permission.
+The public download is the design and conversion source for this project, but
+it does not state a licence allowing this project to rehost the archive.
+Complete X3 installation releases nevertheless include adapted cards with
+direct credit to dmellok/u/xDaftTurtle and a documented removal or
+credit-correction process.
 
 Tesserae itself is AGPL-3.0-or-later. This repository does not copy or embed
 Tesserae code; crediting Tesserae does not change the rights attached to the
@@ -68,6 +69,9 @@ The offline tools create only the files needed by the X3:
 
 The validator accepts IDs 001–151 and the five named evolution stones. Eggs,
 later-generation Pokémon, extra BMPs, and incorrectly sized files are rejected.
+The public ZIP contains only this generated tree, the tested firmware, internal
+checksums, and [the rights notice](../RIGHTS_AND_ATTRIBUTION.md). It contains no
+Pokémon saves, books, reader settings, caches, or sleep-screen files.
 
 ## Ownership and affiliation
 

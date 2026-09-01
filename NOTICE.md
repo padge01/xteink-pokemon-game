@@ -29,9 +29,10 @@ The cards were rendered with [Tesserae](https://github.com/dmellok/tesserae),
 an AGPL-3.0-or-later e-ink dashboard project, using Pokémon information and
 sprites from PokéAPI.
 
-The public download is credited as the design and conversion reference. It does
-not provide this project with an explicit licence to rehost the card archive.
-This repository and its public releases therefore do not include those cards.
+The public download is credited as the design and conversion source. It does
+not provide this project with an explicit redistribution licence. Complete
+X3 installation releases include adapted cards with direct creator credit and
+the removal or credit-correction process in `RIGHTS_AND_ATTRIBUTION.md`.
 
 ## Artwork source references
 
@@ -49,8 +50,9 @@ its sprite images are copyright Nintendo/Creatures Inc./GAME FREAK Inc.
 
 Those repository licences do not grant this project ownership of Pokémon
 artwork. Attribution records provenance; it is not redistribution permission.
-Users must obtain source files themselves and generate any SD-card artwork
-locally.
+Complete installation releases nevertheless distribute X3-adapted copies as
+part of this unofficial, noncommercial fan project. The project will remove,
+replace, or correct credited assets when a credible request is received.
 
 ## Names, artwork, and affiliation
 

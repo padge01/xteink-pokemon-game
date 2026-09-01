@@ -13,26 +13,39 @@ performed on another build is not evidence for the release candidate.
       used.
 - [ ] No Pokémon images, converted cards, artwork packs, firmware binaries,
       personal saves, SD-card contents, credentials, or private paths are
-      tracked.
+      tracked in Git. Converted artwork is distributed only through the
+      reviewed GitHub Release archive.
 - [ ] Inherited GitHub workflows have been reviewed for this repository and
       cannot publish CrossInk, Sticky, X4, font, Pages, or catalog artifacts by
       mistake.
 - [ ] Inherited funding links have been removed or explicitly approved by the
       named recipient.
 
-## Local artwork
+## Full-install artwork and packaging
 
-- [ ] The user obtained source art independently.
 - [ ] The source revisions match `docs/third-party-assets.md`.
 - [ ] `scripts/generate_pokemon_icon_art.py` completed locally.
 - [ ] `scripts/generate_pokemon_pokedex_art.py` completed locally.
-- [ ] `scripts/package_pokemon_v2_release.py` accepted the complete local pack.
-- [ ] The generated archive remains local and is not attached to GitHub.
+- [ ] The canonical local artwork directory contains all 614 required one-bit
+      BMPs with the documented dimensions.
+- [ ] `scripts/package_pokemon_v2_release.py` accepted the complete local pack
+      and included `RIGHTS_AND_ATTRIBUTION.md`.
+- [ ] The full archive contains `update.bin`, `.crosspoint/pokemon/`, the
+      artwork manifest, internal checksums, and the rights notice.
+- [ ] The full archive does not contain `pokemon-v2-a.bin`,
+      `pokemon-v2-b.bin`, books, sleep screens, settings, or cache files.
+- [ ] Extracting the full archive over temporary existing Pokémon saves leaves
+      both save hashes unchanged.
+- [ ] The firmware inside the full archive is byte-identical to the separately
+      published firmware-only asset.
+- [ ] The release-level `SHA256SUMS.txt` covers both public downloads.
 
 ## Automated checks
 
 - [ ] Pokémon host tests pass.
 - [ ] Artwork generator and packager tests pass.
+- [ ] Full-archive layout, path-safety, manifest, checksum, and
+      save-preservation tests pass.
 - [ ] Portrait Pokémon simulator smoke route passes.
 - [ ] Landscape Pokémon simulator smoke route passes.
 - [ ] `pio run -e pokemon-x3` succeeds.
@@ -67,9 +80,17 @@ Automated checks do not approve a hardware release.
 
 - [ ] Review the final commit diff.
 - [ ] Review the exact GitHub Actions configuration on the release commit.
-- [ ] Confirm the release contains firmware and documentation only—no Pokémon
-      artwork or generated artwork archive.
+- [ ] Confirm converted artwork is present only in the full-install Release
+      ZIP and is not committed to Git history.
+- [ ] Confirm the release includes the full ZIP, firmware-only binary, and
+      `SHA256SUMS.txt` with the approved public filenames.
+- [ ] Confirm release notes link to `RIGHTS_AND_ATTRIBUTION.md` and the Rights
+      or Attribution issue form.
 - [ ] Put backup, installation, rollback, known limitations, test evidence, and
-      the firmware SHA-256 in the release notes.
+      all public asset SHA-256 values in the release notes.
+- [ ] Download every published asset again, verify its SHA-256, open the full
+      ZIP, and rerun archive verification against the download.
+- [ ] Confirm the live GitHub Pages primary button downloads the full ZIP and
+      the secondary button downloads the firmware-only binary.
 - [ ] Mark the release as a beta.
 - [ ] Publish only after the physical X3 report passes every required item.
