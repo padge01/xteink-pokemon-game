@@ -31,21 +31,45 @@ export async function fetchRelease(tag = '', fetchImpl = fetch) {
     headers: { Accept: 'application/vnd.github+json' },
   });
 
-  if (!response.ok) {
+  if (response.ok) {
+    return selectReleaseAssets(await response.json());
+  }
+
+  if (tag || response.status !== 404) {
     throw new Error(`Release lookup failed (${response.status}).`);
   }
 
-  return selectReleaseAssets(await response.json());
+  const releasesResponse = await fetchImpl(`${RELEASES_API_URL}?per_page=20`, {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!releasesResponse.ok) {
+    throw new Error(`Release lookup failed (${releasesResponse.status}).`);
+  }
+
+  const releases = await releasesResponse.json();
+  const published = releases.find((release) => !release.draft);
+  if (!published) {
+    throw new Error('No published release is available.');
+  }
+  return selectReleaseAssets(published);
 }
 
-export async function verifyReleaseChecksum(firmware, checksumText, subtle = globalThis.crypto?.subtle) {
+export async function verifyReleaseChecksum(
+  firmware,
+  checksumText,
+  filename,
+  subtle = globalThis.crypto?.subtle,
+) {
   if (!(firmware instanceof Uint8Array) || !subtle) {
     throw new Error('Firmware checksum verification is unavailable.');
   }
 
-  const published = String(checksumText).match(/^([0-9a-f]{64})\s{2,}\S+$/im)?.[1]?.toLowerCase();
+  const published = String(checksumText)
+    .split(/\r?\n/)
+    .map((line) => line.match(/^([0-9a-f]{64})\s{2,}(.+)$/i))
+    .find((match) => match?.[2] === filename)?.[1]?.toLowerCase();
   if (!published) {
-    throw new Error('Release checksum file is invalid.');
+    throw new Error(`Release checksum is missing for ${filename}.`);
   }
 
   const digest = new Uint8Array(await subtle.digest('SHA-256', firmware));

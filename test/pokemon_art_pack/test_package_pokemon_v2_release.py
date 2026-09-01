@@ -2,6 +2,7 @@
 
 import importlib.util
 import hashlib
+import os
 import struct
 import tempfile
 import unittest
@@ -18,12 +19,23 @@ SPEC.loader.exec_module(PACKAGE)
 
 
 def write_bmp(path: Path, width: int, height: int) -> None:
-    header = bytearray(30)
+    row_size = ((width + 31) // 32) * 4
+    image_size = row_size * height
+    pixel_offset = 62
+    file_size = pixel_offset + image_size
+    header = bytearray(pixel_offset)
     header[:2] = b"BM"
+    struct.pack_into("<I", header, 2, file_size)
+    struct.pack_into("<I", header, 10, pixel_offset)
+    struct.pack_into("<I", header, 14, 40)
     struct.pack_into("<ii", header, 18, width, height)
+    struct.pack_into("<H", header, 26, 1)
     struct.pack_into("<H", header, 28, 1)
+    struct.pack_into("<I", header, 34, image_size)
+    struct.pack_into("<I", header, 46, 2)
+    header[54:62] = b"\x00\x00\x00\x00\xff\xff\xff\x00"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(header)
+    path.write_bytes(header + bytes(image_size))
 
 
 class PokemonArtPackTest(unittest.TestCase):
@@ -40,6 +52,18 @@ class PokemonArtPackTest(unittest.TestCase):
         self.assertEqual(expected[Path("pokedex/portrait/151.bmp")], (472, 708))
         self.assertEqual(expected[Path("pokedex/landscape/151.bmp")], (288, 432))
         self.assertEqual(len(expected), 614)
+
+    def test_bmp_validation_rejects_header_without_pixel_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "truncated.bmp"
+            header = bytearray(30)
+            header[:2] = b"BM"
+            struct.pack_into("<ii", header, 18, 40, 30)
+            struct.pack_into("<H", header, 28, 1)
+            path.write_bytes(header)
+
+            with self.assertRaisesRegex(ValueError, "truncated|invalid BMP"):
+                PACKAGE.bmp_info(path)
 
     def test_release_filters_dirty_source_and_verifies_exact_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -133,6 +157,28 @@ class PokemonArtPackTest(unittest.TestCase):
 
             self.assertEqual(save_a.read_bytes(), b"save-a")
             self.assertEqual(save_b.read_bytes(), b"save-b")
+
+    def test_public_release_zip_is_stable_when_source_mtimes_change(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self.make_complete_source(root)
+            firmware = root / "firmware.bin"
+            firmware.write_bytes(b"tested firmware")
+            notice = root / "RIGHTS_AND_ATTRIBUTION.md"
+            notice.write_bytes(b"rights and credits\n")
+
+            first, _, _ = PACKAGE.build_public_release(
+                source, firmware, notice, "0.1.0-RC", root / "dist-one"
+            )
+            first_bytes = first.read_bytes()
+            changed_time = 2_000_000_000
+            for path in source.rglob("*.bmp"):
+                os.utime(path, (changed_time, changed_time))
+
+            second, _, _ = PACKAGE.build_public_release(
+                source, firmware, notice, "0.1.0-RC", root / "dist-two"
+            )
+            self.assertEqual(first_bytes, second.read_bytes())
 
 
 if __name__ == "__main__":

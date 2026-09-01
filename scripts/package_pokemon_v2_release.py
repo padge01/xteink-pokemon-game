@@ -31,13 +31,41 @@ def expected_art() -> dict[Path, tuple[int, int]]:
 
 
 def bmp_info(path: Path) -> tuple[int, int, int]:
-    with path.open("rb") as handle:
-        header = handle.read(30)
-    if len(header) != 30 or header[:2] != b"BM":
-        raise ValueError(f"not a BMP: {path}")
-    width, height = struct.unpack_from("<ii", header, 18)
-    bits = struct.unpack_from("<H", header, 28)[0]
-    return width, abs(height), bits
+    return _validate_bmp_bytes(path.read_bytes(), str(path))
+
+
+def _validate_bmp_bytes(data: bytes, label: str) -> tuple[int, int, int]:
+    error = f"invalid or truncated BMP: {label}"
+    if len(data) < 54 or data[:2] != b"BM":
+        raise ValueError(error)
+
+    declared_size = struct.unpack_from("<I", data, 2)[0]
+    pixel_offset = struct.unpack_from("<I", data, 10)[0]
+    dib_size = struct.unpack_from("<I", data, 14)[0]
+    width, height = struct.unpack_from("<ii", data, 18)
+    planes, bits = struct.unpack_from("<HH", data, 26)
+    compression = struct.unpack_from("<I", data, 30)[0]
+    image_size = struct.unpack_from("<I", data, 34)[0]
+    colors_used = struct.unpack_from("<I", data, 46)[0]
+
+    if dib_size < 40 or width <= 0 or height == 0:
+        raise ValueError(error)
+    if planes != 1 or bits != 1 or compression != 0:
+        raise ValueError(error)
+
+    absolute_height = abs(height)
+    row_size = ((width * bits + 31) // 32) * 4
+    expected_image_size = row_size * absolute_height
+    palette_entries = colors_used or (1 << bits)
+    minimum_pixel_offset = 14 + dib_size + palette_entries * 4
+    if declared_size != len(data):
+        raise ValueError(error)
+    if pixel_offset < minimum_pixel_offset or pixel_offset + expected_image_size > len(data):
+        raise ValueError(error)
+    if image_size not in (0, expected_image_size):
+        raise ValueError(error)
+
+    return width, absolute_height, bits
 
 
 def sha256(path: Path) -> str:
@@ -129,6 +157,19 @@ def _write_tree_checksums(root: Path) -> None:
     (root / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="ascii")
 
 
+def _write_deterministic_zip(source: Path, archive: Path) -> None:
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
+        for path in sorted((candidate for candidate in source.rglob("*") if candidate.is_file()),
+                           key=lambda candidate: candidate.relative_to(source).as_posix()):
+            name = path.relative_to(source).as_posix()
+            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.create_system = 3
+            entry.external_attr = 0o100644 << 16
+            with path.open("rb") as input_file, package.open(entry, "w") as output_file:
+                shutil.copyfileobj(input_file, output_file, length=65536)
+
+
 def build_public_release(source: Path, firmware: Path, notice: Path, version: str,
                          output: Path) -> tuple[Path, Path, Path]:
     source = source.resolve()
@@ -164,10 +205,7 @@ def build_public_release(source: Path, firmware: Path, notice: Path, version: st
 
         if full_zip.exists():
             full_zip.unlink()
-        with zipfile.ZipFile(full_zip, "w", zipfile.ZIP_DEFLATED) as package:
-            for path in sorted((candidate for candidate in staging.rglob("*") if candidate.is_file()),
-                               key=lambda candidate: candidate.relative_to(staging).as_posix()):
-                package.write(path, path.relative_to(staging).as_posix())
+        _write_deterministic_zip(staging, full_zip)
 
     verify_archive(full_zip, firmware_asset, notice)
     release_sums.write_text(
@@ -191,11 +229,7 @@ def _parse_checksums(text: str) -> dict[str, str]:
 
 
 def _bmp_bytes_info(data: bytes) -> tuple[int, int, int]:
-    if len(data) < 30 or data[:2] != b"BM":
-        raise ValueError("archive contains a non-BMP artwork file")
-    width, height = struct.unpack_from("<ii", data, 18)
-    bits = struct.unpack_from("<H", data, 28)[0]
-    return width, abs(height), bits
+    return _validate_bmp_bytes(data, "archive artwork")
 
 
 def verify_archive(archive: Path, firmware: Path, notice: Path) -> None:
