@@ -79,5 +79,5 @@ Pokémon and related names, characters, and artwork belong to their respective
 rights holders, including Nintendo, Creatures Inc., GAME FREAK Inc., and The
 Pokémon Company.
 
-Pokémon Game for Xteink X3 is not affiliated with or endorsed by those rights
+Xteink Pokémon Game is not affiliated with or endorsed by those rights
 holders, Xteink, PokéAPI, PokéSprite, Tesserae, CrossInk, or CrossPoint Reader.
