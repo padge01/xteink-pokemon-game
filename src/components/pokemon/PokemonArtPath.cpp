@@ -34,15 +34,15 @@ const char* itemSlug(const EvolutionItem item) {
 
 }  // namespace
 
-const char* pokemonSpeciesArtPath(const uint16_t speciesId, const bool hero, char* output,
-                                  const size_t outputSize) {
+const char* pokemonSpeciesArtPath(const uint16_t speciesId, const bool hero, char* output, const size_t outputSize) {
   if (output == nullptr || outputSize == 0) return nullptr;
   output[0] = '\0';
   if (speciesId == 0 || speciesId > KANTO_SPECIES_COUNT) return nullptr;
-  return finishPath(output, outputSize,
-                    std::snprintf(output, outputSize, hero ? "/.crosspoint/pokemon/heroes/%03u.bmp"
-                                                          : "/.crosspoint/pokemon/sprites/%03u.bmp",
-                                  static_cast<unsigned>(speciesId)));
+  return finishPath(
+      output, outputSize,
+      std::snprintf(output, outputSize,
+                    hero ? "/.crosspoint/pokemon/heroes/%03u.bmp" : "/.crosspoint/pokemon/sprites/%03u.bmp",
+                    static_cast<unsigned>(speciesId)));
 }
 
 const char* pokemonPokedexArtPath(const uint16_t speciesId, const bool landscape, char* output,
@@ -55,16 +55,15 @@ const char* pokemonPokedexArtPath(const uint16_t speciesId, const bool landscape
                                   landscape ? "landscape" : "portrait", static_cast<unsigned>(speciesId)));
 }
 
-const char* pokemonItemArtPath(const EvolutionItem item, const bool hero, char* output,
-                               const size_t outputSize) {
+const char* pokemonItemArtPath(const EvolutionItem item, const bool hero, char* output, const size_t outputSize) {
   if (output == nullptr || outputSize == 0) return nullptr;
   output[0] = '\0';
   const char* slug = itemSlug(item);
   if (slug == nullptr) return nullptr;
-  return finishPath(output, outputSize,
-                    std::snprintf(output, outputSize, hero ? "/.crosspoint/pokemon/heroes/items/%s.bmp"
-                                                          : "/.crosspoint/pokemon/items/%s.bmp",
-                                  slug));
+  return finishPath(
+      output, outputSize,
+      std::snprintf(output, outputSize,
+                    hero ? "/.crosspoint/pokemon/heroes/items/%s.bmp" : "/.crosspoint/pokemon/items/%s.bmp", slug));
 }
 
 }  // namespace pokemon
