@@ -54,12 +54,12 @@ void stateCodecUsesTheCanonical116ByteLayout() {
   pokemon::PokemonState state{};
   state.partyRecordIds[0] = 7;
   state.partyRecordIds[1] = 9;
-  state.pendingEvents[0] = {0, 25, 5, pokemon::Gender::Female, pokemon::EvolutionItem::None,
-                            pokemon::PendingEventKind::Encounter};
-  state.pendingEvents[1] = {0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::LinkCable,
-                            pokemon::PendingEventKind::Item};
-  state.pendingEvents[2] = {7, 26, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None,
-                            pokemon::PendingEventKind::Evolution};
+  state.pendingEvents[0] = {
+      0, 25, 5, pokemon::Gender::Female, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter};
+  state.pendingEvents[1] = {
+      0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::LinkCable, pokemon::PendingEventKind::Item};
+  state.pendingEvents[2] = {
+      7, 26, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Evolution};
   state.itemCounts = {1, 2, 3, 4, 5, 6};
   state.seenSpecies[0] = 0x05;
   state.caughtSpecies[0] = 0x01;

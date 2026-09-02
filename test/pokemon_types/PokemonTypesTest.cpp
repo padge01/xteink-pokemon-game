@@ -296,14 +296,10 @@ void pendingEventValidationFollowsItsTag() {
 
 void pendingEventQueueIsFixedFifoAndCompacted() {
   PokemonState state = validState();
-  const PendingEvent encounter{0, 25, 5, Gender::Female, pokemon::EvolutionItem::None,
-                               PendingEventKind::Encounter};
-  const PendingEvent item{0, 0, 0, Gender::Unknown, pokemon::EvolutionItem::ThunderStone,
-                          PendingEventKind::Item};
-  const PendingEvent evolution{1, 2, 0, Gender::Unknown, pokemon::EvolutionItem::None,
-                               PendingEventKind::Evolution};
-  const PendingEvent fourth{2, 5, 0, Gender::Unknown, pokemon::EvolutionItem::None,
-                            PendingEventKind::Evolution};
+  const PendingEvent encounter{0, 25, 5, Gender::Female, pokemon::EvolutionItem::None, PendingEventKind::Encounter};
+  const PendingEvent item{0, 0, 0, Gender::Unknown, pokemon::EvolutionItem::ThunderStone, PendingEventKind::Item};
+  const PendingEvent evolution{1, 2, 0, Gender::Unknown, pokemon::EvolutionItem::None, PendingEventKind::Evolution};
+  const PendingEvent fourth{2, 5, 0, Gender::Unknown, pokemon::EvolutionItem::None, PendingEventKind::Evolution};
 
   CHECK(pokemon::pendingEventCount(state) == 0);
   CHECK(pokemon::pendingEventFront(state) == nullptr);

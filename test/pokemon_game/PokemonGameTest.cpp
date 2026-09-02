@@ -212,11 +212,15 @@ void fifteenMinuteCheckUsesFortyPercentEncounterChance() {
 void fullQueueCreditsReadingAndPrimesGuaranteesWithoutRolling() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   pokemon::PokemonState state = stateWithLeader(leader);
-  state.pendingEvents[0] = {0, 81, 24, pokemon::Gender::Genderless, pokemon::EvolutionItem::None,
-                            pokemon::PendingEventKind::Encounter};
-  state.pendingEvents[1] = {0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone,
-                            pokemon::PendingEventKind::Item};
-  state.pendingEvents[2] = {leader.recordId, 26, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None,
+  state.pendingEvents[0] = {
+      0, 81, 24, pokemon::Gender::Genderless, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter};
+  state.pendingEvents[1] = {
+      0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone, pokemon::PendingEventKind::Item};
+  state.pendingEvents[2] = {leader.recordId,
+                            26,
+                            0,
+                            pokemon::Gender::Unknown,
+                            pokemon::EvolutionItem::None,
                             pokemon::PendingEventKind::Evolution};
   state.readingMinuteRemainder = 59;
   const auto pendingBefore = state.pendingEvents;
@@ -271,11 +275,15 @@ void resolvingEventsPopsOnlyTheFrontAndRefreshesTheNotice() {
   leader.speciesId = 1;
   leader.totalXp = pokemon::xpRequired(16);
   pokemon::PokemonState state = stateWithLeader(leader);
-  state.pendingEvents[0] = {0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone,
-                            pokemon::PendingEventKind::Item};
-  state.pendingEvents[1] = {0, 4, 6, pokemon::Gender::Female, pokemon::EvolutionItem::None,
-                            pokemon::PendingEventKind::Encounter};
-  state.pendingEvents[2] = {leader.recordId, 2, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None,
+  state.pendingEvents[0] = {
+      0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone, pokemon::PendingEventKind::Item};
+  state.pendingEvents[1] = {
+      0, 4, 6, pokemon::Gender::Female, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter};
+  state.pendingEvents[2] = {leader.recordId,
+                            2,
+                            0,
+                            pokemon::Gender::Unknown,
+                            pokemon::EvolutionItem::None,
                             pokemon::PendingEventKind::Evolution};
   state.dashboardNotice = pokemon::DashboardNotice::ItemFound;
 
@@ -790,12 +798,16 @@ void promptTogglePreservesAnUnrelatedPendingEvent() {
 void disablingPromptsRemovesOnlyMatchingQueuedEvolutions() {
   pokemon::PokemonRecord leader = leaderAtLevelFive();
   pokemon::PokemonState state = stateWithLeader(leader);
-  const pokemon::PendingEvent encounter{0, 4, 6, pokemon::Gender::Female, pokemon::EvolutionItem::None,
-                                        pokemon::PendingEventKind::Encounter};
-  const pokemon::PendingEvent evolution{leader.recordId, 26, 0, pokemon::Gender::Unknown,
-                                        pokemon::EvolutionItem::None, pokemon::PendingEventKind::Evolution};
-  const pokemon::PendingEvent item{0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::ThunderStone,
-                                   pokemon::PendingEventKind::Item};
+  const pokemon::PendingEvent encounter{
+      0, 4, 6, pokemon::Gender::Female, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter};
+  const pokemon::PendingEvent evolution{leader.recordId,
+                                        26,
+                                        0,
+                                        pokemon::Gender::Unknown,
+                                        pokemon::EvolutionItem::None,
+                                        pokemon::PendingEventKind::Evolution};
+  const pokemon::PendingEvent item{
+      0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::ThunderStone, pokemon::PendingEventKind::Item};
   state.pendingEvents = {encounter, evolution, item};
   state.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
   pokemon::RecordMutation mutation{};

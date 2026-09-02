@@ -62,8 +62,8 @@ size_t snapshotStateBytes(const uint16_t version) {
 uint64_t snapshotFileBytes(const SnapshotHeader& header) {
   const size_t stateBytes = snapshotStateBytes(header.version);
   if (stateBytes == 0) return 0;
-  return POKEMON_SNAPSHOT_HEADER_BYTES + stateBytes +
-         static_cast<uint64_t>(header.recordCount) * POKEMON_RECORD_BYTES + POKEMON_SNAPSHOT_CRC_BYTES;
+  return POKEMON_SNAPSHOT_HEADER_BYTES + stateBytes + static_cast<uint64_t>(header.recordCount) * POKEMON_RECORD_BYTES +
+         POKEMON_SNAPSHOT_CRC_BYTES;
 }
 
 bool encodeSnapshotHeader(const SnapshotHeader& header, HeaderBytes& output) {
