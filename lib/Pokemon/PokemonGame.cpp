@@ -119,9 +119,7 @@ DashboardNotice noticeForEvent(const PendingEvent* event) {
   return DashboardNotice::None;
 }
 
-void refreshDashboardNotice(PokemonState& state) {
-  state.dashboardNotice = noticeForEvent(pendingEventFront(state));
-}
+void refreshDashboardNotice(PokemonState& state) { state.dashboardNotice = noticeForEvent(pendingEventFront(state)); }
 
 bool popPendingEvent(PokemonState& state) {
   if (!dequeuePendingEvent(state)) return false;
@@ -165,8 +163,8 @@ bool queueEvolutionAfterLevelGain(PokemonState& state, const PokemonRecord& reco
   const uint8_t level = levelForXp(record.totalXp);
   for (const EvolutionRule& rule : evolutionsFor(record.speciesId)) {
     if (rule.trigger != EvolutionTrigger::Level || level < rule.minimumLevel) continue;
-    const PendingEvent event{record.recordId, rule.targetSpeciesId, 0, Gender::Unknown, EvolutionItem::None,
-                             PendingEventKind::Evolution};
+    const PendingEvent event{record.recordId, rule.targetSpeciesId, 0,
+                             Gender::Unknown, EvolutionItem::None,  PendingEventKind::Evolution};
     if (!enqueuePendingEvent(state, event)) return false;
     if (!markSpecies(state.seenSpecies, rule.targetSpeciesId)) return false;
     refreshDashboardNotice(state);
@@ -257,8 +255,8 @@ bool createItem(PokemonState& state, const OwnedEvolutionNeeds ownedEvolutionNee
   if (candidateCount > 1 && !randomBelow(random, static_cast<uint32_t>(candidateCount), selectedIndex)) return false;
   const uint8_t itemIndex = candidates[selectedIndex];
   ++state.itemCounts[itemIndex];
-  const PendingEvent event{0, 0, 0, Gender::Unknown, static_cast<EvolutionItem>(itemIndex + 1U),
-                           PendingEventKind::Item};
+  const PendingEvent event{
+      0, 0, 0, Gender::Unknown, static_cast<EvolutionItem>(itemIndex + 1U), PendingEventKind::Item};
   if (!enqueuePendingEvent(state, event)) return false;
   refreshDashboardNotice(state);
   created = true;
@@ -461,8 +459,7 @@ bool resolveEvolution(PokemonState& state, PokemonRecord& record, const Evolutio
   }
   const PendingEvent pending = *front;
 
-  const EvolutionRule* rule =
-      findEvolution(record, EvolutionTrigger::Level, EvolutionItem::None, pending.speciesId);
+  const EvolutionRule* rule = findEvolution(record, EvolutionTrigger::Level, EvolutionItem::None, pending.speciesId);
   if (rule == nullptr || levelForXp(record.totalXp) < rule->minimumLevel) return false;
 
   PokemonState stateCandidate = state;

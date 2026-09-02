@@ -35,7 +35,8 @@ bool encodeLegacyState(const pokemon::PokemonState& state,
                        std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES>& output) {
   if (!pokemon::validateState(state) || pokemon::pendingEventCount(state) > 1) return false;
   output = {};
-  for (size_t slot = 0; slot < pokemon::PARTY_SIZE; ++slot) write32(output.data(), slot * 4U, state.partyRecordIds[slot]);
+  for (size_t slot = 0; slot < pokemon::PARTY_SIZE; ++slot)
+    write32(output.data(), slot * 4U, state.partyRecordIds[slot]);
   const pokemon::PendingEvent* pending = pokemon::pendingEventFront(state);
   if (pending != nullptr) {
     write32(output.data(), 24, pending->recordId);
@@ -59,8 +60,7 @@ bool encodeLegacyState(const pokemon::PokemonState& state,
   return true;
 }
 
-bool writeLegacySnapshot(const char* path, const pokemon::PokemonState& state,
-                         const pokemon::PokemonRecord& record) {
+bool writeLegacySnapshot(const char* path, const pokemon::PokemonState& state, const pokemon::PokemonRecord& record) {
   pokemon::HeaderBytes headerBytes{};
   const pokemon::SnapshotHeader header{pokemon::POKEMON_SNAPSHOT_VERSION_V1, state.sequence, 1};
   std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES> stateBytes{};
@@ -69,8 +69,8 @@ bool writeLegacySnapshot(const char* path, const pokemon::PokemonState& state,
       !pokemon::encodeRecord(record, recordBytes)) {
     return false;
   }
-  uint32_t crc = pokemon::updateSnapshotCrc32(pokemon::POKEMON_SNAPSHOT_CRC32_INITIAL, headerBytes.data(),
-                                               headerBytes.size());
+  uint32_t crc =
+      pokemon::updateSnapshotCrc32(pokemon::POKEMON_SNAPSHOT_CRC32_INITIAL, headerBytes.data(), headerBytes.size());
   crc = pokemon::updateSnapshotCrc32(crc, stateBytes.data(), stateBytes.size());
   crc = pokemon::updateSnapshotCrc32(crc, recordBytes.data(), recordBytes.size());
   uint8_t crcBytes[pokemon::POKEMON_SNAPSHOT_CRC_BYTES]{};
@@ -527,8 +527,8 @@ void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
   legacy.partyRecordIds[0] = pikachu.recordId;
   legacy.sequence = 7;
   legacy.lifetimeMinutes = 123;
-  legacy.pendingEvents[0] = {0, 1, 8, pokemon::Gender::Female, pokemon::EvolutionItem::None,
-                             pokemon::PendingEventKind::Encounter};
+  legacy.pendingEvents[0] = {
+      0, 1, 8, pokemon::Gender::Female, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter};
   legacy.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
   CHECK(pokemon::markSpecies(legacy.seenSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(legacy.caughtSpecies, pikachu.speciesId));
