@@ -1,5 +1,7 @@
 # Xteink Pokémon Game
 
+[Support the project on Ko-fi](https://ko-fi.com/padge01)
+
 This project was inspired by [the reading companion idea built by Joshua Miller](https://github.com/JoshuaMillerCode/crosspoint-reader-companion). I started by bringing CrossInk up to date with the current CrossPoint 1.5 release. Then I adapted the reading companion idea into a lightweight Pokémon game built around CrossInk's reading sessions and dashboards.
 
 Real page turns train your lead Pokémon, trigger encounters and item finds, and let you build a party and Pokédex while you read.
