@@ -45,6 +45,10 @@ The full-install ZIP contains the firmware and all required artwork. It does not
 
 The [download and install guide](https://padge01.github.io/xteink-pokemon-game/install.html) always points to the latest release and includes both update options.
 
+## Support
+
+Xteink Pokémon Game is free and open source. If it has made reading more fun and you would like to support continued development and testing, you can leave an optional tip on [Ko-fi](https://ko-fi.com/padge01).
+
 ## Credits
 
 - [CrossInk](https://github.com/uxjulia/CrossInk): the reader firmware, reading-session tracking, dashboards, and foundation for this project
@@ -55,7 +59,7 @@ The [download and install guide](https://padge01.github.io/xteink-pokemon-game/i
 
 See [NOTICE.md](NOTICE.md) and [Rights and attribution](RIGHTS_AND_ATTRIBUTION.md). Project code is covered by the inherited [MIT License](LICENSE).
 
-Pokémon and related names, characters, and artwork belong to their respective rights holders. This is an unofficial, noncommercial project and is not affiliated with or endorsed by Nintendo, Creatures Inc., GAME FREAK Inc., The Pokémon Company, Xteink, CrossInk, or CrossPoint Reader.
+Pokémon and related names, characters, and artwork belong to their respective rights holders. This is an unofficial fan project and is not affiliated with or endorsed by Nintendo, Creatures Inc., GAME FREAK Inc., The Pokémon Company, Xteink, CrossInk, or CrossPoint Reader. Optional tips support development and testing; they do not purchase access to Pokémon content.
 
 ## Development notes
 
