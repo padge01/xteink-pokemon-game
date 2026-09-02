@@ -93,5 +93,4 @@ Automated checks do not approve a hardware release.
       ZIP, and rerun archive verification against the download.
 - [ ] Confirm the live GitHub Pages primary button downloads the full ZIP and
       the secondary button downloads the firmware-only binary.
-- [ ] Mark the release as a beta.
-- [ ] Publish only after the physical X3 report passes every required item.
+- [ ] Publish v0.1.0 as a stable release only after the physical X3 report passes every required item.

@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -66,14 +67,10 @@ jobs:
         run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
 
       - name: Run cppcheck
-        run: pio check --fail-on-defect low --fail-on-defect medium --fail-on-defect high
+        run: pio check -e pokemon-x3 --fail-on-defect low --fail-on-defect medium --fail-on-defect high
 
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        environment: [default, sticky]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -93,34 +90,33 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: ${{ runner.os }}-platformio-${{ matrix.environment }}-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
+          key: ${{ runner.os }}-platformio-pokemon-x3-${{ hashFiles('platformio.ini', 'platformio.local.example.ini') }}
           restore-keys: |
-            ${{ runner.os }}-platformio-${{ matrix.environment }}-
+            ${{ runner.os }}-platformio-pokemon-x3-
             ${{ runner.os }}-platformio-
 
       - name: Install PlatformIO Core
         run: uv pip install --system -U https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip
 
-      - name: Build ${{ matrix.environment }} firmware
+      - name: Build Pokémon X3 firmware
         run: |
           set -euo pipefail
-          pio run -e ${{ matrix.environment }} | tee pio-${{ matrix.environment }}.log
+          pio run -e pokemon-x3 | tee pio-pokemon-x3.log
 
       - name: Extract firmware stats
         run: |
           set -euo pipefail
           {
-            echo "## ${{ matrix.environment }} firmware build stats"
-            grep -E "RAM:\\s|Flash:\\s" pio-${{ matrix.environment }}.log | while read -r line; do echo "- ${line}"; done
+            echo "## Pokémon X3 firmware build stats"
+            grep -E "RAM:\\s|Flash:\\s" pio-pokemon-x3.log | while read -r line; do echo "- ${line}"; done
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload firmware artifacts
-        if: matrix.environment == 'default'
         uses: actions/upload-artifact@v7
         with:
-          name: firmware-x3-x4
+          name: firmware-pokemon-x3
           path: |
-            .pio/build/default/firmware-x3-x4.bin
+            .pio/build/pokemon-x3/firmware-x3-x4.bin
           if-no-files-found: error
 
   site:

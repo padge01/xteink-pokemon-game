@@ -4,13 +4,15 @@ This project was inspired by [the reading companion idea built by Joshua Miller]
 
 Real page turns train your lead Pokémon, trigger encounters and item finds, and let you build a party and Pokédex while you read.
 
+The first release has been installed and tested on a physical Xteink X3.
+
 ## How it works
 
 Put the Pokémon you want to train at the top of your Party. As you read, it gains experience and levels up.
 
 Every 15–60 minutes of active reading, a wild Pokémon encounter or item find can occur. A `!` on the dashboard tells you something is waiting in the Pokémon menu.
 
-The Pokémon you encounter is random, but your progress through the current book influences its level and rarity. Catch, train, and evolve Pokémon to complete the original 151 Pokédex.
+The Pokémon you encounter is random, but your progress through the current book influences its level and rarity. Catch, train, and evolve Pokémon to complete the original 151 entries in the Pokédex.
 
 Only active reading counts. Leaving a book open does not train your Pokémon.
 
@@ -33,7 +35,7 @@ This build is for the **Xteink X3 only**. Do not install it on an X4, X4 Pro, St
 
 1. Download the full-install ZIP to a computer.
 2. Extract the ZIP. Do not copy the ZIP itself to the SD card.
-3. Back up `/.crosspoint/pokemon-a.bin` and `/.crosspoint/pokemon-b.bin` if they already exist.
+3. Back up any `/.crosspoint/pokemon*.bin` files if they already exist. Earlier `pokemon-v2-a.bin` and `pokemon-v2-b.bin` saves migrate automatically.
 4. Copy the extracted `update.bin` and `.crosspoint` folder to the SD-card root.
 5. Merge the `.crosspoint` folder. Do not replace or delete the existing folder.
 6. Safely eject the card and return it to the X3.
@@ -49,7 +51,7 @@ The [download and install guide](https://padge01.github.io/xteink-pokemon-game/i
 - [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader): the original firmware and upstream 1.5 improvements brought into this CrossInk build
 - [Joshua Miller's CrossPoint Reader Companion](https://github.com/JoshuaMillerCode/crosspoint-reader-companion): the reading companion concept and verified-reading behavior
 - [PokeAPI Sprites](https://github.com/PokeAPI/sprites): the source for the adapted Pokémon sprites
-- [Tesserae](https://github.com/dmellok/tesserae) and [u/xDaftTurtle's Pokédex cards](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3): the Pokédex artwork reference
+- [u/xDaftTurtle's Pokédex sleep-screen project](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3): the adapted X3 Pokédex cards, created with [Tesserae](https://github.com/dmellok/tesserae)
 
 See [NOTICE.md](NOTICE.md) and [Rights and attribution](RIGHTS_AND_ATTRIBUTION.md). Project code is covered by the inherited [MIT License](LICENSE).
 
