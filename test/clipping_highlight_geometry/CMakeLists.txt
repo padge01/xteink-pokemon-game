@@ -1,0 +1,9 @@
+add_executable(ClippingHighlightGeometryTest
+  ClippingHighlightGeometryTest.cpp
+)
+
+target_link_libraries(ClippingHighlightGeometryTest PRIVATE
+  crosspoint_test_common
+)
+
+add_test(NAME ClippingHighlightGeometryTest COMMAND ClippingHighlightGeometryTest)

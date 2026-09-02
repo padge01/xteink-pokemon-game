@@ -1,0 +1,9 @@
+add_executable(DictionaryLookupPolicyTest
+  DictionaryLookupPolicyTest.cpp
+)
+
+target_link_libraries(DictionaryLookupPolicyTest PRIVATE
+  crosspoint_test_common
+)
+
+add_test(NAME DictionaryLookupPolicyTest COMMAND DictionaryLookupPolicyTest)

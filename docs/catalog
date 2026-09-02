@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "releases": [
+    {
+      "id": "stable-1.5.0-x3-x4",
+      "channel": "stable",
+      "name": "1.5.0",
+      "version": "1.5.0",
+      "variant": "x3-x4",
+      "released_at": "2026-08-08T21:46:17Z",
+      "notes": "CrossInk 1.5.0 stable firmware",
+      "firmware_url": "https://github.com/uxjulia/CrossInk/releases/download/v1.5.0/firmware-x3-x4-v1.5.0.bin",
+      "firmware_sha256": "b5debe8b6b3f26f1af53410f388a2eb8def78b19b0c04aa94e46e942684dce2f",
+      "size": 6260208,
+      "supported_devices": [
+        "x4",
+        "x3"
+      ]
+    },
+    {
+      "id": "stable-1.5.0-sticky",
+      "channel": "stable",
+      "name": "1.5.0",
+      "version": "1.5.0",
+      "variant": "sticky",
+      "released_at": "2026-08-08T21:46:17Z",
+      "notes": "CrossInk 1.5.0 stable firmware",
+      "firmware_url": "https://github.com/uxjulia/CrossInk/releases/download/v1.5.0/firmware-sticky-v1.5.0.bin",
+      "firmware_sha256": "1373e000d0f5d160bb16c24b9e427bb5a489570a62c1838c7f7b198579054366",
+      "size": 6052160,
+      "supported_devices": [
+        "sticky"
+      ]
+    }
+  ]
+}

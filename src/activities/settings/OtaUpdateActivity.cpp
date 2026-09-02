@@ -1,0 +1,309 @@
+#include "OtaUpdateActivity.h"
+
+#include <GfxRenderer.h>
+#include <I18n.h>
+#include <WiFi.h>
+
+#include "AppVersion.h"
+#include "MappedInputManager.h"
+#include "SdCardFontSystem.h"
+#include "SilentRestart.h"
+#include "activities/network/WifiSelectionActivity.h"
+#include "components/TouchHeaderBackButton.h"
+#include "components/UITheme.h"
+#include "fontIds.h"
+#include "network/OtaUpdater.h"
+
+namespace {
+bool hasActiveWifiConnection() { return WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0); }
+
+StrId failureMessageFor(const OtaUpdater::OtaUpdaterError error) {
+  if (error == OtaUpdater::HASH_MISMATCH_ERROR) return StrId::STR_UPDATE_HASH_MISMATCH;
+  if (error == OtaUpdater::WRONG_DEVICE_ERROR) return StrId::STR_FIRMWARE_WRONG_DEVICE;
+  return StrId::STR_UPDATE_FAILED;
+}
+
+struct OtaActionRects {
+  Rect cancel;
+  Rect update;
+};
+
+OtaActionRects getOtaActionRects(const GfxRenderer& renderer) {
+  const int top = renderer.getScreenHeight() - 80;
+  const int width = renderer.getScreenWidth() / 2;
+  return {Rect{0, top, width, 80}, Rect{width, top, renderer.getScreenWidth() - width, 80}};
+}
+
+bool contains(const Rect& rect, const int x, const int y) {
+  return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
+}
+}  // namespace
+
+void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
+  if (!success) {
+    LOG_ERR("OTA", "WiFi connection failed, exiting");
+    finish();
+    return;
+  }
+
+  {
+    RenderLock lock(*this);
+    state = CHECKING_FOR_UPDATE;
+  }
+  if (requestUpdateAndWait() != RequestUpdateResult::Rendered) {
+    LOG_ERR("OTA", "Checking update screen could not be rendered synchronously; aborting update check");
+    {
+      RenderLock lock(*this);
+      state = FAILED;
+    }
+    requestUpdate(true);
+    return;
+  }
+
+  const auto res = updater.checkForUpdate();
+  if (res != OtaUpdater::OK) {
+    LOG_DBG("OTA", "Update check failed: %d", res);
+    {
+      RenderLock lock(*this);
+      failureMessage = failureMessageFor(res);
+      state = FAILED;
+    }
+    requestUpdate(true);
+    return;
+  }
+
+  if (!updater.isUpdateNewer()) {
+    {
+      RenderLock lock(*this);
+      state = NO_UPDATE;
+    }
+    requestUpdate(true);
+    return;
+  }
+
+  {
+    RenderLock lock(*this);
+    state = WAITING_CONFIRMATION;
+  }
+  requestUpdate(true);
+}
+
+void OtaUpdateActivity::onEnter() {
+  Activity::onEnter();
+  sdFontSystem.releaseLoadedFont(renderer);
+
+  if (hasActiveWifiConnection()) {
+    onWifiSelectionComplete(true);
+    return;
+  }
+
+  // Turn on WiFi immediately
+  WiFi.mode(WIFI_STA);
+
+  // Launch WiFi selection subactivity
+  startActivityForResult(std::make_unique<WifiSelectionActivity>(renderer, mappedInput),
+                         [this](const ActivityResult& result) { onWifiSelectionComplete(!result.isCancelled); });
+}
+
+void OtaUpdateActivity::onExit() {
+  Activity::onExit();
+
+  // Success path reboots via the SHUTTING_DOWN state's plain ESP.restart()
+  // (loop() above) so the new firmware boots normally. Back-out paths land
+  // here with wifi still active; silent-restart to free the LWIP/mbedTLS
+  // fragmentation, same as the other wifi activities.
+  if (WiFi.getMode() != WIFI_MODE_NULL) {
+    WiFi.disconnect(false);
+    delay(30);
+    silentRestart();
+  }
+}
+
+void OtaUpdateActivity::render(RenderLock&&) {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
+
+  renderer.clearScreen();
+
+  const Rect header{0, metrics.topPadding, pageWidth, TouchHeaderBackButton::height(metrics, mappedInput)};
+  const bool canGoBack = state == WAITING_CONFIRMATION || state == FAILED || state == NO_UPDATE;
+  if (canGoBack && mappedInput.hasTouchHardware()) {
+    TouchHeaderBackButton::draw(renderer, header, tr(STR_UPDATE), false);
+  } else {
+    GUI.drawHeader(renderer, header, tr(STR_UPDATE));
+  }
+  const auto height = renderer.getLineHeight(UI_10_FONT_ID);
+  const auto top = (pageHeight - height) / 2;
+
+  float updaterProgress = 0;
+  if (state == UPDATE_IN_PROGRESS) {
+    updaterProgress = static_cast<float>(updater.getProcessedSize()) / static_cast<float>(updater.getTotalSize());
+    // Only update every 2% at the most
+    if (static_cast<int>(updaterProgress * 50) == lastUpdaterPercentage / 2) {
+      return;
+    }
+    lastUpdaterPercentage = static_cast<int>(updaterProgress * 100);
+  }
+
+  if (state == CHECKING_FOR_UPDATE) {
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_CHECKING_UPDATE));
+  } else if (state == WAITING_CONFIRMATION) {
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NEW_UPDATE), true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, top + height + metrics.verticalSpacing,
+                      (std::string(tr(STR_CURRENT_VERSION)) + CROSSINK_VERSION).c_str());
+    renderer.drawText(UI_10_FONT_ID, metrics.contentSidePadding, top + height * 2 + metrics.verticalSpacing * 2,
+                      (std::string(tr(STR_NEW_VERSION)) + updater.getLatestVersion()).c_str());
+
+    if (mappedInput.hasTouch()) {
+      const auto actionRects = getOtaActionRects(renderer);
+      const int cancelTextWidth = renderer.getTextWidth(UI_10_FONT_ID, tr(STR_CANCEL));
+      renderer.drawText(UI_10_FONT_ID, actionRects.cancel.x + (actionRects.cancel.width - cancelTextWidth) / 2,
+                        actionRects.cancel.y + 28, tr(STR_CANCEL));
+      const int updateTextWidth = renderer.getTextWidth(UI_10_FONT_ID, tr(STR_UPDATE));
+      renderer.drawText(UI_10_FONT_ID, actionRects.update.x + (actionRects.update.width - updateTextWidth) / 2,
+                        actionRects.update.y + 28, tr(STR_UPDATE));
+    }
+
+    const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), tr(STR_UPDATE), "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  } else if (state == UPDATE_IN_PROGRESS) {
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATING));
+
+    int y = top + height + metrics.verticalSpacing;
+    GUI.drawProgressBar(
+        renderer,
+        Rect{metrics.contentSidePadding, y, pageWidth - metrics.contentSidePadding * 2, metrics.progressBarHeight},
+        static_cast<int>(updaterProgress * 100), 100);
+
+    y += metrics.progressBarHeight + metrics.verticalSpacing;
+    // Percent label is drawn by BaseTheme::drawProgressBar; this slot is left intentionally empty
+    // so the bytes line below stays at the same Y it was at when the activity drew its own percent.
+    y += height + metrics.verticalSpacing;
+    renderer.drawCenteredText(
+        UI_10_FONT_ID, y,
+        (std::to_string(updater.getProcessedSize()) + " / " + std::to_string(updater.getTotalSize())).c_str());
+  } else if (state == NO_UPDATE) {
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_NO_UPDATE), true, EpdFontFamily::BOLD);
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  } else if (state == FAILED) {
+    renderer.drawCenteredText(UI_10_FONT_ID, top, I18n::getInstance().get(failureMessage), true, EpdFontFamily::BOLD);
+    const auto labels = mappedInput.mapLabels(tr(STR_BACK), "", "", "");
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  } else if (state == FINISHED) {
+    renderer.drawCenteredText(UI_10_FONT_ID, top, tr(STR_UPDATE_COMPLETE), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_10_FONT_ID, top + height + metrics.verticalSpacing, tr(STR_POWER_ON_HINT));
+  }
+
+  renderer.displayBuffer(screenTransitionRefresh.modeFor(static_cast<uint8_t>(state)));
+}
+
+void OtaUpdateActivity::runUpdateInstall() {
+  {
+    RenderLock lock(*this);
+    failureMessage = StrId::STR_UPDATE_FAILED;
+    state = UPDATE_IN_PROGRESS;
+  }
+  if (requestUpdateAndWait() != RequestUpdateResult::Rendered) {
+    LOG_ERR("OTA", "Update progress screen could not be rendered synchronously; aborting OTA install");
+    {
+      RenderLock lock(*this);
+      state = FAILED;
+    }
+    requestUpdate(true);
+    return;
+  }
+  const auto res = updater.installUpdate(
+      [](void* ctx) {
+        // immediate=true notifies the render task directly. The default deferred path only
+        // sets a flag consumed at the end of ActivityManager::loop(), which never runs while
+        // installUpdate() blocks this task.
+        static_cast<OtaUpdateActivity*>(ctx)->requestUpdate(true);
+      },
+      this);
+
+  if (res != OtaUpdater::OK) {
+    LOG_DBG("OTA", "Update failed: %d", res);
+    {
+      RenderLock lock(*this);
+      failureMessage = failureMessageFor(res);
+      state = FAILED;
+    }
+    requestUpdate();
+    return;
+  }
+
+  {
+    RenderLock lock(*this);
+    state = FINISHED;
+  }
+  const auto renderResult = requestUpdateAndWait();
+  if (renderResult == RequestUpdateResult::Rendered) {
+    // Hold the completion screen briefly so the user sees it, then restart.
+    delay(3000);
+  } else {
+    LOG_ERR("OTA", "Completion screen could not be rendered synchronously; restarting without sync confirmation");
+  }
+  {
+    RenderLock lock(*this);
+    state = SHUTTING_DOWN;
+  }
+}
+
+void OtaUpdateActivity::loop() {
+  if ((state == WAITING_CONFIRMATION || state == FAILED || state == NO_UPDATE) &&
+      TouchHeaderBackButton::wasTapped(mappedInput, renderer)) {
+    finish();
+    return;
+  }
+
+  if (state == WAITING_CONFIRMATION) {
+    int x = 0;
+    int y = 0;
+    if (mappedInput.wasScreenTapped(x, y)) {
+      const auto actionRects = getOtaActionRects(renderer);
+      if (contains(actionRects.cancel, x, y)) {
+        finish();
+        return;
+      }
+      if (contains(actionRects.update, x, y)) {
+        runUpdateInstall();
+        return;
+      }
+    }
+
+    if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+      runUpdateInstall();
+      return;
+    }
+
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+      finish();
+    }
+
+    return;
+  }
+
+  if (state == FAILED) {
+    int x = 0;
+    int y = 0;
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasScreenTapped(x, y)) {
+      finish();
+    }
+    return;
+  }
+
+  if (state == NO_UPDATE) {
+    int x = 0;
+    int y = 0;
+    if (mappedInput.wasPressed(MappedInputManager::Button::Back) || mappedInput.wasScreenTapped(x, y)) {
+      finish();
+    }
+    return;
+  }
+
+  if (state == SHUTTING_DOWN) {
+    ESP.restart();
+  }
+}

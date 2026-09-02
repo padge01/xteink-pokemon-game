@@ -1,0 +1,90 @@
+name: Bug report
+description: Report a reproducible problem on an Xteink X3
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project supports the Xteink X3 only. Back up both Pokémon save files before reproducing storage or reset problems. Do not attach copyrighted books or Pokémon artwork.
+
+  - type: input
+    id: version
+    attributes:
+      label: Firmware version or commit
+      description: Give the release name or full commit used to build the exact binary.
+      placeholder: v0.1.0-beta.1 or 40-character commit
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: X3 hardware
+      description: Include the hardware or display revision if known.
+      placeholder: Xteink X3, revision unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: orientation
+    attributes:
+      label: Orientation
+      options:
+        - Portrait
+        - Landscape
+        - Both
+        - Not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: artwork
+    attributes:
+      label: Local artwork pack
+      description: Did the included packager validate the exact artwork folder installed on the SD card?
+      options:
+        - Validated successfully
+        - Not validated
+        - Artwork is not involved
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the visible result and whether the device restarted, froze, or continued working.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start on ...
+        2. Press ...
+        3. Select ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Crash report or logs
+      description: Attach crash_report.txt when one was created. Remove credentials and private book information first.
+      render: shell
+
+  - type: textarea
+    id: images
+    attributes:
+      label: Screen photo
+      description: A photo of the X3 is useful for clipping, ghosting, contrast, and button-focus problems. Do not attach Pokémon source artwork.

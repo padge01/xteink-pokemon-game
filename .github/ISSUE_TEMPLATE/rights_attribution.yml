@@ -1,0 +1,34 @@
+name: Rights or attribution request
+description: Request removal, replacement, or corrected credit for an asset.
+title: "[Rights/Attribution] "
+labels:
+  - rights-request
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for helping us correct an artwork or attribution issue.
+  - type: dropdown
+    id: action
+    attributes:
+      label: Requested action
+      options:
+        - Remove an asset
+        - Replace an asset
+        - Correct attribution
+    validations:
+      required: true
+  - type: textarea
+    id: asset
+    attributes:
+      label: Asset or credit
+      description: Identify the affected file, artwork family, source, or credit.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Request details
+      description: Explain the requested change and your connection to the work or rights involved.
+    validations:
+      required: true
+
