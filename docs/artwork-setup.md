@@ -100,7 +100,7 @@ Run from the repository root:
 ```sh
 python scripts/generate_pokemon_icon_art.py \
   --pokemon-source pokemon-art-source/pokeapi-sprites/sprites/pokemon/versions/generation-vii/icons \
-  --item-source pokemon-art-source/pokesprite/items/evo-item \
+  --item-source pokemon-art-source/pokesprite/icons/evo-item \
   --output pokemon-art-output
 ```
 
