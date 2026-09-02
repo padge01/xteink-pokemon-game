@@ -6,6 +6,7 @@
 #include <Logging.h>
 #include <PokemonSpecies.h>
 
+#include <algorithm>
 #include <cstring>
 
 namespace pokemon {
@@ -143,10 +144,8 @@ bool sequenceIsNewer(const uint32_t candidate, const uint32_t current) {
 }
 
 bool recordIsInParty(const PokemonState& state, const uint32_t recordId) {
-  for (const uint32_t partyRecordId : state.partyRecordIds) {
-    if (partyRecordId == recordId) return true;
-  }
-  return false;
+  return std::any_of(state.partyRecordIds.begin(), state.partyRecordIds.end(),
+                     [recordId](const uint32_t partyRecordId) { return partyRecordId == recordId; });
 }
 
 }  // namespace
