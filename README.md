@@ -18,6 +18,22 @@ The Pokémon you encounter is random, but your progress through the current book
 
 Only active reading counts. Leaving a book open does not train your Pokémon.
 
+## Screenshots
+
+These are current X3 simulator captures using the artwork included in the full install.
+
+| Starter selection | Pokémon menu |
+| --- | --- |
+| ![Choose your first partner](docs/screenshots/starter-selection.png) | ![Pokémon menu](docs/screenshots/pokemon-menu.png) |
+
+| Party | Summary |
+| --- | --- |
+| ![Pokémon Party](docs/screenshots/party.png) | ![Pokémon Summary](docs/screenshots/pokemon-summary.png) |
+
+| Pokédex | Pokédex entry |
+| --- | --- |
+| ![Pokédex list](docs/screenshots/pokedex.png) | ![Charmander Pokédex entry](docs/screenshots/pokedex-detail.png) |
+
 ## How to play
 
 1. Choose Bulbasaur, Charmander, Squirtle, or Pikachu as your first partner. Choose its gender and give it a nickname if you want one.
