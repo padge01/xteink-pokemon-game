@@ -65,11 +65,14 @@ void drawPokemonHomeAccessory(const GfxRenderer& renderer, const PokemonDashboar
 
   const int top = bounds.y + 5;
   const int bottom = bounds.y + bounds.height / 2 + 1;
-  char speciesFit[40], nicknameFit[40], levelFit[24], xpFit[40];
+  char speciesFit[40];
+  char levelFit[24];
+  char xpFit[40];
   renderer.drawText(UI_12_FONT_ID, bounds.x + layout.identity.x, top,
                     fit(renderer, UI_12_FONT_ID, speciesLabel, layout.identity.width, speciesFit, EpdFontFamily::BOLD),
                     true, EpdFontFamily::BOLD);
   if (snapshot.leader.nickname[0] != '\0') {
+    char nicknameFit[40];
     renderer.drawText(
         UI_10_FONT_ID, bounds.x + layout.identity.x, bottom,
         fit(renderer, UI_10_FONT_ID, snapshot.leader.nickname.data(), layout.identity.width, nicknameFit));
