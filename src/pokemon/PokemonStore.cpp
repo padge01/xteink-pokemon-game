@@ -12,8 +12,10 @@ namespace pokemon {
 namespace {
 
 constexpr const char* STORE_DIRECTORY = "/.crosspoint";
-constexpr const char* STORE_PATH_A = "/.crosspoint/pokemon-v2-a.bin";
-constexpr const char* STORE_PATH_B = "/.crosspoint/pokemon-v2-b.bin";
+constexpr const char* STORE_PATH_A = "/.crosspoint/pokemon-a.bin";
+constexpr const char* STORE_PATH_B = "/.crosspoint/pokemon-b.bin";
+constexpr const char* LEGACY_STORE_PATH_A = "/.crosspoint/pokemon-v2-a.bin";
+constexpr const char* LEGACY_STORE_PATH_B = "/.crosspoint/pokemon-v2-b.bin";
 
 enum class InspectionResult : uint8_t {
   Missing,
@@ -161,8 +163,39 @@ StoreBeginResult PokemonStore::begin() {
 
   SnapshotHeader headerA{};
   SnapshotHeader headerB{};
-  const InspectionResult resultA = inspectSnapshot(STORE_PATH_A, headerA);
-  const InspectionResult resultB = inspectSnapshot(STORE_PATH_B, headerB);
+  InspectionResult resultA = inspectSnapshot(STORE_PATH_A, headerA);
+  InspectionResult resultB = inspectSnapshot(STORE_PATH_B, headerB);
+  if (resultA == InspectionResult::Missing && resultB == InspectionResult::Missing) {
+    SnapshotHeader legacyHeaderA{};
+    SnapshotHeader legacyHeaderB{};
+    const InspectionResult legacyResultA = inspectSnapshot(LEGACY_STORE_PATH_A, legacyHeaderA);
+    const InspectionResult legacyResultB = inspectSnapshot(LEGACY_STORE_PATH_B, legacyHeaderB);
+    if (legacyResultA == InspectionResult::Unsupported || legacyResultB == InspectionResult::Unsupported) {
+      if (legacyResultA == InspectionResult::Corrupt || legacyResultB == InspectionResult::Corrupt) {
+        return StoreBeginResult::Corrupt;
+      }
+      return StoreBeginResult::Unsupported;
+    }
+    if (legacyResultA == InspectionResult::Ready || legacyResultB == InspectionResult::Ready) {
+      const bool legacyIsA = legacyResultA == InspectionResult::Ready &&
+                             (legacyResultB != InspectionResult::Ready ||
+                              !sequenceIsNewer(legacyHeaderB.sequence, legacyHeaderA.sequence));
+      const char* legacyPath = legacyIsA ? LEGACY_STORE_PATH_A : LEGACY_STORE_PATH_B;
+      const SnapshotHeader legacyHeader = legacyIsA ? legacyHeaderA : legacyHeaderB;
+      if (!Storage.rename(legacyPath, STORE_PATH_A)) {
+        LOG_ERR("PokemonStore", "Failed to migrate legacy save filename");
+        return StoreBeginResult::Corrupt;
+      }
+      resultA = inspectSnapshot(STORE_PATH_A, headerA);
+      if (resultA != InspectionResult::Ready || headerA != legacyHeader) {
+        LOG_ERR("PokemonStore", "Migrated legacy save failed verification");
+        return StoreBeginResult::Corrupt;
+      }
+      LOG_INF("PokemonStore", "Migrated legacy save filename");
+    } else if (legacyResultA != InspectionResult::Missing || legacyResultB != InspectionResult::Missing) {
+      return StoreBeginResult::Corrupt;
+    }
+  }
   if (resultA == InspectionResult::Unsupported || resultB == InspectionResult::Unsupported) {
     if (resultA == InspectionResult::Corrupt || resultB == InspectionResult::Corrupt) {
       return StoreBeginResult::Corrupt;

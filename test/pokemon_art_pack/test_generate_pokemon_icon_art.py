@@ -24,6 +24,16 @@ def write_rgba_icon(path: Path, size: tuple[int, int]) -> None:
     image.save(path)
 
 
+def write_shaded_icon(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGBA", (40, 30), (255, 255, 255, 0))
+    for y in range(5, 25):
+        for x in range(8, 32):
+            shade = 72 + ((x + y) % 5) * 32
+            image.putpixel((x, y), (shade, shade, shade, 255))
+    image.save(path)
+
+
 class PokemonIconArtGeneratorTest(unittest.TestCase):
     def test_builds_species_and_item_sizes_as_one_bit_bmps(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -72,6 +82,24 @@ class PokemonIconArtGeneratorTest(unittest.TestCase):
             )
 
             self.assertTrue((root / "output/sprites/001.bmp").is_file())
+
+    def test_renders_hero_at_final_resolution_before_dithering(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.png"
+            write_shaded_icon(source)
+
+            GENERATOR.save_pair(
+                source,
+                root / "small.bmp",
+                root / "hero.bmp",
+                (40, 30),
+                3,
+            )
+
+            with Image.open(root / "small.bmp") as small, Image.open(root / "hero.bmp") as hero:
+                enlarged_small = small.resize(hero.size, Image.Resampling.NEAREST)
+                self.assertNotEqual(hero.tobytes(), enlarged_small.tobytes())
 
     def test_rejects_a_missing_species_icon(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

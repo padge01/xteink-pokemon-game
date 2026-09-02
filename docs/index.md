@@ -8,9 +8,9 @@ nav_order: 1
 A lightweight, reading-powered Pokémon companion for the Xteink X3, built on CrossInk.
 
 - [Download and install](https://padge01.github.io/xteink-pokemon-game/install.html)
-- [Pokémon companion guide](./pokemon-v2-beta.md)
+- [Pokémon game](./pokemon-game.md)
 - [Installation details](./installation.md)
-- [Project scope](../SCOPE.md)
+- [Project scope](./development/project-scope.md)
 - [Rights and attribution](../RIGHTS_AND_ATTRIBUTION.md)
 
 ## CrossInk reference

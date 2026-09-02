@@ -1,72 +1,15 @@
-# Notices and credits
+# Third-party notices
 
-## Firmware ancestry
+This project is built from the MIT-licensed [CrossInk](https://github.com/uxjulia/CrossInk) firmware, which is based on the MIT-licensed [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader). The inherited [MIT License](LICENSE) remains with the firmware source.
 
-This repository preserves the history of two MIT-licensed firmware projects:
+[Joshua Miller's CrossPoint Reader Companion](https://github.com/JoshuaMillerCode/crosspoint-reader-companion), also MIT-licensed, inspired the reading-companion behavior.
 
-- [CrossInk](https://github.com/uxjulia/CrossInk), maintained by uxjulia, is
-  the direct firmware base.
-- [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)
-  is the original upstream firmware.
+Artwork provenance:
 
-The inherited `LICENSE` and copyright notice must remain with copies or
-substantial portions of the software. This notice supplements that licence; it
-does not replace it.
+- Pokémon menu sprites: [PokeAPI Sprites](https://github.com/PokeAPI/sprites), revision `4bc9d60186fe2e499ee2f3d4d1b796806cb99a67`
+- Evolution-stone sprites: [PokéSprite](https://github.com/msikma/pokesprite), revision `c5aaa610ff2acdf7fd8e2dccd181bca8be9fcb3e`
+- Pokédex cards: [dmellok / u/xDaftTurtle](https://github.com/dmellok), shared in [this Reddit thread](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3) and created with [Tesserae](https://github.com/dmellok/tesserae)
 
-## Reading-companion reference
+PokeAPI Sprites states that its repository is CC0 while separately noting that Pokémon image content belongs to The Pokémon Company and is not rights-cleared by the repository. PokéSprite applies MIT to its code and non-art materials while identifying the sprite artwork as © Nintendo/Creatures Inc./GAME FREAK Inc. The Pokédex-card download did not include an explicit redistribution license.
 
-[Joshua Miller's CrossPoint Reader Companion](https://github.com/JoshuaMillerCode/crosspoint-reader-companion)
-provided the companion concept and the reference behaviour for crediting real
-reading activity rather than idle time. That repository is distributed under
-the MIT License.
-
-## Pokédex-card reference
-
-[dmellok/xDaftTurtle](https://github.com/dmellok) created and publicly shared
-the original-151 X3 Pokédex-card set in
-[this Reddit post](https://www.reddit.com/r/XTEINK/comments/1ve0pr4/comment/p1lpy0w/?context=3).
-The cards were rendered with [Tesserae](https://github.com/dmellok/tesserae),
-an AGPL-3.0-or-later e-ink dashboard project, using Pokémon information and
-sprites from PokéAPI.
-
-The public download is credited as the design and conversion source. It does
-not provide this project with an explicit redistribution licence. Complete
-X3 installation releases include adapted cards with direct creator credit and
-the removal or credit-correction process in `RIGHTS_AND_ATTRIBUTION.md`.
-
-## Artwork source references
-
-- [PokeAPI Sprites](https://github.com/PokeAPI/sprites) is the source reference
-  for the Generation VII 40×30 species icons.
-- [PokéSprite](https://github.com/msikma/pokesprite) is the source reference for
-  the five evolution-stone icons.
-
-[PokeAPI Sprites' licence](https://github.com/PokeAPI/sprites/blob/master/LICENCE.txt)
-applies CC0 to its repository while expressly stating that all image contents
-are copyright The Pokémon Company and that it does not clear third-party
-rights. [PokéSprite's licence statement](https://github.com/msikma/pokesprite#license)
-applies the MIT License to its code and non-art materials while stating that
-its sprite images are copyright Nintendo/Creatures Inc./GAME FREAK Inc.
-
-Those repository licences do not grant this project ownership of Pokémon
-artwork. Attribution records provenance; it is not redistribution permission.
-Complete installation releases nevertheless distribute X3-adapted copies as
-part of this unofficial, noncommercial fan project. The project will remove,
-replace, or correct credited assets when a credible request is received.
-
-## Names, artwork, and affiliation
-
-Pokémon and related names, characters, and artwork belong to their respective
-rights holders, including Nintendo, Creatures Inc., GAME FREAK Inc., and The
-Pokémon Company. Xteink is a trademark of its respective owner.
-
-[Pokémon Support's current published position](https://support.pokemon.com/hc/en-us/articles/360000634094-Can-I-use-Pok%C3%A9mon-images-or-materials)
-asks creators not to use or associate Pokémon intellectual property with their
-projects. Nothing in this repository claims authorization from a Pokémon rights
-holder. The Xteink name is used descriptively to identify the supported device;
-it does not claim authorization from or affiliation with Xteink.
-
-Xteink Pokémon Game is an unofficial, independently maintained,
-noncommercial project. It is not affiliated with or endorsed by Nintendo,
-Creatures Inc., GAME FREAK Inc., The Pokémon Company, Xteink, CrossInk,
-CrossPoint Reader, PokéAPI, PokéSprite, or Tesserae.
+See [Rights and attribution](RIGHTS_AND_ATTRIBUTION.md) for the project disclaimer and removal process.

@@ -122,6 +122,8 @@ class PokemonArtPackTest(unittest.TestCase):
             self.assertIn(".crosspoint/pokemon/pokedex/portrait/151.bmp", names)
             self.assertNotIn(".crosspoint/pokemon-v2-a.bin", names)
             self.assertNotIn(".crosspoint/pokemon-v2-b.bin", names)
+            self.assertNotIn(".crosspoint/pokemon-a.bin", names)
+            self.assertNotIn(".crosspoint/pokemon-b.bin", names)
 
             expected_lines = {
                 f"{hashlib.sha256(full_zip.read_bytes()).hexdigest()}  {full_zip.name}",
@@ -147,16 +149,25 @@ class PokemonArtPackTest(unittest.TestCase):
             sd_root = root / "sd"
             crosspoint = sd_root / ".crosspoint"
             crosspoint.mkdir(parents=True)
-            save_a = crosspoint / "pokemon-v2-a.bin"
-            save_b = crosspoint / "pokemon-v2-b.bin"
-            save_a.write_bytes(b"save-a")
-            save_b.write_bytes(b"save-b")
+            save_a = crosspoint / "pokemon-a.bin"
+            save_b = crosspoint / "pokemon-b.bin"
+            legacy_save_a = crosspoint / "pokemon-v2-a.bin"
+            legacy_save_b = crosspoint / "pokemon-v2-b.bin"
+            for path, content in (
+                (save_a, b"save-a"),
+                (save_b, b"save-b"),
+                (legacy_save_a, b"legacy-a"),
+                (legacy_save_b, b"legacy-b"),
+            ):
+                path.write_bytes(content)
 
             with zipfile.ZipFile(full_zip) as package:
                 package.extractall(sd_root)
 
             self.assertEqual(save_a.read_bytes(), b"save-a")
             self.assertEqual(save_b.read_bytes(), b"save-b")
+            self.assertEqual(legacy_save_a.read_bytes(), b"legacy-a")
+            self.assertEqual(legacy_save_b.read_bytes(), b"legacy-b")
 
     def test_public_release_zip_is_stable_when_source_mtimes_change(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

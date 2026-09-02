@@ -84,6 +84,7 @@ class HalStorage {
     failSync_ = false;
     failWritableOpen_ = false;
     failRemove_ = false;
+    failRename_ = false;
     failRead_ = false;
   }
 
@@ -98,6 +99,7 @@ class HalStorage {
   void setFailSync(const bool fail) { failSync_ = fail; }
   void setFailWritableOpen(const bool fail) { failWritableOpen_ = fail; }
   void setFailRemove(const bool fail) { failRemove_ = fail; }
+  void setFailRename(const bool fail) { failRename_ = fail; }
   void setFailRead(const bool fail) { failRead_ = fail; }
   void setByte(const char* path, const size_t offset, const uint8_t value) {
     auto found = files_.find(path);
@@ -107,6 +109,14 @@ class HalStorage {
   bool ensureDirectoryExists(const char*) { return true; }
   bool exists(const char* path) const { return files_.find(path) != files_.end(); }
   bool remove(const char* path) { return !failRemove_ && files_.erase(path) != 0; }
+  bool rename(const char* oldPath, const char* newPath) {
+    if (failRename_ || exists(newPath)) return false;
+    auto found = files_.find(oldPath);
+    if (found == files_.end() || openCounts_[oldPath] != 0) return false;
+    files_.emplace(newPath, std::move(found->second));
+    files_.erase(found);
+    return true;
+  }
 
   HalFile open(const char* path, const oflag_t flags = O_RDONLY) {
     const std::string key(path);
@@ -145,6 +155,7 @@ class HalStorage {
   bool failSync_ = false;
   bool failWritableOpen_ = false;
   bool failRemove_ = false;
+  bool failRename_ = false;
   bool failRead_ = false;
 };
 

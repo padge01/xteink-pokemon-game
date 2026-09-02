@@ -32,8 +32,9 @@ performed on another build is not evidence for the release candidate.
       and included `RIGHTS_AND_ATTRIBUTION.md`.
 - [ ] The full archive contains `update.bin`, `.crosspoint/pokemon/`, the
       artwork manifest, internal checksums, and the rights notice.
-- [ ] The full archive does not contain `pokemon-v2-a.bin`,
-      `pokemon-v2-b.bin`, books, sleep screens, settings, or cache files.
+- [ ] The full archive does not contain `pokemon-a.bin`, `pokemon-b.bin`,
+      legacy `pokemon-v2-*.bin` saves, books, sleep screens, settings, or cache
+      files.
 - [ ] Extracting the full archive over temporary existing Pokémon saves leaves
       both save hashes unchanged.
 - [ ] The firmware inside the full archive is byte-identical to the separately

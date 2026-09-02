@@ -226,5 +226,5 @@ still use `scripts/build_web.py` to generate the flash-served headers.
 
 Before implementing larger ideas, check:
 
-- [SCOPE.md](../../SCOPE.md)
+- [Project scope](project-scope.md)
 - [GOVERNANCE.md](../../GOVERNANCE.md)

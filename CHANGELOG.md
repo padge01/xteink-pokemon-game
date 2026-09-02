@@ -14,6 +14,8 @@
 
 ### Changed
 
+- Pokémon saves now use the release-ready `pokemon-a.bin` and `pokemon-b.bin` names, with one-time migration from the earlier filenames.
+- Large Pokémon and item artwork is now converted at its final display size instead of enlarging an already-dithered menu icon.
 - The download page now uses four plain static files instead of Astro, npm packages, and a generated site bundle.
 - Pokémon companion builds now check for wild encounters every 15 credited minutes with a 40% chance, guarantee the next available check after three misses, and use four gentler species-rarity tiers while keeping evolution-item checks hourly.
 - The Pokémon menu now presents Party, Pokédex, PC Box, PC Box sort, Bag, and Reset in the approved collection-first order.

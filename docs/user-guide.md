@@ -5,7 +5,7 @@ nav_order: 1.5
 
 # CrossInk User Guide
 
-> This is inherited CrossInk reader documentation. For this X3 project, the [installation guide](./installation.md), [Pokémon guide](./pokemon-v2-beta.md), and [controls guide](./controls.md) take precedence.
+> This is inherited CrossInk reader documentation. For this X3 project, the [installation guide](./installation.md), [Pokémon guide](./pokemon-game.md), and [controls guide](./controls.md) take precedence.
 
 Welcome to the **CrossInk** firmware. This guide covers day-to-day device use.
 For focused reference material, see [Reader Features](./reader-features.md),

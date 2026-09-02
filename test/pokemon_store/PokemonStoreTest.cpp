@@ -137,8 +137,8 @@ void emptyStoreCommitsAndReloadsSequenceOne() {
   state.lifetimeMinutes = 42;
 
   CHECK(store.commit(state));
-  CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
-  CHECK(!Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-a.bin"));
+  CHECK(!Storage.exists("/.crosspoint/pokemon-b.bin"));
 
   pokemon::PokemonStore reopened;
   CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
@@ -157,8 +157,8 @@ void secondCommitUsesSlotBAndWinsStartupSelection() {
   CHECK(store.commit(state));
   state.lifetimeMinutes = 20;
   CHECK(store.commit(state));
-  CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
-  CHECK(Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-a.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-b.bin"));
 
   pokemon::PokemonStore reopened;
   CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
@@ -338,8 +338,8 @@ void resetCommitsANewerEmptySnapshot() {
   CHECK(store.commit(state));
 
   CHECK(store.reset());
-  CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
-  CHECK(Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-a.bin"));
+  CHECK(Storage.exists("/.crosspoint/pokemon-b.bin"));
   CHECK(store.isReady());
   CHECK(store.recordCount() == 0);
   pokemon::PokemonState loaded{};
@@ -533,7 +533,7 @@ void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
   CHECK(pokemon::markSpecies(legacy.seenSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(legacy.caughtSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(legacy.seenSpecies, 1));
-  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-v2-a.bin", legacy, pikachu));
+  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-a.bin", legacy, pikachu));
 
   pokemon::PokemonStore store;
   CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
@@ -546,7 +546,7 @@ void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
 
   CHECK(store.commit(loaded));
   pokemon::SnapshotHeader migratedHeader{};
-  CHECK(readStoredHeader("/.crosspoint/pokemon-v2-b.bin", migratedHeader));
+  CHECK(readStoredHeader("/.crosspoint/pokemon-b.bin", migratedHeader));
   CHECK(migratedHeader.version == pokemon::POKEMON_SNAPSHOT_VERSION);
   CHECK(migratedHeader.sequence == 8);
 
@@ -559,7 +559,7 @@ void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
   CHECK(migrated.readRecord(pikachu.recordId, loadedRecord));
   CHECK(loadedRecord == pikachu);
 
-  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + 104, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-b.bin", pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + 104, 0xFF);
   pokemon::PokemonStore fallback;
   CHECK(fallback.begin() == pokemon::StoreBeginResult::Ready);
   CHECK(fallback.loadState(loaded));
@@ -575,14 +575,14 @@ void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData
   pokemon::PokemonState state{};
   state.lifetimeMinutes = 10;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 24 + 104, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 24 + 104, 0xFF);
   pokemon::PokemonStore corrupt;
   CHECK(corrupt.begin() == pokemon::StoreBeginResult::Corrupt);
 
   Storage.clear();
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, 3);
   pokemon::PokemonStore unsupported;
   CHECK(unsupported.begin() == pokemon::StoreBeginResult::Unsupported);
 
@@ -591,7 +591,7 @@ void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData
   CHECK(store.commit(state));
   state.lifetimeMinutes = 20;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", 24 + 104, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-b.bin", 24 + 104, 0xFF);
   pokemon::PokemonStore fallback;
   CHECK(fallback.begin() == pokemon::StoreBeginResult::Ready);
   pokemon::PokemonState loaded{};
@@ -609,13 +609,13 @@ void startupBlocksDowngradesAndMixedUnsupportedCorruption() {
   CHECK(store.commit(state));
   state.lifetimeMinutes = 20;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-b.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-b.bin", 4, 3);
 
   pokemon::PokemonStore downgraded;
   CHECK(downgraded.begin() == pokemon::StoreBeginResult::Unsupported);
   CHECK(!downgraded.commit(state));
 
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 24 + 104, 0xFF);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 24 + 104, 0xFF);
   pokemon::PokemonStore mixed;
   CHECK(mixed.begin() == pokemon::StoreBeginResult::Corrupt);
   CHECK(!mixed.commit(state));
@@ -627,7 +627,7 @@ void failedResetDoesNotBypassProtectedStoreGating() {
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   pokemon::PokemonState state{};
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-v2-a.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, 3);
 
   pokemon::PokemonStore protectedStore;
   CHECK(protectedStore.begin() == pokemon::StoreBeginResult::Unsupported);
@@ -635,7 +635,49 @@ void failedResetDoesNotBypassProtectedStoreGating() {
   CHECK(!protectedStore.reset());
   Storage.setFailRemove(false);
   CHECK(!protectedStore.commit(state));
+  CHECK(Storage.exists("/.crosspoint/pokemon-a.bin"));
+}
+
+void legacyFilenamesMigrateTheNewestValidSnapshot() {
+  Storage.clear();
+  const pokemon::PokemonRecord pikachu = starterPikachu();
+  pokemon::PokemonState older{};
+  older.partyRecordIds[0] = pikachu.recordId;
+  older.sequence = 7;
+  older.lifetimeMinutes = 120;
+  CHECK(pokemon::markSpecies(older.seenSpecies, pikachu.speciesId));
+  CHECK(pokemon::markSpecies(older.caughtSpecies, pikachu.speciesId));
+  pokemon::PokemonState newer = older;
+  newer.sequence = 8;
+  newer.lifetimeMinutes = 135;
+  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-v2-a.bin", older, pikachu));
+  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-v2-b.bin", newer, pikachu));
+
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
+  pokemon::PokemonState loaded{};
+  CHECK(store.loadState(loaded));
+  CHECK(loaded == newer);
+  CHECK(Storage.exists("/.crosspoint/pokemon-a.bin"));
+  CHECK(!Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
   CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
+}
+
+void failedLegacyFilenameMigrationKeepsTheOriginalSave() {
+  Storage.clear();
+  const pokemon::PokemonRecord pikachu = starterPikachu();
+  pokemon::PokemonState state{};
+  state.partyRecordIds[0] = pikachu.recordId;
+  state.sequence = 4;
+  CHECK(pokemon::markSpecies(state.seenSpecies, pikachu.speciesId));
+  CHECK(pokemon::markSpecies(state.caughtSpecies, pikachu.speciesId));
+  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-v2-a.bin", state, pikachu));
+  Storage.setFailRename(true);
+
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Corrupt);
+  CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
+  CHECK(!Storage.exists("/.crosspoint/pokemon-a.bin"));
 }
 
 }  // namespace
@@ -658,5 +700,7 @@ int main() {
   startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData();
   startupBlocksDowngradesAndMixedUnsupportedCorruption();
   failedResetDoesNotBypassProtectedStoreGating();
+  legacyFilenamesMigrateTheNewestValidSnapshot();
+  failedLegacyFilenameMigrationKeepsTheOriginalSave();
   return failures == 0 ? 0 : 1;
 }

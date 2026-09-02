@@ -16,9 +16,9 @@ Download the current package from the [download and install guide](https://padge
 1. Download `xteink-pokemon-x3-full-v<version>.zip` to a computer.
 2. Extract the ZIP. Do not copy the ZIP file itself to the SD card.
 3. Power off the X3 and put its SD card in the computer.
-4. Back up `/.crosspoint/pokemon-v2-a.bin` and `/.crosspoint/pokemon-v2-b.bin` if present.
+4. Back up `/.crosspoint/pokemon-a.bin` and `/.crosspoint/pokemon-b.bin` if present.
 5. Copy the extracted `update.bin` and `.crosspoint` folder to the SD-card root.
-6. Merge `.crosspoint`; do not replace or delete the existing folder.
+6. Merge the `.crosspoint` folder. Do not replace or delete the existing folder.
 7. Confirm `update.bin` and `.crosspoint` are directly at the SD-card root.
 8. Safely eject the card and return it to the X3.
 9. Open **Settings → System → SD Card Firmware Update**, select `update.bin`, and confirm.

@@ -30,11 +30,13 @@ def item_source(root: Path, item: str) -> Path:
     return candidate
 
 
-def one_bit_canvas(source: Path, size: tuple[int, int]) -> Image.Image:
+def one_bit_canvas(source: Path, size: tuple[int, int], allow_upscale: bool = False) -> Image.Image:
     with Image.open(source) as opened:
         icon = opened.convert("RGBA")
-    if icon.width > size[0] or icon.height > size[1]:
-        icon.thumbnail(size, Image.Resampling.NEAREST)
+    if icon.width > size[0] or icon.height > size[1] or allow_upscale:
+        scale = min(size[0] / icon.width, size[1] / icon.height)
+        scaled_size = (max(1, round(icon.width * scale)), max(1, round(icon.height * scale)))
+        icon = icon.resize(scaled_size, Image.Resampling.NEAREST)
     canvas = Image.new("RGBA", size, (255, 255, 255, 255))
     canvas.alpha_composite(icon, ((size[0] - icon.width) // 2, (size[1] - icon.height) // 2))
     return canvas.convert("L").convert("1", dither=Image.Dither.FLOYDSTEINBERG)
@@ -45,8 +47,10 @@ def save_pair(source: Path, small: Path, large: Path, small_size: tuple[int, int
     small.parent.mkdir(parents=True, exist_ok=True)
     rendered.save(small, format="BMP")
     large.parent.mkdir(parents=True, exist_ok=True)
-    rendered.resize(
-        (small_size[0] * scale, small_size[1] * scale), Image.Resampling.NEAREST
+    one_bit_canvas(
+        source,
+        (small_size[0] * scale, small_size[1] * scale),
+        allow_upscale=True,
     ).save(large, format="BMP")
 
 

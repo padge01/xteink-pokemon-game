@@ -5,12 +5,12 @@ All POD fields are written in the ESP32 little-endian representation used by
 `Serialization.h`; strings are length-prefixed UTF-8 unless a format notes a
 fixed-size char buffer.
 
-## `/.crosspoint/pokemon-v2-{a,b}.bin`
+## `/.crosspoint/pokemon-{a,b}.bin`
 
 ### Version 2
 
 The `pokemon-x3` build alternates complete snapshots between
-`pokemon-v2-a.bin` and `pokemon-v2-b.bin`. Startup validates both files and uses
+`pokemon-a.bin` and `pokemon-b.bin`. Startup validates both files and uses
 the newest supported sequence. A commit streams the active roster into the
 inactive file, applies at most one append or replacement, syncs and closes it,
 then reopens and verifies the complete snapshot before making it active. The
@@ -19,6 +19,11 @@ If either slot uses a newer unsupported format, an older build refuses to write
 instead of risking progress loss by truncating that slot. An unsupported slot
 paired with a corrupt slot is reported as corruption rather than a safe upgrade
 case.
+
+If neither current filename exists, startup validates the earlier
+`pokemon-v2-a.bin` and `pokemon-v2-b.bin` files, atomically renames the newest
+valid snapshot to `pokemon-a.bin`, and verifies it again before use. The older
+legacy snapshot remains untouched as a recovery copy.
 
 If `sync()` reports failure after all bytes were written, the live store keeps
 using its previous snapshot and reports failure. A later startup may use either
