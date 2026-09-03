@@ -94,12 +94,12 @@ is already present. Back up both files before updates or resets. Choosing
 starter selection; it does not alter books, reading positions, or CrossInk
 reading statistics.
 
-## `/.crosspoint/pokemon/`
+## `/pokemon/`
 
 The locally generated artwork pack is stored separately from firmware state:
 
 ```text
-/.crosspoint/pokemon/
+/pokemon/
   sprites/001.bmp ... 151.bmp
   heroes/001.bmp  ... 151.bmp
   items/moon-stone.bmp, fire-stone.bmp, thunder-stone.bmp,

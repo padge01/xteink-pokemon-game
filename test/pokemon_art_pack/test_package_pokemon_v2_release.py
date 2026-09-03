@@ -88,8 +88,8 @@ class PokemonArtPackTest(unittest.TestCase):
             PACKAGE.verify(output)
             self.assertEqual((output / "update.bin").read_bytes(), b"firmware")
             self.assertFalse((output / "firmware-x3-x4.bin").exists())
-            self.assertFalse((output / ".crosspoint/pokemon/sprites/152.bmp").exists())
-            self.assertFalse((output / ".crosspoint/pokemon/egg.bmp").exists())
+            self.assertFalse((output / "pokemon/sprites/152.bmp").exists())
+            self.assertFalse((output / "pokemon/egg.bmp").exists())
 
     def test_public_release_contains_firmware_artwork_and_rights_notice(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,9 +117,10 @@ class PokemonArtPackTest(unittest.TestCase):
                 self.assertEqual(
                     package.read("RIGHTS_AND_ATTRIBUTION.md"), b"rights and credits\n"
                 )
-            self.assertIn(".crosspoint/pokemon/manifest.json", names)
-            self.assertIn(".crosspoint/pokemon/sprites/001.bmp", names)
-            self.assertIn(".crosspoint/pokemon/pokedex/portrait/151.bmp", names)
+            self.assertIn("pokemon/manifest.json", names)
+            self.assertIn("pokemon/sprites/001.bmp", names)
+            self.assertIn("pokemon/pokedex/portrait/151.bmp", names)
+            self.assertFalse(any(name.startswith(".crosspoint/pokemon/") for name in names))
             self.assertNotIn(".crosspoint/pokemon-v2-a.bin", names)
             self.assertNotIn(".crosspoint/pokemon-v2-b.bin", names)
             self.assertNotIn(".crosspoint/pokemon-a.bin", names)
@@ -147,27 +148,32 @@ class PokemonArtPackTest(unittest.TestCase):
             )
 
             sd_root = root / "sd"
-            crosspoint = sd_root / ".crosspoint"
-            crosspoint.mkdir(parents=True)
-            save_a = crosspoint / "pokemon-a.bin"
-            save_b = crosspoint / "pokemon-b.bin"
-            legacy_save_a = crosspoint / "pokemon-v2-a.bin"
-            legacy_save_b = crosspoint / "pokemon-v2-b.bin"
-            for path, content in (
-                (save_a, b"save-a"),
-                (save_b, b"save-b"),
-                (legacy_save_a, b"legacy-a"),
-                (legacy_save_b, b"legacy-b"),
-            ):
+            protected_files = {
+                sd_root / "books" / "current.epub": b"book",
+                sd_root / "sleep" / "001.bmp": b"sleep-cover",
+                sd_root / ".crosspoint" / "crossink-settings.json": b"settings",
+                sd_root / ".crosspoint" / "progress" / "current.json": b"progress",
+                sd_root / ".crosspoint" / "stats" / "current.json": b"stats",
+                sd_root / ".crosspoint" / "pokemon-a.bin": b"save-a",
+                sd_root / ".crosspoint" / "pokemon-b.bin": b"save-b",
+                sd_root / ".crosspoint" / "pokemon-v2-a.bin": b"legacy-a",
+                sd_root / ".crosspoint" / "pokemon-v2-b.bin": b"legacy-b",
+            }
+            before = {}
+            for path, content in protected_files.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(content)
+                before[path] = hashlib.sha256(path.read_bytes()).hexdigest()
 
             with zipfile.ZipFile(full_zip) as package:
+                self.assertFalse(any(name.startswith(".crosspoint/") for name in package.namelist()))
                 package.extractall(sd_root)
 
-            self.assertEqual(save_a.read_bytes(), b"save-a")
-            self.assertEqual(save_b.read_bytes(), b"save-b")
-            self.assertEqual(legacy_save_a.read_bytes(), b"legacy-a")
-            self.assertEqual(legacy_save_b.read_bytes(), b"legacy-b")
+            after = {
+                path: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in protected_files
+            }
+            self.assertEqual(after, before)
 
     def test_public_release_zip_is_stable_when_source_mtimes_change(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -1,5 +1,22 @@
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-02
+
+### Added
+
+- Added a Pokémon menu setting that can hide the lead Pokémon from every supported home screen without stopping training or events.
+
+### Changed
+
+- The Pokémon firmware now identifies itself as `Xteink Pokemon` in Settings while standard CrossInk builds retain the CrossInk name.
+- Pokémon artwork is now installed in the visible `/pokemon` folder at the SD-card root instead of the hidden `/.crosspoint/pokemon` folder. Save files remain safely stored under `/.crosspoint`.
+- The Classic dashboard now makes room beneath its book preview for the same compact lead-Pokémon strip used by supported dashboard themes.
+
+### Fixed
+
+- Home navigation now reaches Settings after the Pokémon row, and Minimal/Dashboard Confirm activates an action selected with Up/Down.
+- Selecting a party or PC Pokémon now opens its action menu before Summary so Deposit and Withdraw are discoverable.
+
 ## [0.1.0] - 2026-09-01
 
 ### Added

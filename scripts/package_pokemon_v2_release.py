@@ -100,7 +100,7 @@ def validate_art(root: Path, allow_extra: bool = False) -> list[dict[str, object
         width, height, bits = bmp_info(path)
         if (width, height) != dimensions or bits != 1:
             raise ValueError(f"invalid BMP {relative}: {width}x{height} {bits}bpp")
-        assets.append({"path": f".crosspoint/pokemon/{relative.as_posix()}", "sha256": sha256(path),
+        assets.append({"path": f"pokemon/{relative.as_posix()}", "sha256": sha256(path),
                        "width": width, "height": height, "bits_per_pixel": bits})
     return assets
 
@@ -113,7 +113,7 @@ def build(source: Path, firmware: Path, notice: Path, output: Path) -> Path:
     assets = validate_art(source, allow_extra=True)
     if output.exists():
         shutil.rmtree(output)
-    art_output = output / ".crosspoint/pokemon"
+    art_output = output / "pokemon"
     for relative in expected_art():
         destination = art_output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -138,9 +138,9 @@ def build(source: Path, firmware: Path, notice: Path, output: Path) -> Path:
 
 
 def verify(output: Path) -> None:
-    validate_art(output / ".crosspoint/pokemon")
+    validate_art(output / "pokemon")
     required = (output / "update.bin", output / "POKEMON_ASSET_LICENSES.md",
-                output / "SHA256SUMS.txt", output / ".crosspoint/pokemon/manifest.json")
+                output / "SHA256SUMS.txt", output / "pokemon/manifest.json")
     if any(not path.is_file() for path in required):
         raise ValueError("release package is incomplete")
     for line in (output / "SHA256SUMS.txt").read_text(encoding="ascii").splitlines():
@@ -190,7 +190,7 @@ def build_public_release(source: Path, firmware: Path, notice: Path, version: st
 
     with tempfile.TemporaryDirectory(prefix="xteink-pokemon-full-") as temporary:
         staging = Path(temporary)
-        art_output = staging / ".crosspoint/pokemon"
+        art_output = staging / "pokemon"
         for relative in expected_art():
             destination = art_output / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -234,10 +234,10 @@ def _bmp_bytes_info(data: bytes) -> tuple[int, int, int]:
 
 def verify_archive(archive: Path, firmware: Path, notice: Path) -> None:
     expected_paths = {
-        f".crosspoint/pokemon/{relative.as_posix()}" for relative in expected_art()
+        f"pokemon/{relative.as_posix()}" for relative in expected_art()
     }
     expected_paths.update({
-        ".crosspoint/pokemon/manifest.json",
+        "pokemon/manifest.json",
         "RIGHTS_AND_ATTRIBUTION.md",
         "SHA256SUMS.txt",
         "update.bin",
@@ -262,16 +262,16 @@ def verify_archive(archive: Path, firmware: Path, notice: Path) -> None:
         if package.read("RIGHTS_AND_ATTRIBUTION.md") != notice.read_bytes():
             raise ValueError("archive rights notice does not match repository notice")
 
-        manifest = json.loads(package.read(".crosspoint/pokemon/manifest.json"))
+        manifest = json.loads(package.read("pokemon/manifest.json"))
         manifest_assets = {entry["path"]: entry for entry in manifest.get("assets", [])}
         if set(manifest_assets) != expected_paths - {
-            ".crosspoint/pokemon/manifest.json", "RIGHTS_AND_ATTRIBUTION.md",
+            "pokemon/manifest.json", "RIGHTS_AND_ATTRIBUTION.md",
             "SHA256SUMS.txt", "update.bin",
         }:
             raise ValueError("archive manifest does not match artwork files")
 
         for relative, dimensions in expected_art().items():
-            name = f".crosspoint/pokemon/{relative.as_posix()}"
+            name = f"pokemon/{relative.as_posix()}"
             data = package.read(name)
             width, height, bits = _bmp_bytes_info(data)
             if (width, height) != dimensions or bits != 1:
