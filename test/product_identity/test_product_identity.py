@@ -15,6 +15,8 @@ class ProductIdentityTest(unittest.TestCase):
         )
 
         self.assertIn("#ifndef CROSSINK_PRODUCT_NAME", app_version)
+        self.assertIn("#if defined(CROSSINK_PRODUCT_XTEINK_POKEMON)", app_version)
+        self.assertIn('#define CROSSINK_PRODUCT_NAME "Xteink Pokemon"', app_version)
         self.assertIn('#define CROSSINK_PRODUCT_NAME "CrossInk"', app_version)
 
     def test_pokemon_x3_overrides_the_product_name(self) -> None:
@@ -26,9 +28,8 @@ class ProductIdentityTest(unittest.TestCase):
         )
 
         self.assertIsNotNone(match, "platformio.ini is missing [env:pokemon-x3]")
-        self.assertIn(
-            r'-DCROSSINK_PRODUCT_NAME=\"Xteink Pokemon\"', match.group("section")
-        )
+        self.assertIn("-DCROSSINK_PRODUCT_XTEINK_POKEMON=1", match.group("section"))
+        self.assertNotIn("-DCROSSINK_PRODUCT_NAME=", match.group("section"))
 
     def test_settings_footer_uses_the_configured_product_name(self) -> None:
         settings = (

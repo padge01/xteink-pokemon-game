@@ -1913,9 +1913,9 @@ void HomeActivity::render(RenderLock&&) {
   };
   bool showPokemonAccessory = false;
 #if defined(CROSSINK_ENABLE_POKEMON)
-  showPokemonAccessory = pokemon::pokemonHomeAccessoryVisible(
-      SETTINGS.pokemonHomeScreen != 0, pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme),
-      pokemonDashboard_.leader.recordId != 0);
+  showPokemonAccessory = pokemon::pokemonHomeAccessoryVisible(SETTINGS.pokemonHomeScreen != 0,
+                                                              pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme),
+                                                              pokemonDashboard_.leader.recordId != 0);
 #endif
 
   if (usesMinimalHomeInteraction()) {
@@ -2053,7 +2053,7 @@ void HomeActivity::render(RenderLock&&) {
   bool bufferRestored = coverBufferStored && restoreCoverBuffer();
 
   auto menuItems = buildSelectableHomeMenuItems(hasOpdsServers, hasReadingStats, hasBookmarks, hasClippings,
-                                                 metrics.homeContinueReadingInMenu && !recentBooks.empty());
+                                                metrics.homeContinueReadingInMenu && !recentBooks.empty());
   int homeCoverTileHeight = metrics.homeCoverTileHeight;
   if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::CLASSIC) {
     // Keep the four always-present actions clear of the button-hint strip on

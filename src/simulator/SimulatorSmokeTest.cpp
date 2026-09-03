@@ -124,8 +124,7 @@ class SimulatorSmokeTest {
 
   static bool homeNavigationUsesCarouselInteraction() {
     const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_THEME");
-    return raw != nullptr && raw[0] != '\0' &&
-           std::atoi(raw) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
+    return raw != nullptr && raw[0] != '\0' && std::atoi(raw) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
   }
 
   static int pageTurnCount() {
@@ -344,8 +343,7 @@ class SimulatorSmokeTest {
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Settings opened from Home", 4));
     inputScript.push_back(assertActivity("Settings"));
-    LOG_INF("SMOKE", "Running Home navigation to Settings using theme index %d",
-            static_cast<int>(SETTINGS.uiTheme));
+    LOG_INF("SMOKE", "Running Home navigation to Settings using theme index %d", static_cast<int>(SETTINGS.uiTheme));
   }
 
   void buildReaderInputScript() {

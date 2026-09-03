@@ -38,11 +38,9 @@ const char* pokemonSpeciesArtPath(const uint16_t speciesId, const bool hero, cha
   if (output == nullptr || outputSize == 0) return nullptr;
   output[0] = '\0';
   if (speciesId == 0 || speciesId > KANTO_SPECIES_COUNT) return nullptr;
-  return finishPath(
-      output, outputSize,
-      std::snprintf(output, outputSize,
-                    hero ? "/pokemon/heroes/%03u.bmp" : "/pokemon/sprites/%03u.bmp",
-                    static_cast<unsigned>(speciesId)));
+  return finishPath(output, outputSize,
+                    std::snprintf(output, outputSize, hero ? "/pokemon/heroes/%03u.bmp" : "/pokemon/sprites/%03u.bmp",
+                                  static_cast<unsigned>(speciesId)));
 }
 
 const char* pokemonPokedexArtPath(const uint16_t speciesId, const bool landscape, char* output,
@@ -62,8 +60,7 @@ const char* pokemonItemArtPath(const EvolutionItem item, const bool hero, char* 
   if (slug == nullptr) return nullptr;
   return finishPath(
       output, outputSize,
-      std::snprintf(output, outputSize,
-                    hero ? "/pokemon/heroes/items/%s.bmp" : "/pokemon/items/%s.bmp", slug));
+      std::snprintf(output, outputSize, hero ? "/pokemon/heroes/items/%s.bmp" : "/pokemon/items/%s.bmp", slug));
 }
 
 }  // namespace pokemon

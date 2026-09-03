@@ -7,7 +7,11 @@
 #endif
 
 #ifndef CROSSINK_PRODUCT_NAME
+#if defined(CROSSINK_PRODUCT_XTEINK_POKEMON)
+#define CROSSINK_PRODUCT_NAME "Xteink Pokemon"
+#else
 #define CROSSINK_PRODUCT_NAME "CrossInk"
+#endif
 #endif
 
 #ifndef CROSSINK_BUILD_ENV

@@ -13,8 +13,8 @@
 #include <cstring>
 #include <string>
 
-#include "activities/util/KeyboardEntryActivity.h"
 #include "CrossPointSettings.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "components/UIThemeTokens.h"
