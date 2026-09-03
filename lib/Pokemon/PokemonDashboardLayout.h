@@ -20,6 +20,17 @@ struct DashboardLayout {
   bool valid = false;
 };
 
+struct HomeAccessorySizing {
+  int coverHeight = 0;
+  int accessoryHeight = 0;
+  int followingContentOffset = 0;
+};
+
+constexpr int kPokemonHomeAccessoryHeight = 68;
+constexpr int kPokemonHomeAccessoryFollowingOffset = 72;
+
 DashboardLayout pokemonDashboardLayout(int width, int height);
+HomeAccessorySizing classicHomeAccessorySizing(int baseCoverHeight, bool visible);
+bool pokemonHomeAccessoryVisible(bool enabled, bool themeSupported, bool hasLeader);
 
 }  // namespace pokemon

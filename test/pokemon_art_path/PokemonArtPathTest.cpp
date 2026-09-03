@@ -5,9 +5,9 @@
 TEST(PokemonArtPath, BuildsApprovedKantoIconAndHeroPaths) {
   char path[64]{};
   ASSERT_NE(pokemon::pokemonSpeciesArtPath(1, false, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/sprites/001.bmp");
+  EXPECT_STREQ(path, "/pokemon/sprites/001.bmp");
   ASSERT_NE(pokemon::pokemonSpeciesArtPath(151, true, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/heroes/151.bmp");
+  EXPECT_STREQ(path, "/pokemon/heroes/151.bmp");
 }
 
 TEST(PokemonArtPath, RejectsSpeciesOutsideTheOriginal151) {
@@ -21,19 +21,19 @@ TEST(PokemonArtPath, RejectsSpeciesOutsideTheOriginal151) {
 TEST(PokemonArtPath, BuildsDedicatedOrientationSpecificPokedexPaths) {
   char path[64]{};
   ASSERT_NE(pokemon::pokemonPokedexArtPath(1, false, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/pokedex/portrait/001.bmp");
+  EXPECT_STREQ(path, "/pokemon/pokedex/portrait/001.bmp");
   ASSERT_NE(pokemon::pokemonPokedexArtPath(29, true, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/pokedex/landscape/029.bmp");
+  EXPECT_STREQ(path, "/pokemon/pokedex/landscape/029.bmp");
   ASSERT_NE(pokemon::pokemonPokedexArtPath(151, false, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/pokedex/portrait/151.bmp");
+  EXPECT_STREQ(path, "/pokemon/pokedex/portrait/151.bmp");
 }
 
 TEST(PokemonArtPath, BuildsStonePathsButLeavesLinkCableBlank) {
   char path[80]{};
   ASSERT_NE(pokemon::pokemonItemArtPath(pokemon::EvolutionItem::ThunderStone, false, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/items/thunder-stone.bmp");
+  EXPECT_STREQ(path, "/pokemon/items/thunder-stone.bmp");
   ASSERT_NE(pokemon::pokemonItemArtPath(pokemon::EvolutionItem::MoonStone, true, path, sizeof(path)), nullptr);
-  EXPECT_STREQ(path, "/.crosspoint/pokemon/heroes/items/moon-stone.bmp");
+  EXPECT_STREQ(path, "/pokemon/heroes/items/moon-stone.bmp");
   EXPECT_EQ(pokemon::pokemonItemArtPath(pokemon::EvolutionItem::LinkCable, false, path, sizeof(path)), nullptr);
   EXPECT_STREQ(path, "");
 }

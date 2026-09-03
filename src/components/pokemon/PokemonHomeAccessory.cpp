@@ -35,8 +35,11 @@ const char* fit(const GfxRenderer& renderer, const int font, const char* source,
 
 bool pokemonHomeAccessorySupported(const uint8_t theme) {
   const auto selected = static_cast<CrossPointSettings::UI_THEME>(theme);
-  return selected == CrossPointSettings::UI_THEME::DASHBOARD || selected == CrossPointSettings::UI_THEME::LYRA ||
+  return selected == CrossPointSettings::UI_THEME::CLASSIC || selected == CrossPointSettings::UI_THEME::MINIMAL ||
+         selected == CrossPointSettings::UI_THEME::DASHBOARD ||
+         selected == CrossPointSettings::UI_THEME::LYRA ||
          selected == CrossPointSettings::UI_THEME::LYRA_3_COVERS ||
+         selected == CrossPointSettings::UI_THEME::LYRA_CAROUSEL ||
          selected == CrossPointSettings::UI_THEME::ROUNDEDRAFF;
 }
 

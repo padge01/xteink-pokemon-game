@@ -18,9 +18,30 @@ SPEC.loader.exec_module(RUNNER)
 
 
 class SimulatorSmokeRunnerTest(unittest.TestCase):
+    def test_pokemon_assets_are_staged_at_the_runtime_visible_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            source = root / "source"
+            source.mkdir()
+            (source / "marker.bmp").write_bytes(b"art")
+            previous_source = RUNNER.POKEMON_ASSETS
+            RUNNER.POKEMON_ASSETS = source
+            try:
+                RUNNER.prepare_pokemon_assets(root / "simulator")
+            finally:
+                RUNNER.POKEMON_ASSETS = previous_source
+
+            visible_art = root / "simulator" / "fs_" / "pokemon" / "marker.bmp"
+            self.assertTrue(visible_art.is_file(), "artwork was not staged under /pokemon")
+            self.assertEqual(visible_art.read_bytes(), b"art")
+            self.assertFalse(
+                (root / "simulator" / "fs_" / ".crosspoint" / "pokemon").exists()
+            )
+
     def test_smoke_environment_uses_the_isolated_sd_root(self) -> None:
         args = SimpleNamespace(
             headless=True,
+            home_navigation=False,
             landscape=False,
             page_turns=2,
             pokemon=True,
@@ -37,6 +58,38 @@ class SimulatorSmokeRunnerTest(unittest.TestCase):
         self.assertEqual(env["CROSSINK_SIMULATOR_START_POKEMON"], "1")
         self.assertEqual(env["SDL_VIDEODRIVER"], "dummy")
         self.assertEqual(env["PRESERVE_ME"], "yes")
+
+    def test_home_navigation_environment_enables_the_real_home_route(self) -> None:
+        args = SimpleNamespace(
+            headless=True,
+            home_navigation=True,
+            landscape=False,
+            page_turns=0,
+            pokemon=False,
+            theme="classic",
+        )
+
+        env = RUNNER.build_smoke_environment(
+            {}, args, Path("/tmp/crossink-smoke/fs_"), "/books/test.epub"
+        )
+
+        self.assertEqual(env["CROSSINK_SIMULATOR_HOME_NAVIGATION"], "1")
+
+    def test_minimal_home_navigation_uses_the_minimal_theme(self) -> None:
+        args = SimpleNamespace(
+            headless=True,
+            home_navigation=True,
+            landscape=False,
+            page_turns=0,
+            pokemon=False,
+            theme="minimal",
+        )
+
+        env = RUNNER.build_smoke_environment(
+            {}, args, Path("/tmp/crossink-smoke/fs_"), "/books/test.epub"
+        )
+
+        self.assertEqual(env["CROSSINK_SIMULATOR_SMOKE_THEME"], "5")
 
     def test_pokedex_fixture_uses_packaged_portrait_card_format(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BOOK = ROOT / "test" / "epubs" / "test_reader_rendering_matrix.epub"
-POKEMON_ASSETS = ROOT / "fs_" / ".crosspoint" / "pokemon"
+POKEMON_ASSETS = ROOT / "fs_" / "pokemon"
 CRASH_PATTERNS = (
     "std::bad_alloc",
     "terminating due to uncaught exception",
@@ -43,6 +43,7 @@ THEMES = {
     "lyra-carousel": 4,
     "lyra_carousel": 4,
     "carousel": 4,
+    "minimal": 5,
     "dashboard": 6,
 }
 
@@ -70,7 +71,7 @@ def prepare_fs(temp_root: Path, book: Path) -> str:
 def prepare_pokemon_assets(temp_root: Path) -> None:
     if not POKEMON_ASSETS.is_dir():
         raise FileNotFoundError(f"Pokemon assets not found: {POKEMON_ASSETS}")
-    target = temp_root / "fs_" / ".crosspoint" / "pokemon"
+    target = temp_root / "fs_" / "pokemon"
     shutil.copytree(POKEMON_ASSETS, target)
     prepare_pokedex_card_fixture(target / "pokedex" / "portrait" / "004.bmp")
     prepare_pokedex_card_fixture(target / "pokedex" / "landscape" / "004.bmp", 288, 432)
@@ -115,6 +116,8 @@ def build_smoke_environment(
     env["CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS"] = str(args.page_turns)
     if args.pokemon:
         env["CROSSINK_SIMULATOR_START_POKEMON"] = "1"
+    if args.home_navigation:
+        env["CROSSINK_SIMULATOR_HOME_NAVIGATION"] = "1"
     if args.landscape:
         env["CROSSINK_SIMULATOR_POKEMON_LANDSCAPE"] = "1"
     if args.theme:
@@ -191,6 +194,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--page-turns", type=int, default=2, help="Number of EPUB page-forward taps to run")
     parser.add_argument("--theme", choices=sorted(THEMES), help="UI theme to use during the smoke test")
     parser.add_argument("--pokemon", action="store_true", help="Run the Pokemon onboarding and collection smoke route")
+    parser.add_argument("--home-navigation", action="store_true",
+                        help="Exercise Home navigation through the Pokemon row to Settings")
     parser.add_argument("--landscape", action="store_true", help="Run the Pokemon route in landscape orientation")
     parser.add_argument("--no-build", dest="build", action="store_false", help="Run the existing simulator binary")
     parser.add_argument("--window", dest="headless", action="store_false", help="Show the SDL window instead of using dummy video")
@@ -200,6 +205,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--landscape requires --pokemon")
     if args.pokemon and args.env != "pokemon-simulator-X3":
         parser.error("--pokemon requires --env pokemon-simulator-X3")
+    if args.home_navigation and args.env != "pokemon-simulator-X3":
+        parser.error("--home-navigation requires --env pokemon-simulator-X3")
     return args
 
 

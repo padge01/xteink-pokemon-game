@@ -6,6 +6,10 @@
 #define CROSSINK_VERSION "dev"
 #endif
 
+#ifndef CROSSINK_PRODUCT_NAME
+#define CROSSINK_PRODUCT_NAME "CrossInk"
+#endif
+
 #ifndef CROSSINK_BUILD_ENV
 #define CROSSINK_BUILD_ENV "unknown"
 #endif

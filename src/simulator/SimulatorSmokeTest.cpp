@@ -112,6 +112,22 @@ class SimulatorSmokeTest {
 
   static bool pokemonMode() { return std::getenv("CROSSINK_SIMULATOR_START_POKEMON") != nullptr; }
 
+  static bool homeNavigationMode() { return std::getenv("CROSSINK_SIMULATOR_HOME_NAVIGATION") != nullptr; }
+
+  static bool homeNavigationUsesMinimalInteraction() {
+    const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_THEME");
+    if (raw == nullptr || raw[0] == '\0') return false;
+
+    const int theme = std::atoi(raw);
+    return theme == CrossPointSettings::UI_THEME::MINIMAL || theme == CrossPointSettings::UI_THEME::DASHBOARD;
+  }
+
+  static bool homeNavigationUsesCarouselInteraction() {
+    const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_THEME");
+    return raw != nullptr && raw[0] != '\0' &&
+           std::atoi(raw) == CrossPointSettings::UI_THEME::LYRA_CAROUSEL;
+  }
+
   static int pageTurnCount() {
     const char* raw = std::getenv("CROSSINK_SIMULATOR_SMOKE_PAGE_TURNS");
     if (raw == nullptr || raw[0] == '\0') {
@@ -183,6 +199,11 @@ class SimulatorSmokeTest {
         break;
 
       case SmokeStep::Home:
+        if (homeNavigationMode()) {
+          buildHomeNavigationInputScript();
+          step = SmokeStep::InputScript;
+          break;
+        }
         activityManager.goToFileBrowser("/books");
         queueStep("File Browser", SmokeStep::FileBrowser);
         break;
@@ -304,6 +325,27 @@ class SimulatorSmokeTest {
   void addTap(MappedInputManager::Button button) {
     inputScript.push_back(press(button));
     inputScript.push_back(release(button));
+  }
+
+  void buildHomeNavigationInputScript() {
+    inputScript.clear();
+    scriptIndex = 0;
+    inputScript.push_back(assertActivity("Home"));
+
+    // Standard themes render Browse, Recent Books, File Transfer, Pokemon,
+    // then Settings. Minimal and Dashboard expose Menu, Browse, and Settings.
+    if (homeNavigationUsesCarouselInteraction()) {
+      for (int index = 0; index < 4; ++index) addTap(MappedInputManager::Button::Right);
+    } else {
+      const int downPresses = homeNavigationUsesMinimalInteraction() ? 3 : 4;
+      for (int index = 0; index < downPresses; ++index) addTap(MappedInputManager::Button::Down);
+    }
+    inputScript.push_back(render("Home Settings selected", 3));
+    addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Settings opened from Home", 4));
+    inputScript.push_back(assertActivity("Settings"));
+    LOG_INF("SMOKE", "Running Home navigation to Settings using theme index %d",
+            static_cast<int>(SETTINGS.uiTheme));
   }
 
   void buildReaderInputScript() {
@@ -478,9 +520,11 @@ class SimulatorSmokeTest {
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Party", 4));
     addTap(MappedInputManager::Button::Confirm);
+    inputScript.push_back(render("Pokemon Actions", 4));
+    addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Summary", 4));
     addTap(MappedInputManager::Button::Confirm);
-    inputScript.push_back(render("Pokemon Actions", 4));
+    inputScript.push_back(render("Pokemon Actions Restored", 4));
     inputScript.push_back(assertActivity("Pokemon"));
 
     addTap(MappedInputManager::Button::Back);

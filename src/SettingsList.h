@@ -406,6 +406,11 @@ inline const std::vector<SettingInfo>& getBaseSettingsList() {
                                 CrossPointSettings::UI_THEME::LYRA_3_COVERS,
                                 CrossPointSettings::UI_THEME::LYRA_CAROUSEL,
                                 CrossPointSettings::UI_THEME::ROUNDEDRAFF}));
+#if defined(CROSSINK_ENABLE_POKEMON)
+    // Persisted here, but edited from the Pokemon menu rather than the main Settings screen.
+    add(SettingInfo::Toggle(StrId::STR_POKEMON_HOME_SCREEN, &CrossPointSettings::pokemonHomeScreen,
+                            "pokemonHomeScreen"));
+#endif
     add(SettingInfo::Enum(StrId::STR_UI_SCALE, &CrossPointSettings::uiScale, {StrId::STR_SMALL, StrId::STR_LARGE},
                           "uiScale", StrId::STR_CAT_DISPLAY)
             .withEnumRawValues({CrossPointSettings::UI_SCALE_SMALL, CrossPointSettings::UI_SCALE_LARGE}));

@@ -66,3 +66,27 @@ TEST(PokemonDashboardLayoutTest, RejectsTooSmallBounds) {
   EXPECT_FALSE(pokemon::pokemonDashboardLayout(239, 68).valid);
   EXPECT_FALSE(pokemon::pokemonDashboardLayout(480, 59).valid);
 }
+
+TEST(PokemonDashboardLayoutTest, ClassicAccessoryReplacesCoverHeightInsteadOfMovingTheMenu) {
+  const auto sizing = pokemon::classicHomeAccessorySizing(370, true);
+
+  EXPECT_EQ(sizing.coverHeight, 298);
+  EXPECT_EQ(sizing.accessoryHeight, 68);
+  EXPECT_EQ(sizing.followingContentOffset, 72);
+  EXPECT_EQ(sizing.coverHeight + sizing.followingContentOffset, 370);
+}
+
+TEST(PokemonDashboardLayoutTest, ClassicCoverIsUnchangedWithoutAPokemon) {
+  const auto sizing = pokemon::classicHomeAccessorySizing(370, false);
+
+  EXPECT_EQ(sizing.coverHeight, 370);
+  EXPECT_EQ(sizing.accessoryHeight, 0);
+  EXPECT_EQ(sizing.followingContentOffset, 0);
+}
+
+TEST(PokemonDashboardLayoutTest, DisabledHomeAccessoryNeverUsesDashboardSpace) {
+  EXPECT_TRUE(pokemon::pokemonHomeAccessoryVisible(true, true, true));
+  EXPECT_FALSE(pokemon::pokemonHomeAccessoryVisible(false, true, true));
+  EXPECT_FALSE(pokemon::pokemonHomeAccessoryVisible(true, false, true));
+  EXPECT_FALSE(pokemon::pokemonHomeAccessoryVisible(true, true, false));
+}
