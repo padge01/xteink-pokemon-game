@@ -30,11 +30,12 @@ performed on another build is not evidence for the release candidate.
       BMPs with the documented dimensions.
 - [ ] `scripts/package_pokemon_v2_release.py` accepted the complete local pack
       and included `RIGHTS_AND_ATTRIBUTION.md`.
-- [ ] The full archive contains `update.bin`, `.crosspoint/pokemon/`, the
+- [ ] The full archive contains `update.bin`, the visible `pokemon/` folder, the
       artwork manifest, internal checksums, and the rights notice.
 - [ ] The full archive does not contain `pokemon-a.bin`, `pokemon-b.bin`,
       legacy `pokemon-v2-*.bin` saves, books, sleep screens, settings, or cache
       files.
+- [ ] The full archive contains no artwork under `.crosspoint/pokemon/`.
 - [ ] Extracting the full archive over temporary existing Pokémon saves leaves
       both save hashes unchanged.
 - [ ] The firmware inside the full archive is byte-identical to the separately

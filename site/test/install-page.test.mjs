@@ -13,6 +13,16 @@ test('full install tells users to extract the package before copying it', () => 
   assert.match(installPage, /pokemon-v2-a\.bin/i);
 });
 
+test('full install explicitly protects existing SD-card data', () => {
+  assert.match(installPage, /merge/i);
+  assert.match(installPage, /do not format/i);
+  assert.match(installPage, /do not delete/i);
+  assert.match(installPage, /do not replace/i);
+  assert.match(installPage, /books/i);
+  assert.match(installPage, /sleep covers/i);
+  assert.match(installPage, /reading progress/i);
+});
+
 test('firmware-only updates do not claim that the X3 supports USB flashing', () => {
   assert.match(installPage, /Firmware-only Wi-Fi update/i);
   assert.doesNotMatch(installPage, /Flash over USB/i);

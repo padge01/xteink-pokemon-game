@@ -2,6 +2,8 @@
 
 #include "PokemonDashboardLayout.h"
 
+#include <algorithm>
+
 namespace pokemon {
 
 DashboardLayout pokemonDashboardLayout(const int width, const int height) {
@@ -25,6 +27,20 @@ DashboardLayout pokemonDashboardLayout(const int width, const int height) {
   layout.notice = {statsX + statsWidth, 0, noticeWidth, height};
   layout.valid = true;
   return layout;
+}
+
+HomeAccessorySizing classicHomeAccessorySizing(const int baseCoverHeight, const bool visible) {
+  const int safeCoverHeight = std::max(0, baseCoverHeight);
+  if (!visible || safeCoverHeight < kPokemonHomeAccessoryFollowingOffset) {
+    return {safeCoverHeight, 0, 0};
+  }
+
+  return {safeCoverHeight - kPokemonHomeAccessoryFollowingOffset, kPokemonHomeAccessoryHeight,
+          kPokemonHomeAccessoryFollowingOffset};
+}
+
+bool pokemonHomeAccessoryVisible(const bool enabled, const bool themeSupported, const bool hasLeader) {
+  return enabled && themeSupported && hasLeader;
 }
 
 }  // namespace pokemon

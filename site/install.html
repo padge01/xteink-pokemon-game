@@ -34,11 +34,12 @@
           <li>Open or extract the ZIP. <strong>Do not copy the ZIP file itself to the SD card.</strong></li>
           <li>Power off the X3 and put its SD card in the computer.</li>
           <li>Back up any <strong>/.crosspoint/pokemon*.bin</strong> files if present. Earlier <strong>pokemon-v2-a.bin</strong> and <strong>pokemon-v2-b.bin</strong> saves migrate automatically.</li>
-          <li>Copy the extracted <strong>update.bin</strong> and <strong>.crosspoint</strong> folder to the SD-card root. Merge <strong>.crosspoint</strong>; do not replace or delete the existing folder.</li>
-          <li>Confirm <strong>update.bin</strong> and <strong>.crosspoint</strong> are directly at the SD-card root, safely eject the card, and return it to the X3.</li>
+          <li>Copy <strong>update.bin</strong> to the SD-card root and merge the extracted <strong>pokemon</strong> folder into the root.</li>
+          <li><strong>Do not format the SD card. Do not delete any existing folder. Do not replace any existing folder.</strong> Your books, sleep covers, settings, reading progress, and Pokémon saves must stay in place.</li>
+          <li>Confirm <strong>update.bin</strong> and <strong>pokemon</strong> are directly at the SD-card root, safely eject the card, and return it to the X3.</li>
           <li>Open <strong>Settings → System → SD Card Firmware Update</strong>, select <strong>update.bin</strong>, and confirm.</li>
         </ol>
-        <p>The package does not contain or replace Pokémon saves, books, or reading data.</p>
+        <p>The package does not contain or replace Pokémon saves, books, or reading data. If your artwork is still under <strong>/.crosspoint/pokemon/</strong>, use this full install once to move to the visible folder.</p>
       </section>
 
       <section class="install-card" aria-labelledby="wifi-title">
@@ -47,7 +48,7 @@
           <h2 id="wifi-title">Firmware-only Wi-Fi update</h2>
         </div>
         <ol>
-          <li>Use this route only if <strong>/.crosspoint/pokemon/</strong> is already installed.</li>
+          <li>Use this route only if <strong>/pokemon/</strong> is already installed at the SD-card root.</li>
           <li>Download <strong>Firmware only</strong>.</li>
           <li>Leave the SD card inside the X3 and open <strong>File Transfer</strong>.</li>
           <li>Open the address shown by the X3 and upload the downloaded <strong>.bin</strong> file to the SD-card root.</li>

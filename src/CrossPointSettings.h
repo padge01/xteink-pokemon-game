@@ -426,6 +426,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t longPressButtonBehavior = OFF;
   // UI Theme
   uint8_t uiTheme = LYRA;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  // Show the lead Pokemon on supported home screens. Training continues when hidden.
+  uint8_t pokemonHomeScreen = 1;
+#endif
   // Recent Books screen layout
   uint8_t recentBooksView = RECENT_BOOKS_LIST;
   // UI scale (list fonts + row heights); touch boards default one step larger

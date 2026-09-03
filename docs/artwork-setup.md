@@ -161,23 +161,23 @@ xteink-pokemon-x3-firmware-v0.1.0.bin
 SHA256SUMS.txt
 ```
 
-The full ZIP contains `update.bin`, `.crosspoint/pokemon/`,
+The full ZIP contains `update.bin`, `pokemon/`,
 `RIGHTS_AND_ATTRIBUTION.md`, and internal checksums. Publish it as a GitHub
 Release asset, not as hundreds of tracked binary files.
 
 ## SD-card paths
 
-Copy the generated `.crosspoint/pokemon/` tree to the SD-card root. The final
+Copy the generated `pokemon/` tree to the SD-card root. The final
 paths are:
 
 ```text
-/.crosspoint/pokemon/sprites/
-/.crosspoint/pokemon/heroes/
-/.crosspoint/pokemon/items/
-/.crosspoint/pokemon/heroes/items/
-/.crosspoint/pokemon/pokedex/portrait/
-/.crosspoint/pokemon/pokedex/landscape/
-/.crosspoint/pokemon/manifest.json
+/pokemon/sprites/
+/pokemon/heroes/
+/pokemon/items/
+/pokemon/heroes/items/
+/pokemon/pokedex/portrait/
+/pokemon/pokedex/landscape/
+/pokemon/manifest.json
 ```
 
 See [Third-party assets](third-party-assets.md) and

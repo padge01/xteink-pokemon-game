@@ -39,6 +39,7 @@
 #include "fontIds.h"
 #if defined(CROSSINK_ENABLE_POKEMON)
 #include "Memory.h"
+#include "PokemonDashboardLayout.h"
 #include "activities/pokemon/PokemonActivity.h"
 #include "components/pokemon/PokemonHomeAccessory.h"
 #endif
@@ -611,22 +612,10 @@ static_assert(HomeActivity::kMaxCachedBooks >= LyraCarouselMetrics::values.homeR
 
 int HomeActivity::getMenuItemCount() const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  int count = 4;  // File Browser, Recents, File transfer, Settings
-  if (!metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
-    count += getVisibleRecentBookCount();
-  } else if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
-    count++;  // Continue Reading menu item
-  }
-  if (hasOpdsServers) {
-    count++;
-  }
-  if (hasReadingStats) {
-    count++;
-  }
-  if (hasBookmarks || hasClippings) {
-    count++;
-  }
-  return count;
+  const bool includeContinueReading = metrics.homeContinueReadingInMenu && !recentBooks.empty();
+  const auto menuItems =
+      buildSelectableHomeMenuItems(hasOpdsServers, hasReadingStats, hasBookmarks, hasClippings, includeContinueReading);
+  return getHomeMenuSelectionOffset(recentBooks) + static_cast<int>(menuItems.size());
 }
 
 void HomeActivity::loadRecentBooks(int maxBooks) {
@@ -869,7 +858,7 @@ void HomeActivity::onEnter() {
 
 #if defined(CROSSINK_ENABLE_POKEMON)
   pokemonDashboard_ = {};
-  if (pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme)) {
+  if (SETTINGS.pokemonHomeScreen != 0 && pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme)) {
     pokemon::devicePokemonService().loadDashboardSnapshot(pokemonDashboard_);
   }
 #endif
@@ -1624,7 +1613,9 @@ void HomeActivity::loop() {
       return;
     }
     if (releasedFrontButton == HalGPIO::BTN_CONFIRM) {
-      minimalHomeNavIndex = 1;
+      if (minimalHomeNavIndex < 0) {
+        minimalHomeNavIndex = 1;
+      }
       activateMinimalHomeNav(minimalHomeNavIndex);
       return;
     }
@@ -1641,7 +1632,9 @@ void HomeActivity::loop() {
       return;
     }
     if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-      onContinueReading();
+      if (minimalHomeNavIndex >= 0) {
+        activateMinimalHomeNav(minimalHomeNavIndex);
+      }
       return;
     }
     return;
@@ -1918,6 +1911,12 @@ void HomeActivity::render(RenderLock&&) {
     initialFullRefresh = false;
     renderer.displayBuffer(refreshMode);
   };
+  bool showPokemonAccessory = false;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  showPokemonAccessory = pokemon::pokemonHomeAccessoryVisible(SETTINGS.pokemonHomeScreen != 0,
+                                                              pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme),
+                                                              pokemonDashboard_.leader.recordId != 0);
+#endif
 
   if (usesMinimalHomeInteraction()) {
     renderer.clearScreen();
@@ -1963,7 +1962,7 @@ void HomeActivity::render(RenderLock&&) {
     }
 
 #if defined(CROSSINK_ENABLE_POKEMON)
-    if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::DASHBOARD) {
+    if (showPokemonAccessory) {
       constexpr int bandHeight = 68;
       pokemon::drawPokemonHomeAccessory(
           renderer, pokemonDashboard_,
@@ -2025,6 +2024,15 @@ void HomeActivity::render(RenderLock&&) {
         }
       }
 
+#if defined(CROSSINK_ENABLE_POKEMON)
+      if (showPokemonAccessory) {
+        const auto& carouselTheme = static_cast<const LyraCarouselTheme&>(GUI);
+        pokemon::drawPokemonHomeAccessory(
+            renderer, pokemonDashboard_,
+            carouselTheme.homeAccessoryRect(renderer, pokemon::kPokemonHomeAccessoryHeight));
+      }
+#endif
+
       displayHomeBuffer();
       // E-ink refresh complete — pre-render the missing adjacent frame while idle.
       updateSlidingWindowCache(centerIdx, bookCount);
@@ -2056,6 +2064,11 @@ void HomeActivity::render(RenderLock&&) {
     const int maxCoverHeight = pageHeight - metrics.buttonHintsHeight - metrics.homeTopPadding -
                                metrics.homeMenuTopOffset - requiredMenuHeight;
     homeCoverTileHeight = std::clamp(maxCoverHeight, 0, metrics.homeCoverTileHeight);
+#if defined(CROSSINK_ENABLE_POKEMON)
+    const auto accessorySizing = pokemon::classicHomeAccessorySizing(homeCoverTileHeight, showPokemonAccessory);
+    homeCoverTileHeight = accessorySizing.coverHeight;
+    showPokemonAccessory = accessorySizing.accessoryHeight != 0;
+#endif
   }
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.homeTopPadding},
@@ -2076,11 +2089,17 @@ void HomeActivity::render(RenderLock&&) {
 
   int menuStartY = metrics.homeTopPadding + homeCoverTileHeight + metrics.homeMenuTopOffset;
 #if defined(CROSSINK_ENABLE_POKEMON)
-  if (pokemonDashboard_.leader.recordId != 0 && pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme)) {
-    constexpr int bandHeight = 68;
-    const int bandY = metrics.homeTopPadding + homeCoverTileHeight + 2;
-    pokemon::drawPokemonHomeAccessory(renderer, pokemonDashboard_, Rect{0, bandY, pageWidth, bandHeight});
-    menuStartY += bandHeight + 4;
+  if (showPokemonAccessory) {
+    constexpr int bandHeight = pokemon::kPokemonHomeAccessoryHeight;
+    if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::LYRA_CAROUSEL) {
+      const auto& carouselTheme = static_cast<const LyraCarouselTheme&>(GUI);
+      pokemon::drawPokemonHomeAccessory(renderer, pokemonDashboard_,
+                                        carouselTheme.homeAccessoryRect(renderer, bandHeight));
+    } else {
+      const int bandY = metrics.homeTopPadding + homeCoverTileHeight + 2;
+      pokemon::drawPokemonHomeAccessory(renderer, pokemonDashboard_, Rect{0, bandY, pageWidth, bandHeight});
+      menuStartY += pokemon::kPokemonHomeAccessoryFollowingOffset;
+    }
   }
 #endif
   const int menuEndY = pageHeight - metrics.buttonHintsHeight;
@@ -2176,7 +2195,9 @@ void HomeActivity::onPokemonOpen() {
   }
   startActivityForResult(std::move(pokemon), [this](const ActivityResult&) {
     pokemonDashboard_ = {};
-    pokemon::devicePokemonService().loadDashboardSnapshot(pokemonDashboard_);
+    if (SETTINGS.pokemonHomeScreen != 0 && pokemon::pokemonHomeAccessorySupported(SETTINGS.uiTheme)) {
+      pokemon::devicePokemonService().loadDashboardSnapshot(pokemonDashboard_);
+    }
   });
 }
 #endif

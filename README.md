@@ -54,12 +54,13 @@ This build is for the **Xteink X3 only**. Do not install it on an X4, X4 Pro, St
 1. Download the full-install ZIP to a computer.
 2. Extract the ZIP. Do not copy the ZIP itself to the SD card.
 3. Back up any `/.crosspoint/pokemon*.bin` files if they already exist. Earlier `pokemon-v2-a.bin` and `pokemon-v2-b.bin` saves migrate automatically.
-4. Copy the extracted `update.bin` and `.crosspoint` folder to the SD-card root.
-5. Merge the `.crosspoint` folder. Do not replace or delete the existing folder.
-6. Safely eject the card and return it to the X3.
-7. Open **Settings → System → SD Card Firmware Update**, select `update.bin`, and confirm.
+4. Copy `update.bin` to the SD-card root and merge the extracted `pokemon` folder into the root.
+5. **Do not format the SD card. Do not delete any existing folder. Do not replace any existing folder.** Keep your books, sleep covers, settings, reading progress, and Pokémon saves in place.
+6. Confirm both `update.bin` and the visible `pokemon` folder are directly at the SD-card root.
+7. Safely eject the card and return it to the X3.
+8. Open **Settings → System → SD Card Firmware Update**, select `update.bin`, and confirm.
 
-The full-install ZIP contains the firmware and all required artwork. It does not contain or replace Pokémon saves, books, or reading data. Once the artwork is installed, later releases can also be applied with the firmware-only download over the X3's Wi-Fi file transfer.
+The full-install ZIP contains the firmware and all required artwork. It does not contain or replace Pokémon saves, books, or reading data. The first release that moves artwork to `/pokemon` must be installed from the full ZIP; later releases can use the firmware-only download over the X3's Wi-Fi file transfer.
 
 The [download and install guide](https://padge01.github.io/xteink-pokemon-game/install.html) always points to the latest release and includes both update options.
 

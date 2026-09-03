@@ -13,6 +13,7 @@
 #include <cstring>
 #include <string>
 
+#include "CrossPointSettings.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
@@ -174,7 +175,7 @@ int PokemonActivity::logicalCount() const {
     case Screen::ResetFinal:
       return screen_ == Screen::Move ? snapshot_.partyCount : 2;
     case Screen::Menu:
-      return 6;
+      return 7;
     case Screen::Party:
       return pokemon::PARTY_SIZE;
     case Screen::Actions: {
@@ -308,7 +309,16 @@ void PokemonActivity::activate() {
         setScreen(Screen::PcOrder, static_cast<int>(pcOrder_));
       else if (selected_ == 4)
         setScreen(Screen::Bag);
-      else
+      else if (selected_ == 5) {
+        const uint8_t previous = SETTINGS.pokemonHomeScreen;
+        SETTINGS.pokemonHomeScreen = previous == 0 ? 1 : 0;
+        if (!SETTINGS.saveToFile()) {
+          SETTINGS.pokemonHomeScreen = previous;
+          showMessage(tr(STR_POKEMON_SAVE_ERROR), Screen::Menu);
+        } else {
+          setScreen(Screen::Menu, selected_);
+        }
+      } else
         setScreen(Screen::ResetFirst);
       return;
     case Screen::Party:
@@ -317,7 +327,7 @@ void PokemonActivity::activate() {
       if (recordId == 0) return;
       focusedRecordId_ = recordId;
       actionSource_ = screen_;
-      setScreen(Screen::Summary);
+      setScreen(Screen::Actions);
       return;
     }
     case Screen::Summary:
@@ -493,6 +503,8 @@ void PokemonActivity::goBack() {
       }
       return;
     case Screen::Summary:
+      setScreen(Screen::Actions);
+      return;
     case Screen::Actions:
       setScreen(actionSource_);
       return;
@@ -589,12 +601,17 @@ void PokemonActivity::buildRows() {
         row(local, index == 0 ? tr(STR_YES) : tr(STR_NO));
         break;
       case Screen::Menu:
-        row(local, index == 0   ? tr(STR_POKEMON_PARTY)
-                   : index == 1 ? tr(STR_POKEDEX)
-                   : index == 2 ? tr(STR_POKEMON_PC_BOX)
-                   : index == 3 ? tr(STR_POKEMON_PC_SORT)
-                   : index == 4 ? tr(STR_POKEMON_BAG)
-                                : tr(STR_POKEMON_RESET));
+        if (index == 5) {
+          row(local, tr(STR_POKEMON_HOME_SCREEN),
+              SETTINGS.pokemonHomeScreen != 0 ? tr(STR_POKEMON_ON) : tr(STR_POKEMON_OFF));
+        } else {
+          row(local, index == 0   ? tr(STR_POKEMON_PARTY)
+                     : index == 1 ? tr(STR_POKEDEX)
+                     : index == 2 ? tr(STR_POKEMON_PC_BOX)
+                     : index == 3 ? tr(STR_POKEMON_PC_SORT)
+                     : index == 4 ? tr(STR_POKEMON_BAG)
+                                  : tr(STR_POKEMON_RESET));
+        }
         break;
       case Screen::Party:
       case Screen::Move:
