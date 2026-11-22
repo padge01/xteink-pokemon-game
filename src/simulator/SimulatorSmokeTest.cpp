@@ -509,8 +509,7 @@ class SimulatorSmokeTest {
     inputScript.push_back(render("Pokemon Nickname Question", 4));
     inputScript.push_back(assertActivity("Pokemon"));
 
-    addTap(MappedInputManager::Button::Down);
-    inputScript.push_back(render("Pokemon Nickname No", 3));
+    // No is the first (default) row, so Confirm skips the nickname.
     addTap(MappedInputManager::Button::Confirm);
     inputScript.push_back(render("Pokemon Menu", 4));
     inputScript.push_back(assertActivity("Pokemon"));

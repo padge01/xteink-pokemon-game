@@ -289,7 +289,8 @@ void PokemonActivity::activate() {
       setScreen(Screen::NicknameQuestion);
       return;
     case Screen::NicknameQuestion:
-      if (selected_ == 0) {
+      // Rows are No (0), Yes (1): skipping the nickname is the default.
+      if (selected_ == 1) {
         openNickname(nicknamePrompt_.recordId, nicknamePrompt_.isStarter(), Screen::NicknameQuestion);
       } else if (nicknamePrompt_.isStarter())
         finishStarter("");
@@ -596,6 +597,8 @@ void PokemonActivity::buildRows() {
         row(local, index == 0 ? tr(STR_POKEMON_MALE) : tr(STR_POKEMON_FEMALE));
         break;
       case Screen::NicknameQuestion:
+        row(local, index == 0 ? tr(STR_NO) : tr(STR_YES));
+        break;
       case Screen::ResetFirst:
       case Screen::ResetFinal:
         row(local, index == 0 ? tr(STR_YES) : tr(STR_NO));
