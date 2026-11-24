@@ -747,7 +747,10 @@ void PokemonActivity::buildList(UiApp::ScreenType& screen) {
   if (screen_ == Screen::Event)
     top = renderer.getScreenHeight() - metrics.buttonHintsHeight - rowCount_ * rowHeight_ - 8;
   listBounds_ = Rect{8, top, renderer.getScreenWidth() - 16, rowCount_ * rowHeight_};
-  screen.setContentMargin(
+  // listBounds_ is measured from the screen edges. CrossInk 2.0's safe area
+  // already reserves the button hints, so a plain content margin would count
+  // that reserve twice and clip the last row.
+  screen.setContentMarginFromScreen(
       fui::Insets{static_cast<int16_t>(listBounds_.y), 8,
                   static_cast<int16_t>(renderer.getScreenHeight() - listBounds_.y - listBounds_.height), 8});
   fui::ListProps props;
@@ -842,10 +845,13 @@ void PokemonActivity::renderFocused() {
       return;
     }
     const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
-    const int artX = landscape ? 28 : (renderer.getScreenWidth() - 120) / 2;
+    // In landscape the button hints sit in a column at one side of the screen.
+    // Lay the card out inside the safe area so nothing is drawn under them.
+    const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true);
+    const int artX = landscape ? safe.x + 28 : (renderer.getScreenWidth() - 120) / 2;
     const int artY = contentTop + 8;
     pokemon::drawPokemonSpeciesArt(renderer, record.speciesId, true, Rect{artX, artY, 120, 90});
-    const int textX = landscape ? 178 : 28;
+    const int textX = landscape ? safe.x + 178 : 28;
     int y = landscape ? contentTop + 8 : artY + 106;
     renderer.drawText(UI_12_FONT_ID, textX, y, speciesName(record.speciesId), true, EpdFontFamily::BOLD);
     y += 25;
@@ -856,7 +862,7 @@ void PokemonActivity::renderFocused() {
              tr(STR_POKEMON_LEVEL), pokemon::levelForXp(record.totalXp), genderText(record.gender));
     renderer.drawText(UI_10_FONT_ID, textX, y, line);
     y += 26;
-    const int valueRight = renderer.getScreenWidth() - 28;
+    const int valueRight = safe.x + safe.width - 28;
     const auto drawField = [this, textX, valueRight](const int fieldY, const char* label, const char* value) {
       renderer.drawText(UI_10_FONT_ID, textX, fieldY, label, true, EpdFontFamily::BOLD);
       const int width = renderer.getTextWidth(UI_10_FONT_ID, value);
