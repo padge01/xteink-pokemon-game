@@ -119,6 +119,7 @@ add_subdirectory(library_text)
 add_subdirectory(library_format)
 add_subdirectory(library_index_file)
 add_subdirectory(content_opf_parser)
+add_subdirectory(toc_spine_memo)
 add_subdirectory(adobe_font_obfuscation)
 add_subdirectory(library_builder)
 add_subdirectory(library_input_buffer)
@@ -140,6 +141,8 @@ add_subdirectory(interval_selection_layout)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME CrashTaskContextRegression
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/scripts/test_crash_task_context.py)
+add_test(NAME EpubBookMetadataBounds
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/scripts/test_epub_book_metadata_bounds.py)
 add_subdirectory(frontlight_settings_boot)
 add_subdirectory(eego_frontlight)
 add_subdirectory(eego_uid)
@@ -215,6 +218,8 @@ add_test(NAME BookmarkListMemoryRegression
 add_subdirectory(bookmark_store)
 add_test(NAME UpstreamPortRegressions
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/scripts/test_upstream_ports.py)
+add_test(NAME SharedBuiltinFontTables
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/scripts/test_shared_builtin_font_tables.py)
 add_subdirectory(gif_support)
 add_subdirectory(clipping_sync)
 add_subdirectory(progress_slots)

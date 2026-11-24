@@ -35,6 +35,7 @@
 #include <memory>
 #include <new>
 #include <type_traits>
+#include <utility>
 
 #include "../settings/DictionarySelectActivity.h"
 #include "../settings/KOReaderSettingsActivity.h"
@@ -130,7 +131,8 @@ constexpr uint8_t PRE_PUBLISHER_FONTS_READER_SETTINGS_FILE_VERSION = 12;
 constexpr uint8_t PRE_TEXT_DARKNESS_READER_SETTINGS_FILE_VERSION = 13;
 constexpr uint8_t PRE_TWO_TONE_AA_READER_SETTINGS_FILE_VERSION = 14;
 constexpr uint8_t PRE_RULED_LINES_READER_SETTINGS_FILE_VERSION = 15;
-constexpr uint8_t READER_SETTINGS_FILE_VERSION = 16;
+constexpr uint8_t PRE_WORD_HOLD_ACTION_READER_SETTINGS_FILE_VERSION = 16;
+constexpr uint8_t READER_SETTINGS_FILE_VERSION = 17;
 constexpr uint8_t READER_SETTINGS_FLAG_CUSTOM = 1 << 0;
 constexpr uint8_t READER_SETTINGS_FLAG_AUTO_PAGE_TURN = 1 << 1;
 constexpr uint8_t READER_SETTINGS_FLAG_RENDER_MODE = 1 << 2;
@@ -1063,6 +1065,16 @@ struct ReaderViewportLayout {
   uint16_t viewportHeight;
 };
 
+#if !CROSSINK_APP_CAP_TOUCH
+// Extra clearance beyond the calibrated bezel, ordered top/right/bottom/left.
+// The native hints follow the physical buttons, not the logical reading edge.
+std::array<int, 4> footnoteButtonHintInsets(const GfxRenderer& renderer, const Rect& safe) {
+  const Rect base = UITheme::getInstance().getScreenSafeArea(renderer, false, false);
+  return {safe.y - base.y, base.x + base.width - (safe.x + safe.width), base.y + base.height - (safe.y + safe.height),
+          safe.x - base.x};
+}
+#endif
+
 ReaderViewportLayout computeReaderViewportLayout(GfxRenderer& renderer, const bool automaticPageTurnActive,
                                                  const bool showFootnoteHeader = false) {
   ReaderViewportLayout layout{};
@@ -1085,7 +1097,14 @@ ReaderViewportLayout computeReaderViewportLayout(GfxRenderer& renderer, const bo
         std::max(layout.marginTop, header.y + header.height + static_cast<int>(SETTINGS.screenMarginVertical));
   }
 #else
-  (void)showFootnoteHeader;
+  if (showFootnoteHeader) {
+    const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    const auto reserve = footnoteButtonHintInsets(renderer, safe);
+    layout.marginTop += reserve[0];
+    layout.marginRight += reserve[1];
+    layout.marginBottom += reserve[2];
+    layout.marginLeft += reserve[3];
+  }
 #endif
 
   layout.marginBottom += ReaderUtils::getReaderFooterReservedHeight(renderer, automaticPageTurnActive);
@@ -1455,7 +1474,8 @@ BookReaderSettingsData loadBookReaderSettingsFile(const std::string& cachePath,
       version != PRE_PUBLISHER_FONTS_READER_SETTINGS_FILE_VERSION &&
       version != PRE_TEXT_DARKNESS_READER_SETTINGS_FILE_VERSION &&
       version != PRE_TWO_TONE_AA_READER_SETTINGS_FILE_VERSION &&
-      version != PRE_RULED_LINES_READER_SETTINGS_FILE_VERSION && version != READER_SETTINGS_FILE_VERSION) {
+      version != PRE_RULED_LINES_READER_SETTINGS_FILE_VERSION &&
+      version != PRE_WORD_HOLD_ACTION_READER_SETTINGS_FILE_VERSION && version != READER_SETTINGS_FILE_VERSION) {
     file.close();
     LOG_DBG("ERS", "Reader settings version mismatch, using defaults");
     return data;
@@ -1517,8 +1537,12 @@ BookReaderSettingsData loadBookReaderSettingsFile(const std::string& cachePath,
   if (ok && version >= PRE_RULED_LINES_READER_SETTINGS_FILE_VERSION) {
     ok = readU8(file, snapshot.twoToneTextAA) && snapshot.twoToneTextAA <= 1;
   }
-  if (ok && version >= READER_SETTINGS_FILE_VERSION) {
+  if (ok && version >= PRE_WORD_HOLD_ACTION_READER_SETTINGS_FILE_VERSION) {
     ok = readU8(file, snapshot.ruledLines) && snapshot.ruledLines <= 3;
+  }
+  uint8_t wordHoldAction = CrossPointSettings::WORD_HOLD_USE_GLOBAL;
+  if (ok && version >= READER_SETTINGS_FILE_VERSION) {
+    ok = readU8(file, wordHoldAction);
   }
   file.close();
   if (!ok) {
@@ -1557,6 +1581,7 @@ BookReaderSettingsData loadBookReaderSettingsFile(const std::string& cachePath,
     data.dictionarySdFontFamilyName[sizeof(data.dictionarySdFontFamilyName) - 1] = '\0';
     data.dictionaryFontPointSize = SETTINGS.dictionaryFontPointSize;
   }
+  if (wordHoldAction <= CrossPointSettings::WORD_HOLD_ASK) data.wordHoldAction = wordHoldAction;
   if (status) *status = ReadStatus::Loaded;
   return data;
 }
@@ -1579,8 +1604,12 @@ bool saveBookReaderSettingsFile(const std::string& cachePath, const BookReaderSe
   const uint16_t clampedSeconds = clampAutoPageTurnIntervalSeconds(data.autoPageTurnSeconds);
   EpubReaderActivity::ReaderSettingsSnapshot normalizedReaderSettings = data.readerSettings;
   normalizedReaderSettings.epubRenderMode = normalizeRenderModeRaw(data.renderMode);
+  // Keep version 16 readable by older firmware when the book has no long-press override.
+  const bool hasWordHoldOverride = data.wordHoldAction <= CrossPointSettings::WORD_HOLD_ASK;
+  const uint8_t version =
+      hasWordHoldOverride ? READER_SETTINGS_FILE_VERSION : PRE_WORD_HOLD_ACTION_READER_SETTINGS_FILE_VERSION;
   const bool ok =
-      writeU8(file, READER_SETTINGS_FILE_VERSION) && writeU8(file, flags) && writeU16(file, clampedSeconds) &&
+      writeU8(file, version) && writeU8(file, flags) && writeU16(file, clampedSeconds) &&
       writeU8(file, normalizeRenderModeRaw(data.renderMode)) &&
       writeReaderSettingsSnapshot(file, normalizedReaderSettings) &&
       writeExact(file, data.dictionarySdFontFamilyName, sizeof(data.dictionarySdFontFamilyName)) &&
@@ -1592,7 +1621,8 @@ bool saveBookReaderSettingsFile(const std::string& cachePath, const BookReaderSe
       writeU8(file, normalizedReaderSettings.publisherFonts) &&
       writeU8(file, normalizedReaderSettings.textDarkness <= 2 ? normalizedReaderSettings.textDarkness : 0) &&
       writeU8(file, normalizedReaderSettings.twoToneTextAA != 0) &&
-      writeU8(file, normalizedReaderSettings.ruledLines <= 3 ? normalizedReaderSettings.ruledLines : 0);
+      writeU8(file, normalizedReaderSettings.ruledLines <= 3 ? normalizedReaderSettings.ruledLines : 0) &&
+      (!hasWordHoldOverride || writeU8(file, data.wordHoldAction));
   file.close();
   if (!ok) {
     LOG_ERR("ERS", "Short write saving reader settings");
@@ -2833,6 +2863,14 @@ void EpubReaderActivity::openReaderMenu() {
     requestUpdate();
     return;
   }
+  menuActivity->setBookWordHoldAction(bookSettings.wordHoldAction, [](void* context, const uint8_t action) {
+    auto& reader = *static_cast<EpubReaderActivity*>(context);
+    if (reader.section && reader.section->isBuilding()) reader.section->releaseBuildFile();
+    const auto& cachePath = reader.epub->getCachePath();
+    auto data = loadBookReaderSettingsFile(cachePath);
+    data.wordHoldAction = action;
+    return saveBookReaderSettingsFile(cachePath, data);
+  });
   menuActivity->setChapterTitle(std::move(chapterTitle));
 #if CROSSINK_SCALABLE_FONTS
   menuActivity->setPublisherBodyFontProbe(
@@ -3403,8 +3441,27 @@ void EpubReaderActivity::loop() {
     return;
   }
 
+  if (deferredFootnoteBackDepth > 0) {
+    // A new explicit long Back shortcut keeps its ordinary priority.
+    if (mappedInput.isPressed(MappedInputManager::Button::Back) &&
+        mappedInput.getHeldTime() >= ReaderUtils::GO_HOME_MS) {
+      deferredFootnoteBackDepth = 0;
+    } else {
+      if (restoreSavedPosition(deferredFootnoteBackDepth)) deferredFootnoteBackDepth = 0;
+      return;
+    }
+  }
+
   if (RenderLock::peek() && !touch.prev && !touch.next && wasBackReleased() &&
       mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
+    const int depth = footnoteDepth.load(std::memory_order_relaxed);
+    if (depth > 0 && !longPressBackHandled) {
+      // The lock can be held by a redraw (e.g. after closing the drawer), not
+      // just indexing. A note return should never turn into an exit to Home.
+      deferredFootnoteBackDepth = depth;
+      automaticPageTurnActive = false;
+      return;
+    }
     sectionBuildCancelRequested.store(true, std::memory_order_relaxed);
     goHomeAfterBuildCancel.store(true, std::memory_order_relaxed);
     automaticPageTurnActive = false;
@@ -3726,8 +3783,9 @@ void EpubReaderActivity::loop() {
 
   // Short press BACK goes directly to home (or restores position if viewing footnote)
   if (!touch.prev && !touch.next && wasBackReleased() && mappedInput.getHeldTime() < ReaderUtils::GO_HOME_MS) {
-    if (footnoteDepth > 0) {
-      restoreSavedPosition();
+    const int depth = footnoteDepth.load(std::memory_order_relaxed);
+    if (depth > 0) {
+      if (!restoreSavedPosition(depth)) deferredFootnoteBackDepth = depth;
       return;
     }
     onGoHome();
@@ -4164,7 +4222,9 @@ void EpubReaderActivity::openWordSelect(bool framebufferContainsPage, int initia
       renderer, mappedInput, std::move(pageForLookup), layout.marginLeft, layout.marginTop, std::move(bookCachePath),
       std::move(nextPageFirstWord), hasNextPageForLookup, framebufferContainsPage, layout.marginBottom, initialTouchX,
       initialTouchY, autoLookupInitialWord, bookSettings.dictionarySdFontFamilyName,
-      bookSettings.dictionaryFontPointSize, this, &EpubReaderActivity::reloadDictionaryLookupPageCallback);
+      bookSettings.dictionaryFontPointSize, this, &EpubReaderActivity::reloadDictionaryLookupPageCallback,
+      bookSettings.wordHoldAction == CrossPointSettings::WORD_HOLD_USE_GLOBAL ? SETTINGS.wordHoldAction
+                                                                              : bookSettings.wordHoldAction);
   if (!wordSelect) {
     LOG_ERR("DICT", "OOM allocating DictionaryWordSelectActivity (%u bytes)",
             static_cast<unsigned>(sizeof(DictionaryWordSelectActivity)));
@@ -5262,13 +5322,25 @@ void EpubReaderActivity::startClipSelection(const DictionaryClippingRequest* dic
         if (textPoolFull) return false;
         const auto& block = *line.block;
         const uint16_t count = block.wordCount();
+        bool hasSpaceBefore = false;
+        bool hasWordInBlock = false;
+        const auto trackingJoinSlack =
+            static_cast<uint8_t>((std::clamp<int>(block.getCharacterSpacing(), 0, 5) + 1) / 2);
         for (uint16_t i = 0; i < count; ++i) {
           const char* wordText = block.wordText(i);
-          if (!hasVisibleWordText(wordText)) continue;
+          // The first word of a wrapped line can still have an authored preceding space.
+          hasSpaceBefore |= block.wordHasSpaceBefore(i);
+          if (!hasVisibleWordText(wordText)) {
+            // Nonbreaking spaces are separate layout tokens, but cannot be selected.
+            hasSpaceBefore |= *wordText != '\0';
+            continue;
+          }
 
           const auto textStyle = static_cast<EpdFontFamily::Style>(block.wordStyle(i) & ~EpdFontFamily::UNDERLINE);
           const PageWordGeometry geometry = pageWordGeometry(renderer, readerFontId, line, block, i);
           if (geometry.width <= 0) continue;
+          const bool wordHasSpaceBefore = std::exchange(hasSpaceBefore, false);
+          const bool followsWordInBlock = std::exchange(hasWordInBlock, true);
           const size_t wordIndexOnPage = pageWordIndex++;
           if (wordIndexOnPage < firstWordToKeep) continue;
           if (wordIndexOnPage >= firstWordToKeep + wordsToKeep) break;
@@ -5303,6 +5375,9 @@ void EpubReaderActivity::startClipSelection(const DictionaryClippingRequest* dic
           word.style = textStyle;
           word.endsWithInsertedHyphen = block.wordEndsWithInsertedHyphen(i);
           word.lineIsRtl = block.getBlockStyle().isRtl;
+          word.hasSpaceBefore = wordHasSpaceBefore;
+          word.followsWordInBlock = followsWordInBlock;
+          word.trackingJoinSlack = trackingJoinSlack;
           wordStore.words.push_back(word);
         }
         return !textPoolFull && wordStore.words.size() < maxSelectableWords;
@@ -7034,8 +7109,9 @@ void EpubReaderActivity::render(RenderLock&& lock) {
           activeFootnotePreview = false;
         }
         if (shouldRestoreFootnoteOrigin) {
-          footnoteDepth--;
-          const SavedPosition& origin = savedPositions[footnoteDepth];
+          const int depth = footnoteDepth.load(std::memory_order_relaxed) - 1;
+          const SavedPosition& origin = savedPositions[depth];
+          footnoteDepth.store(depth, std::memory_order_relaxed);
           LOG_ERR("ERS", "Footnote preview build failed; restoring origin spine %d page %d", origin.spineIndex,
                   origin.pageNumber);
           pendingAnchor.clear();
@@ -7789,7 +7865,9 @@ bool EpubReaderActivity::saveLinkStack() const {
 }
 
 void EpubReaderActivity::loadLinkStack() {
-  EpubLinkReturnState::load(epub->getCachePath(), savedPositions, footnoteDepth, epub->getSpineItemsCount());
+  int depth = 0;
+  EpubLinkReturnState::load(epub->getCachePath(), savedPositions, depth, epub->getSpineItemsCount());
+  footnoteDepth.store(depth, std::memory_order_relaxed);
 }
 
 bool EpubReaderActivity::queueProgressSave(const int spineIndex, const int currentPage, const int pageCount,
@@ -7979,7 +8057,8 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
   if (deferImageLoading) {
     needsImageGrayscale = false;
   }
-  const bool pageHasImagesNeedingDecode = !deferImageLoading && pageHasImages && page->hasImagesNeedingDecode();
+  const bool pageHasImagesNeedingDecode =
+      !deferImageLoading && pageHasImages && page->hasImagesNeedingDecode(needsImageGrayscale);
 
   if (updatePanel) {
     // First-page glyph and image checks can be slower than opening the book.
@@ -7995,6 +8074,15 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
     if (activeFootnotePreview) {
       TouchHeaderBackButton::draw(renderer, TouchHeaderBackButton::headerRect(renderer, mappedInput), tr(STR_FOOTNOTES),
                                   /*readerContext=*/true);
+    }
+#else
+    if (activeFootnotePreview && renderer.getRenderMode() == GfxRenderer::BW) {
+      const auto labels = mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), "", "", "");
+      // Some themes draw empty button markers for empty strings. This action
+      // needs only a single hint by the physical button assigned to Back.
+      const auto visible = [](const char* label) { return label && *label ? label : nullptr; };
+      GUI.drawButtonHints(renderer, visible(labels.btn1), visible(labels.btn2), visible(labels.btn3),
+                          visible(labels.btn4), true);
     }
 #endif
   };
@@ -8042,7 +8130,7 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
     // materialization. The loan can overwrite the framebuffer, so rebuild
     // the complete page after returning it; the panel keeps the preview.
     GfxRenderer::FrameBufferLoan loan(renderer);
-    page->prepareImageCaches();
+    page->prepareImageCaches(needsImageGrayscale);
     loan.end();
     renderer.clearScreen(ReaderUtils::readerBackgroundColor());
   }
@@ -8108,6 +8196,12 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
   }
   const auto displayMonochromePage = [&]() {
     renderer.setRenderMode(GfxRenderer::BW);
+    // An optimizer Gray hit may never have extracted the original. Let ZIP
+    // inflation borrow the framebuffer before drawing the monochrome fallback.
+    if (pageHasImages) {
+      GfxRenderer::FrameBufferLoan loan(renderer);
+      page->prepareImageCaches(/*grayscale=*/false);
+    }
     renderer.clearScreen(ReaderUtils::readerBackgroundColor());
     drawTextAndRules();
     page->renderImages(renderer, fontId, orientedMarginLeft, orientedMarginTop, foregroundBlack, false);
@@ -8248,6 +8342,7 @@ bool EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int fo
   const bool canApplyGrayscale = needsAnyGrayscale && storedBwBuffer;
   if (needsAnyGrayscale && !storedBwBuffer) {
     LOG_ERR("ERS", "Skipping grayscale enhancement: failed to store BW backup");
+    if (needsImageGrayscale) return displayMonochromePage();
     // A combined driver has not painted this page yet. Complete its B/W fallback
     // while the live framebuffer still contains the intact page.
     renderer.cleanupGrayscaleWithFrameBuffer();
@@ -8582,6 +8677,16 @@ void EpubReaderActivity::renderStatusBar() const {
   content.showProgress = !activeFootnotePreview;
   content.pageCountEstimated = pageCountEstimated;
   content.darkMode = ReaderUtils::readerDarkModeEnabled();
+#if !CROSSINK_APP_CAP_TOUCH
+  Rect safe{};
+  std::array<int, 4> buttonInsets{};
+  if (activeFootnotePreview) {
+    safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+    buttonInsets = footnoteButtonHintInsets(renderer, safe);
+    if (buttonInsets[1] || buttonInsets[3]) content.horizontalBounds = &safe;
+    content.edgePadding = buttonInsets[0];
+  }
+#endif
   GUI.drawReaderStatusBar(renderer, ReaderStatusBarPosition::Top, content);
   if (automaticPageTurnActive) {
     // Replace titles only after the configured top bar has been drawn.
@@ -8589,6 +8694,9 @@ void EpubReaderActivity::renderStatusBar() const {
     content.chapterTitle = autoTurnLabel;
     content.autoTurnLabel = autoTurnLabel;
   }
+#if !CROSSINK_APP_CAP_TOUCH
+  content.edgePadding = buttonInsets[2];
+#endif
   GUI.drawReaderStatusBar(renderer, ReaderStatusBarPosition::Bottom, content);
 }
 
@@ -8826,13 +8934,14 @@ void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool s
   // Keep the return stack for an endnote that happens to point at a TOC
   // chapter.
   const bool saveReturnPosition = savePosition && !contentsNavigation;
-  if (saveReturnPosition) {
-    EpubLinkReturnState::push(savedPositions, footnoteDepth,
-                              {currentSpineIndex, section ? section->currentPage : nextPageNumber});
-  }
-
   {
     RenderLock lock(*this);
+    if (saveReturnPosition) {
+      int depth = footnoteDepth.load(std::memory_order_relaxed);
+      EpubLinkReturnState::push(savedPositions, depth,
+                                {currentSpineIndex, section ? section->currentPage : nextPageNumber});
+      footnoteDepth.store(depth, std::memory_order_relaxed);
+    }
     const bool useFootnotePreview = saveReturnPosition && !chapterDestination && !anchor.empty() &&
                                     (preferFootnotePreview || shouldUseFootnotePreview(targetSpineIndex, anchor));
     pendingAnchor = anchor;
@@ -8846,15 +8955,17 @@ void EpubReaderActivity::navigateToHref(const std::string& hrefStr, const bool s
   requestUpdate();
 }
 
-void EpubReaderActivity::restoreSavedPosition() {
-  pageLoadRetryCount = 0;
-  if (footnoteDepth <= 0) return;
-  clearPendingManualPageTurns();
-  footnoteDepth--;
-  const auto& pos = savedPositions[footnoteDepth];
-
+bool EpubReaderActivity::restoreSavedPosition(const int deferredDepth) {
   {
-    RenderLock lock(*this);
+    RenderLock lock(*this, deferredDepth > 0 ? RenderLock::Mode::Try : RenderLock::Mode::Blocking);
+    if (!lock.ownsLock()) return false;
+    const int depth = footnoteDepth.load(std::memory_order_relaxed);
+    // The renderer can already have restored the origin on preview build failure.
+    if (depth == 0 || (deferredDepth > 0 && depth != deferredDepth)) return true;
+    pageLoadRetryCount = 0;
+    clearPendingManualPageTurns();
+    const auto& pos = savedPositions[depth - 1];
+    footnoteDepth.store(depth - 1, std::memory_order_relaxed);
     clearFootnotePreviewState();
     pendingAnchor.clear();
     currentSpineIndex = pos.spineIndex;
@@ -8863,6 +8974,7 @@ void EpubReaderActivity::restoreSavedPosition() {
   }
   armReadingPaceWarmup("saved_position_restore");
   requestUpdate();
+  return true;
 }
 bool EpubReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, GfxRenderer& renderer) {
   auto epub = makeUniqueNoThrow<Epub>(filePath, "/.crosspoint");
@@ -9036,7 +9148,7 @@ bool EpubReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, Gf
         [](void* context, const char* source, int width, int height, const char* destination) {
           return static_cast<Epub*>(context)->seedOptimizerImageCache(source, width, height, destination);
         });
-    page->prepareImageCaches();
+    page->prepareImageCaches(/*grayscale=*/false);
     ImageBlock::setExtractor(nullptr, nullptr, nullptr);
   }
   renderer.clearScreen(ReaderUtils::readerBackgroundColor());
@@ -9044,7 +9156,8 @@ bool EpubReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, Gf
   ReaderRuling{SETTINGS.ruledLines, layout.marginLeft, layout.viewportWidth, layout.marginTop + layout.viewportHeight,
                SETTINGS.lineHeightPercent}
       .drawPage(renderer, *page, renderFontId, layout.marginTop);
-  page->renderImages(renderer, renderFontId, layout.marginLeft, layout.marginTop, ReaderUtils::readerForegroundBlack());
+  page->renderImages(renderer, renderFontId, layout.marginLeft, layout.marginTop, ReaderUtils::readerForegroundBlack(),
+                     false);
   drawPublisherPageMarkers(renderer, *page, layout.marginTop, renderer.getScreenHeight() - layout.marginBottom,
                            ReaderUtils::readerForegroundBlack());
   // No displayBuffer call; caller (SleepActivity) handles that after compositing the overlay.

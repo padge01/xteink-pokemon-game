@@ -7,6 +7,8 @@
 #include <Utf8.h>
 #include <ZipFile.h>
 
+#include <cstring>
+#include <iterator>
 #include <limits>
 
 #include "FsHelpers.h"
@@ -27,6 +29,43 @@ constexpr size_t BUILD_IO_BUFFER_SIZE = 4096;
 // Cap the reader-session speedup at 4KB on constrained C3 devices. EPUBs with
 // larger spines keep using the existing on-disk lookup path.
 constexpr uint16_t MAX_CACHED_CUMULATIVE_SIZES = 1024;
+
+// A small cold-build optimization, not a reader-session cache. Keep the
+// legacy cursor for tiny spines (the scan often completes sooner).
+constexpr uint16_t MIN_EXACT_SIZE_BATCH_SPINE = 64;
+constexpr size_t EXACT_SIZE_BATCH_TARGETS = 48;
+constexpr size_t EXACT_SIZE_BATCH_PATH_BYTES = 2048;
+constexpr size_t MAX_EXACT_SIZE_BATCH_PASSES = 8;
+
+// Heap scratch (<4 KiB on C3), shared across batches, freed before serialization.
+// Exact paths preserve matching semantics without extending the large-spine
+// hashed lookup to books that previously used the exact ZIP cursor.
+struct ExactSizeBatch {
+  ZipFile::EntryTarget targets[EXACT_SIZE_BATCH_TARGETS];
+  ZipFile::EntryIdentity identities[EXACT_SIZE_BATCH_TARGETS];
+  char paths[EXACT_SIZE_BATCH_PATH_BYTES];
+};
+
+// Estimate the number of scans on the spine LUT pass that already reads every
+// href. Normalizing an href only removes characters, so this is conservative.
+struct ExactSizeBatchPlan {
+  size_t passes = 1;
+  size_t targets = 0;
+  size_t bytes = 0;
+
+  bool add(const std::string& rawHref) {
+    const size_t need = rawHref.size() + 1;
+    if (need > EXACT_SIZE_BATCH_PATH_BYTES || rawHref.find('\0') != std::string::npos) return false;
+    if (targets == EXACT_SIZE_BATCH_TARGETS || need > EXACT_SIZE_BATCH_PATH_BYTES - bytes) {
+      ++passes;
+      targets = 0;
+      bytes = 0;
+    }
+    ++targets;
+    bytes += need;
+    return passes <= MAX_EXACT_SIZE_BATCH_PASSES;
+  }
+};
 
 // Entry (de)serializers, templated so they run over HalFile and the Buffered*
 // wrappers alike (two instantiations each -- a few hundred bytes of flash, in
@@ -104,6 +143,7 @@ bool BookMetadataCache::endContentOpfPass() {
 }
 
 bool BookMetadataCache::beginTocPass() {
+  tocSpineMemo.clear();
   if (!Storage.openFileForRead("BMC", cachePath + tmpSpineBinFile, spineFile)) {
     return false;
   }
@@ -150,6 +190,7 @@ bool BookMetadataCache::beginTocPass() {
 }
 
 bool BookMetadataCache::endTocPass() {
+  tocSpineMemo.clear();
   const bool flushed = !passOut || passOut->flush();
   passOut.reset();
   if (!flushed) {
@@ -228,11 +269,14 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
   serialization::writeString(bookOut, metadata.coverItemHref);
   serialization::writeString(bookOut, metadata.textReferenceHref);
 
-  // Loop through spine entries, writing LUT positions
+  // Loop through spine entries, writing LUT positions and estimating batch work.
+  ExactSizeBatchPlan sizeBatchPlan;
+  bool tryExactSizeBatch = spineCount >= MIN_EXACT_SIZE_BATCH_SPINE && spineCount < LARGE_SPINE_THRESHOLD;
   spineIn.seek(0);
   for (int i = 0; i < spineCount; i++) {
     const uint32_t pos = spineIn.position();
-    readSpineEntryFrom(spineIn);
+    const auto entry = readSpineEntryFrom(spineIn);
+    if (tryExactSizeBatch) tryExactSizeBatch = sizeBatchPlan.add(entry.href);
     serialization::writePod(bookOut, pos + lutOffset + lutSize);
   }
   // Total size of the spine tmp file: entries land in book.bin after the toc LUT
@@ -334,6 +378,66 @@ bool BookMetadataCache::buildBookBin(const std::string& epubPath, const BookMeta
     LOG_DBG("BMC", "Batch lookup matched %d/%d spine items", matched, spineCount);
 
     useBatchSizes = true;
+  }
+
+  if (tryExactSizeBatch) {
+    constexpr size_t reserveBytes = 16 * 1024;
+    constexpr size_t reserveContiguousBytes = 4 * 1024;
+    const auto heap = byteHeapSnapshot(MemoryPool::Internal);
+    auto batch = heap.free >= sizeof(ExactSizeBatch) + reserveBytes &&
+                         heap.largest >= sizeof(ExactSizeBatch) + reserveContiguousBytes
+                     ? makeUniqueNoThrow<ExactSizeBatch>()
+                     : nullptr;
+    if (batch && spineSizes.resize(spineCount)) {
+      useBatchSizes = true;
+      size_t targetCount = 0;
+      size_t pathBytes = 0;
+      size_t batchStart = 0;
+      const auto flushBatch = [&]() {
+        if (targetCount == 0) return true;
+        std::fill_n(batch->identities, targetCount, ZipFile::EntryIdentity{});
+        std::sort(batch->targets, batch->targets + targetCount,
+                  [](const ZipFile::EntryTarget& a, const ZipFile::EntryTarget& b) {
+                    return a.hash < b.hash || (a.hash == b.hash && a.len < b.len);
+                  });
+        if (zip.fillEntryIdentities(batch->targets, targetCount, batch->identities, targetCount,
+                                    /*exactScanEntryLimit=*/2u * spineCount) < 0) {
+          return false;
+        }
+        for (size_t i = 0; i < targetCount; ++i) {
+          spineSizes[batchStart + i] = batch->identities[i].uncompressedSize;
+        }
+        targetCount = 0;
+        pathBytes = 0;
+        return true;
+      };
+
+      spineIn.seek(0);
+      for (size_t i = 0; i < spineCount; ++i) {
+        auto entry = readSpineEntryFrom(spineIn);
+        const std::string path = FsHelpers::normalisePath(entry.href);
+        if (path.size() + 1 > EXACT_SIZE_BATCH_PATH_BYTES || path.find('\0') != std::string::npos) {
+          useBatchSizes = false;
+          break;
+        }
+        if ((targetCount == EXACT_SIZE_BATCH_TARGETS || path.size() + 1 > EXACT_SIZE_BATCH_PATH_BYTES - pathBytes) &&
+            !flushBatch()) {
+          useBatchSizes = false;
+          break;
+        }
+        if (targetCount == 0) batchStart = i;
+        char* targetPath = batch->paths + pathBytes;
+        std::memcpy(targetPath, path.c_str(), path.size() + 1);
+        batch->targets[targetCount] = {ZipFile::fnvHash64(targetPath, path.size()), static_cast<uint16_t>(path.size()),
+                                       static_cast<uint16_t>(targetCount), targetPath};
+        ++targetCount;
+        pathBytes += path.size() + 1;
+      }
+      useBatchSizes = useBatchSizes && flushBatch();
+    }
+    LOG_DBG("BMC", "Exact ZIP size batch %s (scratch=%u free=%u maxAlloc=%u)",
+            useBatchSizes ? "used" : "unavailable; using ZIP cursor", static_cast<unsigned>(sizeof(ExactSizeBatch)),
+            static_cast<unsigned>(heap.free), static_cast<unsigned>(heap.largest));
   }
 
   uint32_t cumSize = 0;
@@ -474,14 +578,13 @@ void BookMetadataCache::createTocEntry(const std::string& title, const std::stri
       LOG_DBG("BMC", "createTocEntry: Could not find spine item for TOC href %s", href.c_str());
     }
   } else {
-    spineFile.seek(0);
-    for (int i = 0; i < spineCount; i++) {
-      auto spineEntry = readSpineEntry(spineFile);
-      if (spineEntry.href == href) {
-        spineIndex = static_cast<int16_t>(i);
-        break;
+    spineIndex = tocSpineMemo.lookup(href, [&]() -> int16_t {
+      spineFile.seek(0);
+      for (int i = 0; i < spineCount; i++) {
+        if (readSpineEntry(spineFile).href == href) return static_cast<int16_t>(i);
       }
-    }
+      return -1;
+    });
     if (spineIndex == -1) {
       LOG_DBG("BMC", "createTocEntry: Could not find spine item for TOC href %s", href.c_str());
     }
@@ -504,51 +607,80 @@ bool BookMetadataCache::exists(const std::string& cachePath) {
   return Storage.exists((cachePath + bookBinFile).c_str());
 }
 
+namespace {
+// A book.bin metadata field is length-prefixed and ends before the LUT.
+// Check it against that boundary before resizing, not after a short read.
+bool readMetadataField(HalFile& file, std::string& value, const size_t metadataEnd) {
+  const size_t start = file.position();
+  uint32_t length = 0;
+  if (start > metadataEnd || metadataEnd - start < sizeof(length) || !serialization::tryReadPod(file, length) ||
+      length > metadataEnd - start - sizeof(length) || length > value.max_size() ||
+      length > static_cast<uint32_t>(std::numeric_limits<int>::max())) {
+    return false;
+  }
+  value.resize(length);
+  return length == 0 || file.read(value.data(), length) == static_cast<int>(length);
+}
+}  // namespace
+
 bool BookMetadataCache::load() {
+  loaded = false;
+  cumulativeSizes.reset();
+  cumulativeSizeCount = 0;
+  if (bookFile) bookFile.close();
+
   const auto bookBinPath = cachePath + bookBinFile;
   if (!Storage.openFileForRead("BMC", bookBinPath, bookFile)) {
     return false;
   }
 
-  uint32_t magic;
-  if (!serialization::tryReadPod(bookFile, magic)) {
-    LOG_DBG("BMC", "Cache header is truncated");
+  const auto rejectCache = [&] {
+    // Only the derived metadata cache is removed; preserve progress and other
+    // user files so the reader can rebuild the metadata normally.
     bookFile.close();
     Storage.remove(bookBinPath.c_str());
     return false;
+  };
+  uint32_t magic = 0;
+  uint8_t version = 0;
+  if (!serialization::tryReadPod(bookFile, magic) || magic != BOOK_CACHE_MAGIC) {
+    LOG_DBG("BMC", "Cache magic missing or invalid");
+    return rejectCache();
   }
-  if (magic != BOOK_CACHE_MAGIC) {
-    LOG_DBG("BMC", "Cache magic mismatch");
-    bookFile.close();
-    Storage.remove(bookBinPath.c_str());
-    return false;
-  }
-
-  uint8_t version;
-  if (!serialization::tryReadPod(bookFile, version)) {
-    LOG_DBG("BMC", "Cache version is missing");
-    bookFile.close();
-    Storage.remove(bookBinPath.c_str());
-    return false;
-  }
-  if (version != BOOK_CACHE_VERSION) {
+  if (!serialization::tryReadPod(bookFile, version) || version != BOOK_CACHE_VERSION) {
     LOG_DBG("BMC", "Cache version mismatch: expected %d, got %d", BOOK_CACHE_VERSION, version);
-    // Explicit close() required: member variable persists beyond function scope
-    bookFile.close();
-    Storage.remove(bookBinPath.c_str());
-    return false;
+    return rejectCache();
+  }
+  if (!serialization::tryReadPod(bookFile, lutOffset) || !serialization::tryReadPod(bookFile, spineCount) ||
+      !serialization::tryReadPod(bookFile, tocCount)) {
+    LOG_DBG("BMC", "Cache header is truncated");
+    return rejectCache();
   }
 
-  if (!serialization::tryReadPod(bookFile, lutOffset) || !serialization::tryReadPod(bookFile, spineCount) ||
-      !serialization::tryReadPod(bookFile, tocCount) || !serialization::tryReadString(bookFile, coreMetadata.title) ||
-      !serialization::tryReadString(bookFile, coreMetadata.author) ||
-      !serialization::tryReadString(bookFile, coreMetadata.language) ||
-      !serialization::tryReadString(bookFile, coreMetadata.coverItemHref) ||
-      !serialization::tryReadString(bookFile, coreMetadata.textReferenceHref)) {
-    LOG_DBG("BMC", "Cache metadata is truncated");
-    bookFile.close();
-    Storage.remove(bookBinPath.c_str());
-    return false;
+  const size_t fileSize = bookFile.size();
+  const size_t lutSize = (static_cast<size_t>(spineCount) + tocCount) * sizeof(uint32_t);
+  if (lutOffset > fileSize || lutSize > fileSize - lutOffset) {
+    LOG_DBG("BMC", "Cache lookup table is outside the file");
+    return rejectCache();
+  }
+  std::string* const fields[] = {&coreMetadata.title, &coreMetadata.author, &coreMetadata.language,
+                                 &coreMetadata.coverItemHref, &coreMetadata.textReferenceHref};
+  const size_t metadataStart = bookFile.position();
+  if (lutOffset < metadataStart || lutOffset - metadataStart < std::size(fields) * sizeof(uint32_t)) {
+    LOG_DBG("BMC", "Cache metadata is missing required lengths");
+    return rejectCache();
+  }
+  for (size_t i = 0; i < std::size(fields); ++i) {
+    // A field cannot consume even the required length prefixes of later fields.
+    const size_t fieldEnd = lutOffset - (std::size(fields) - i - 1) * sizeof(uint32_t);
+    if (!readMetadataField(bookFile, *fields[i], fieldEnd)) {
+      LOG_DBG("BMC", "Cache metadata is truncated or inconsistent");
+      return rejectCache();
+    }
+  }
+  if (bookFile.position() != lutOffset) {
+    LOG_DBG("BMC", "Cache metadata does not end at the lookup table");
+    return rejectCache();
   }
 
   cacheSpineCumulativeSizes();
