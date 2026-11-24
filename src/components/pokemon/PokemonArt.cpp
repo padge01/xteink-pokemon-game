@@ -20,8 +20,7 @@ void drawFallback(const GfxRenderer& renderer, const Rect bounds) {
                     mark);
 }
 
-bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, const bool fallback,
-              const GfxRenderer::BitmapBwPolicy bwPolicy) {
+bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, const bool fallback) {
   if (path == nullptr || bounds.width <= 0 || bounds.height <= 0) return false;
   FsFile file;
   if (!Storage.openFileForRead("PKART", path, file)) {
@@ -38,8 +37,7 @@ bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, 
     return false;
   }
 
-  const bool rendered =
-      renderer.drawBitmap(bitmap, bounds.x, bounds.y, bounds.width, bounds.height, 0.0f, 0.0f, bwPolicy);
+  const bool rendered = renderer.drawBitmap(bitmap, bounds.x, bounds.y, bounds.width, bounds.height);
   if (!rendered) {
     LOG_ERR("PKART", "Could not render Pokemon art: %s", path);
     if (fallback) drawFallback(renderer, bounds);
@@ -53,15 +51,13 @@ bool drawPath(const GfxRenderer& renderer, const char* path, const Rect bounds, 
 bool drawPokemonSpeciesArt(const GfxRenderer& renderer, const uint16_t speciesId, const bool hero, const Rect bounds,
                            const bool fallback) {
   char path[64]{};
-  return drawPath(renderer, pokemonSpeciesArtPath(speciesId, hero, path, sizeof(path)), bounds, fallback,
-                  GfxRenderer::BitmapBwPolicy::ExistingThreshold);
+  return drawPath(renderer, pokemonSpeciesArtPath(speciesId, hero, path, sizeof(path)), bounds, fallback);
 }
 
 bool drawPokemonPokedexArt(const GfxRenderer& renderer, const uint16_t speciesId, const bool landscape,
                            const Rect bounds, const bool fallback) {
   char path[64]{};
-  return drawPath(renderer, pokemonPokedexArtPath(speciesId, landscape, path, sizeof(path)), bounds, fallback,
-                  GfxRenderer::BitmapBwPolicy::ExistingThreshold);
+  return drawPath(renderer, pokemonPokedexArtPath(speciesId, landscape, path, sizeof(path)), bounds, fallback);
 }
 
 bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, const bool hero, const Rect bounds,
@@ -69,7 +65,7 @@ bool drawPokemonItemArt(const GfxRenderer& renderer, const EvolutionItem item, c
   char path[80]{};
   const char* pathValue = pokemonItemArtPath(item, hero, path, sizeof(path));
   if (pathValue == nullptr && item == EvolutionItem::LinkCable) return false;
-  return drawPath(renderer, pathValue, bounds, fallback, GfxRenderer::BitmapBwPolicy::ExistingThreshold);
+  return drawPath(renderer, pathValue, bounds, fallback);
 }
 
 }  // namespace pokemon
