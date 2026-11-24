@@ -47,6 +47,10 @@ void forEachBaseSetting(SettingVisitor visitor, void* context) {
                               CrossPointSettings::UI_THEME::ROUNDEDRAFF, CrossPointSettings::UI_THEME::COVER_GRID}));
   add(SettingInfo::Toggle(StrId::STR_SWAP_LIBRARY_FILE_BROWSER, &CrossPointSettings::swapLibraryFileBrowser,
                           "swapLibraryFileBrowser", StrId::STR_CAT_DISPLAY));
+#if defined(CROSSINK_ENABLE_POKEMON)
+  // Persisted here, but edited from the Pokemon menu rather than the main Settings screen.
+  add(SettingInfo::Toggle(StrId::STR_POKEMON_HOME_SCREEN, &CrossPointSettings::pokemonHomeScreen, "pokemonHomeScreen"));
+#endif
   add(SettingInfo::Enum(StrId::STR_UI_SCALE, &CrossPointSettings::uiScale, {StrId::STR_SMALL, StrId::STR_LARGE},
                         "uiScale", StrId::STR_CAT_DISPLAY)
           .withEnumRawValues({CrossPointSettings::UI_SCALE_SMALL, CrossPointSettings::UI_SCALE_LARGE}));

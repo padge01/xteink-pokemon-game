@@ -1,3 +1,18 @@
+## [Unreleased]
+
+### Added
+
+- The Xteink Pokémon companion (`pokemon-x3` firmware) now runs on CrossInk 2.0. Reading EPUB, TXT and XTC books trains your party, and Home shows the lead Pokémon on supported themes.
+
+### Fixed
+
+- Pokémon training now credits only manual page turns that finish rendering, using the progress of the page shown, and saves pending training before sleep and before the reader restarts for low memory or font downloads.
+- If a Pokémon checkpoint save fails, retries now back off from 30 seconds to 10 minutes instead of retrying every poll.
+- A damaged first Pokémon save with no backup can now be reset from the Pokémon menu.
+- Withdrawing the last Pokémon from a PC box no longer leaves a selectable empty row, and long boxes no longer overflow the page.
+- Nickname and reset prompts now open on No, so pressing Confirm by accident never renames or erases anything.
+- Fixed rare display glitches when navigating Pokémon screens quickly.
+
 ## [v2.0.0] - 2026-11-19
 
 ### Added

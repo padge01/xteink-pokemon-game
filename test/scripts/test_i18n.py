@@ -13,6 +13,10 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts"))
 import gen_i18n
 
+# Product-only strings for the optional Pokemon companion build. They are not
+# community translation targets; SD languages fall back to English for them.
+ENGLISH_ONLY_PREFIXES = ("STR_POKEMON", "STR_POKEDEX")
+
 
 class I18nTest(unittest.TestCase):
     def test_translation_completeness_and_formats(self):
@@ -30,7 +34,7 @@ class I18nTest(unittest.TestCase):
         for file in sorted(directory.glob("*.yaml")):
             data = gen_i18n.parse_yaml_file(str(file))
             for key, source in english.items():
-                if not key.startswith("STR_"):
+                if not key.startswith("STR_") or key.startswith(ENGLISH_ONLY_PREFIXES):
                     continue
                 with self.subTest(language=file.stem, key=key):
                     self.assertIn(key, data)
@@ -86,7 +90,7 @@ class I18nTest(unittest.TestCase):
 
     def test_all_firmware_strings(self):
         languages, names, keys, translations, inherited = gen_i18n.load_translations(str(ROOT / "lib/I18n/translations"))
-        self.assertFalse(any(inherited))
+        self.assertFalse(any(key for keys_ in inherited for key in keys_ if not key.startswith(ENGLISH_ONLY_PREFIXES)))
         self.check_runtime(languages, names, keys, translations)
 
     def test_large_blobs_and_english_fallback(self):

@@ -2523,6 +2523,7 @@ void EpubReaderActivity::onEnter() {
   ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
   showOpeningFeedback();
   epub->setupCacheDir();
+  POKEMON_READER_HOOK(pokemonHook, beginSession());
   {
     GfxRenderer::FrameBufferLoan loan(renderer);
     epub->ensureOptimizerImageIndex();
@@ -2712,6 +2713,7 @@ void EpubReaderActivity::onExit() {
     LOG_ERR("ERS", "Failed to flush debounced reader progress on exit");
   }
   pluginEvents.exit(getCurrentBookPath(), getScreenshotInfo().progressPercent);
+  POKEMON_READER_HOOK(pokemonHook, exit());
 
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
@@ -3321,6 +3323,7 @@ void EpubReaderActivity::flushPendingSyncMark() {
 void EpubReaderActivity::loop() {
   if (mappedInput.hasPendingActivity() || RenderLock::peek()) statsSaveDelay.defer(millis());
   pluginEvents.pollWhenIdle(getCurrentBookPath());
+  POKEMON_READER_HOOK(pokemonHook, poll());
   flushPendingSyncMark();
   if (keptOffer && !keptOfferShown && offerKeptPosition()) return;
   if (!hyphenationPackChecked && checkHyphenationPack()) return;
@@ -3550,6 +3553,7 @@ void EpubReaderActivity::loop() {
   // End-of-Book screen reached (currentSpineIndex == spine count) means the book is
   // finished. Two independent finished-book features key off this same condition.
   const bool atEndOfBook = currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount();
+  POKEMON_READER_HOOK(pokemonHook, noteEndOfBook(atEndOfBook, epub->getPath(), epub->getTitle()));
   if (atEndOfBook) {
     clearPendingManualPageTurns();
   }
@@ -6157,6 +6161,7 @@ void EpubReaderActivity::setBookCompleted(bool isCompleted) {
     }
   }
   if (isCompleted) {
+    POKEMON_READER_HOOK(pokemonHook, onBookFinished(epub->getPath(), epub->getTitle()));
     completionPromptShown = true;
     if (SETTINGS.removeReadBooksFromRecents) {
       RECENT_BOOKS.removeByPath(epub->getPath());
@@ -6525,6 +6530,7 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
       pendingStableReadPage = section ? section->currentPage : nextPageNumber;
     }
     pluginEvents.noteTurn(true);
+    POKEMON_READER_HOOK(pokemonHook, noteTurn(true, source && strcmp(source, "auto") == 0));
     if (shouldRecordForwardRead) {
       if (!exitingChapter) {
         recordForwardPagePaceSample(forwardReadSeconds, source);
@@ -6537,6 +6543,7 @@ void EpubReaderActivity::pageTurn(bool isForwardTurn, const char* source) {
   } else {
     recordCurrentPageReadingTime(source, /*deferStorage=*/true);
     pluginEvents.noteTurn(false);
+    POKEMON_READER_HOOK(pokemonHook, noteTurn(false, source && strcmp(source, "auto") == 0));
     hasStableTextPosition = false;
     pendingStableReadSeconds = 0;
     armReadingPaceWarmup("back_page");
@@ -6666,6 +6673,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     armSilentRestartReaderPageBuild(epub->getPath(), static_cast<uint16_t>(currentSpineIndex),
                                     static_cast<uint16_t>(targetPage), automaticPageTurnActive);
     lowMemoryPartialRestartAttempted = true;
+    POKEMON_READER_HOOK(pokemonHook, flush());
     return silentRestartToReader();
   };
 
@@ -7391,6 +7399,8 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       MemoryBudget::logHeapShape("dict.reader_redrawn");
     }
     if (!activeFootnotePreview) pluginEvents.rendered(static_cast<int>(getCurrentBookProgressPercent() * 100));
+    if (!activeFootnotePreview)
+      POKEMON_READER_HOOK(pokemonHook, rendered(static_cast<int>(getCurrentBookProgressPercent() * 100)));
     pageShownAtMs = activeFootnotePreview ? 0UL : millis();
     startDailyReadingInterval();
   }
@@ -9103,5 +9113,6 @@ bool EpubReaderActivity::saveProgressBeforeRestart() {
   }
   // The restart skips loop() and onExit(), so queue the book for sync now.
   flushPendingSyncMark();
+  POKEMON_READER_HOOK(pokemonHook, flush());
   return saved;
 }

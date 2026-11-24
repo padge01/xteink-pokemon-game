@@ -30,6 +30,7 @@
 #include "GlobalReadingStats.h"
 #include "ManualPageTurnQueue.h"
 #include "PluginReaderEvents.h"
+#include "PokemonReaderHook.h"
 #include "ReaderButtonShortcuts.h"
 #include "ReaderProgressSaveDebouncer.h"
 #include "ReadingSessionJournal.h"
@@ -53,6 +54,9 @@ struct ToastRect {
 
 class EpubReaderActivity final : public Activity {
   PluginReaderEvents pluginEvents;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  PokemonReaderHook pokemonHook;
+#endif
 #ifdef SIMULATOR
   friend struct BookmarkListSmokeTest;
   friend struct ReaderMenuOrientationSmokeTest;
@@ -607,6 +611,7 @@ class EpubReaderActivity final : public Activity {
     if (!saveReadingProgress()) LOG_ERR("PEVT", "Reader progress save failed before sleep");
     pluginEvents.poll(getCurrentBookPath());
     pluginEvents.flush(getCurrentBookPath());
+    POKEMON_READER_HOOK(pokemonHook, flush());
   }
   void loop() override;
   void render(RenderLock&& lock) override;

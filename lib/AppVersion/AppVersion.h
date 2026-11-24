@@ -12,6 +12,16 @@ const char* sdkSha();
 const char* gitDirtyFlag();
 }  // namespace AppVersion
 
+// Product identity shown beside the version. Product builds select a name by
+// flag rather than overriding the string, so stock builds stay "CrossInk".
+#ifndef CROSSINK_PRODUCT_NAME
+#if defined(CROSSINK_PRODUCT_XTEINK_POKEMON)
+#define CROSSINK_PRODUCT_NAME "Xteink Pokemon"
+#else
+#define CROSSINK_PRODUCT_NAME "CrossInk"
+#endif
+#endif
+
 #ifndef CROSSINK_BUILD_ENV
 #define CROSSINK_BUILD_ENV "unknown"
 #endif

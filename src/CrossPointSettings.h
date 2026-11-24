@@ -633,6 +633,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t frontButtonRightLong = IGNORE;
   // UI Theme
   uint8_t uiTheme = LYRA;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  // Show the lead Pokemon on supported Home screens. Training continues when hidden.
+  uint8_t pokemonHomeScreen = 1;
+#endif
   uint8_t swapLibraryFileBrowser = 0;
   bool supportsLibraryFileBrowserSwap() const { return uiTheme == MINIMAL || uiTheme == DASHBOARD; }
   bool isLibraryFileBrowserSwapped() const { return supportsLibraryFileBrowserSwap() && swapLibraryFileBrowser; }

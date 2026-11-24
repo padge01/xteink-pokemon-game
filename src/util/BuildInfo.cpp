@@ -22,7 +22,7 @@
 
 namespace AppVersion {
 const char* version() { return CROSSINK_VERSION; }
-const char* versionLabel() { return "CrossInk " CROSSINK_VERSION; }
+const char* versionLabel() { return CROSSINK_PRODUCT_NAME " " CROSSINK_VERSION; }
 const char* userAgent() { return "CrossInk-ESP32-" CROSSINK_VERSION; }
 const char* supportVersion() { return CROSSINK_SUPPORT_VERSION; }
 const char* sdkSha() { return CROSSINK_SDK_SHA; }

@@ -661,6 +661,14 @@ void LyraCarouselTheme::registerButtonMenuTouchTargets(const GfxRenderer& render
   }
 }
 
+Rect LyraCarouselTheme::homeAccessoryRect(const GfxRenderer& renderer, const int height) {
+  const MenuLayoutMetrics menu = computeMenuLayout(renderer, 1);
+  constexpr int bottomGap = 2;
+  const int bottom = std::max(0, menu.labelY - bottomGap);
+  const int bandHeight = std::clamp(height, 0, bottom);
+  return Rect{menu.x, bottom - bandHeight, menu.width, bandHeight};
+}
+
 Rect LyraCarouselTheme::buttonMenuTouchRect(const GfxRenderer& renderer, const int buttonCount) {
   if (buttonCount <= 0) return Rect{0, 0, 0, 0};
   const MenuLayoutMetrics metrics = computeMenuLayout(renderer, buttonCount);

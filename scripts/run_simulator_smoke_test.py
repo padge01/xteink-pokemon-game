@@ -28,6 +28,13 @@ CRASH_PATTERNS = (
     "AddressSanitizer",
     "UndefinedBehaviorSanitizer",
 )
+POKEMON_ASSETS = ROOT / "fs_" / "pokemon"
+POKEMON_ART_ERROR_PATTERNS = (
+    "[PKART] Missing Pokemon art",
+    "[PKART] Invalid Pokemon art",
+    "[PKART] Could not render Pokemon art",
+)
+POKEMON_DETAIL_SUCCESS_MARKER = "Pokemon Pokedex detail card rendered"
 THEMES = {
     "classic": 0,
     "lyra": 1,
@@ -77,6 +84,51 @@ def prepare_fs(temp_root: Path, book: Path) -> str:
     target = books_dir / book.name
     shutil.copy2(book, target)
     return f"/books/{book.name}"
+
+
+def prepare_pokemon_assets(temp_root: Path) -> bool:
+    """Copy local Pokemon art when present and add the Pokedex card fixture.
+
+    The art pack is not in the repository, so the route still runs without it;
+    only the dedicated 004 card is required. Returns whether real art was copied.
+    """
+    target = temp_root / "fs_" / "pokemon"
+    copied = POKEMON_ASSETS.is_dir()
+    if copied:
+        shutil.copytree(POKEMON_ASSETS, target)
+    prepare_pokedex_card_fixture(target / "pokedex" / "portrait" / "004.bmp")
+    prepare_pokedex_card_fixture(target / "pokedex" / "landscape" / "004.bmp", 288, 432)
+    return copied
+
+
+def prepare_pokedex_card_fixture(target: Path, width: int = 472, height: int = 708) -> None:
+    """Write a packaged-size 1-bit card that exercises the dedicated SD path."""
+    row_stride = ((width + 31) // 32) * 4
+    palette = bytes((0, 0, 0, 0, 255, 255, 255, 0))
+    pixels = bytearray()
+    for y in range(height):
+        row = bytearray(b"\xff" * row_stride)
+        for x in range(width):
+            if x % 23 == 0 or y % 29 == 0:
+                row[x // 8] &= ~(0x80 >> (x % 8))
+        pixels.extend(row)
+    pixel_offset = 14 + 40 + len(palette)
+    header = struct.pack("<2sIHHI", b"BM", pixel_offset + len(pixels), 0, 0, pixel_offset)
+    dib = struct.pack("<IiiHHIIiiII", 40, width, height, 1, 1, 0, len(pixels), 2835, 2835, 2, 2)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(header + dib + palette + pixels)
+
+
+def pokemon_smoke_output_error(output: str, real_art: bool) -> str | None:
+    if real_art:
+        for pattern in POKEMON_ART_ERROR_PATTERNS:
+            if pattern in output:
+                return f"artwork failure: {pattern}"
+    if POKEMON_DETAIL_SUCCESS_MARKER not in output:
+        return "Pokedex detail card was not rendered"
+    if "Simulator smoke test passed: pokemon" not in output:
+        return "Pokemon route did not print its success marker"
+    return None
 
 
 def prepare_asset_mock(temp_root: Path, snapshot: str | None, hyphenation_only: bool = False) -> Path:
@@ -240,6 +292,7 @@ def run_smoke(args: argparse.Namespace) -> int:
     with tempfile.TemporaryDirectory(prefix="crossink-sim-smoke-") as temp_dir_name:
         temp_root = Path(temp_dir_name)
         simulator_book_path = prepare_fs(temp_root, book)
+        pokemon_real_art = prepare_pokemon_assets(temp_root) if args.pokemon else False
 
         if args.custom_sleep_images:
             # Small square with black/white halves: Fit needs centered margins,
@@ -507,6 +560,10 @@ def run_smoke(args: argparse.Namespace) -> int:
             env["CROSSINK_SIMULATOR_SMOKE_HOME_THEMES"] = "1"
         if args.theme:
             env["CROSSINK_SIMULATOR_SMOKE_THEME"] = str(THEMES[args.theme])
+        if args.pokemon:
+            env["CROSSINK_SIMULATOR_START_POKEMON"] = "1"
+        if args.landscape:
+            env["CROSSINK_SIMULATOR_POKEMON_LANDSCAPE"] = "1"
         if args.headless:
             env.setdefault("SDL_VIDEODRIVER", "dummy")
 
@@ -542,6 +599,12 @@ def run_smoke(args: argparse.Namespace) -> int:
     if "Simulator smoke test passed" not in proc.stdout:
         print("Simulator smoke test did not print its success marker", file=sys.stderr)
         return 2
+
+    if args.pokemon:
+        pokemon_error = pokemon_smoke_output_error(proc.stdout, pokemon_real_art)
+        if pokemon_error is not None:
+            print(f"Pokemon smoke test failed: {pokemon_error}", file=sys.stderr)
+            return 2
 
     if args.text_darkness and "Simulator smoke test passed: text darkness" not in proc.stdout:
         print("Simulator did not complete text darkness checks", file=sys.stderr)
@@ -635,7 +698,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--factory-flash", action="store_true",
                         help="Use the reported 80 KiB factory partition; verify it remains unchanged (S3 profiles)")
     parser.add_argument("--book", default=str(DEFAULT_BOOK), help="EPUB fixture to copy into the isolated simulator fs_")
-    parser.add_argument("--env", choices=("simulator", "simulator-X3", "x4-classic-simulator", "sticky-simulator", "x4-pro-simulator"), default="simulator",
+    parser.add_argument("--env", choices=("simulator", "simulator-X3", "x4-classic-simulator", "sticky-simulator", "x4-pro-simulator", "pokemon-simulator-X3"), default="simulator",
                         help="PlatformIO simulator environment to build and run")
     parser.add_argument("--status-bar-lifecycle", action="store_true", help="Exercise reader settings return and reflow")
     parser.add_argument("--wifi-transmit-power", action="store_true", help="Check Wi-Fi power defaults, device picker and persistence")
@@ -703,6 +766,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--menu-orientation", action="store_true", help="Check physical menu labels/actions in all rotations independently of reader preferences; captures via --about-captures")
     parser.add_argument("--home-swipe", action="store_true", help="Check bottom-edge Home swipes, ordinary list swipes, and reader menu gestures on touch devices")
     parser.add_argument("--home-themes", action="store_true", help="Compare drawer theme changes with fresh Home renders (X4 Pro)")
+    parser.add_argument("--pokemon", action="store_true", help="Run the Pokemon onboarding, collection and No-first prompt route")
+    parser.add_argument("--landscape", action="store_true", help="Run the Pokemon route in landscape orientation")
     parser.add_argument("--no-build", dest="build", action="store_false", help="Run the existing simulator binary")
     parser.add_argument("--window", dest="headless", action="store_false", help="Show the SDL window instead of using dummy video")
     parser.set_defaults(build=True, headless=True)
@@ -735,6 +800,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--font-size-book requires --c3-font-sizes")
     if args.language_file and not args.language_installer:
         parser.error("--language-file requires --language-installer")
+    if args.landscape and not args.pokemon:
+        parser.error("--landscape requires --pokemon")
+    if args.pokemon and args.env != "pokemon-simulator-X3":
+        parser.error("--pokemon requires --env pokemon-simulator-X3")
     return args
 
 

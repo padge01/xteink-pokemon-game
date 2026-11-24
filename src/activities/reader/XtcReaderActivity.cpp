@@ -127,6 +127,7 @@ void XtcReaderActivity::onEnter() {
   }
 
   xtc->setupCacheDir();
+  POKEMON_READER_HOOK(pokemonHook, beginSession());
 
   // Activate reader-specific front button mapping (if configured).
   mappedInput.setReaderMode(true);
@@ -169,6 +170,7 @@ void XtcReaderActivity::onExit() {
     LOG_ERR("XTR", "Failed to flush debounced reader progress on exit");
   }
   pluginEvents.exit(getCurrentBookPath(), getScreenshotInfo().progressPercent);
+  POKEMON_READER_HOOK(pokemonHook, exit());
 
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
@@ -216,6 +218,7 @@ void XtcReaderActivity::openReaderMenu() {
 void XtcReaderActivity::loop() {
   if (mappedInput.hasPendingActivity() || RenderLock::peek()) statsSaveDelay.defer(millis());
   pluginEvents.pollWhenIdle(getCurrentBookPath());
+  POKEMON_READER_HOOK(pokemonHook, poll());
   if (!xtc) {
     return;
   }
@@ -513,6 +516,7 @@ void XtcReaderActivity::loop() {
       }
     } else if (prevTriggered && currentPage > 0) {
       pluginEvents.noteTurn(false);
+      POKEMON_READER_HOOK(pokemonHook, noteTurn(false, false));
       recordCurrentPageReadingTime("page_back", /*deferStorage=*/true);
       if (currentPage >= static_cast<uint32_t>(skipAmount)) {
         currentPage -= skipAmount;
@@ -525,9 +529,11 @@ void XtcReaderActivity::loop() {
       const bool shouldRecordForwardRead = forwardPageReadElapsed(forwardReadSeconds, "page_forward");
       recordCurrentPageReadingTime("page_forward", /*deferStorage=*/true);
       pluginEvents.noteTurn(true);
+      POKEMON_READER_HOOK(pokemonHook, noteTurn(true, false));
       currentPage += skipAmount;
       if (currentPage >= pageCount) {
         currentPage = pageCount;  // Allow showing "End of book"
+        POKEMON_READER_HOOK(pokemonHook, onBookFinished(xtc->getPath(), xtc->getTitle()));
       }
       if (shouldRecordForwardRead) {
         recordForwardPageTurn(forwardReadSeconds, true);
@@ -822,6 +828,7 @@ void XtcReaderActivity::setBookCompleted(const bool isCompleted) {
   }
 
   stats.isCompleted = isCompleted;
+  if (isCompleted) POKEMON_READER_HOOK(pokemonHook, onBookFinished(xtc->getPath(), xtc->getTitle()));
   if (isCompleted && statsTrackingActive && !stats.finishedDateManual) {
     ReadingStatsDateTime now;
     if (getCurrentLocalReadingStatsDateTime(now)) {
@@ -1436,6 +1443,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
         })) {
       pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
                                                 : 0);
+      POKEMON_READER_HOOK(pokemonHook, renderedPage(pageToRender, xtc->getPageCount()));
       return;
     }
 
@@ -1476,6 +1484,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
     renderer.cleanupGrayscaleWithFrameBuffer();
     pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
                                               : 0);
+    POKEMON_READER_HOOK(pokemonHook, renderedPage(pageToRender, xtc->getPageCount()));
     return;
   }
 
@@ -1540,6 +1549,7 @@ void XtcReaderActivity::renderPage(const uint32_t pageToRender) {
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
   pluginEvents.rendered(xtc->getPageCount() ? static_cast<int>((pageToRender + 1ULL) * 10000 / xtc->getPageCount())
                                             : 0);
+  POKEMON_READER_HOOK(pokemonHook, renderedPage(pageToRender, xtc->getPageCount()));
 }
 
 bool XtcReaderActivity::saveProgress(const uint32_t page) {
@@ -1721,5 +1731,6 @@ bool XtcReaderActivity::saveProgressBeforeRestart() {
     LOG_ERR("READER", "Failed to save progress before restart");
     saved = false;
   }
+  POKEMON_READER_HOOK(pokemonHook, flush());
   return saved;
 }

@@ -28,6 +28,10 @@
 #include "ClippingSelectionSmokeTest.h"
 #include "OpdsCatalogSmokeTest.h"
 #include "PluginSmokeTest.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include "activities/pokemon/PokemonActivity.h"
+#include "pokemon/PokemonService.h"
+#endif
 #include "ReadingUploadSmokeTest.h"
 #include "SilentRestart.h"
 #include "StatsUploadSmokeTest.h"
@@ -8553,6 +8557,125 @@ class SimulatorSmokeTest {
             notes.simulatorPage() + 1, notes.simulatorPageCount(), releaseNotesPortraitPages);
   }
 
+#if defined(CROSSINK_ENABLE_POKEMON)
+  int pokemonPhase = 0;
+
+  // Onboarding, collection and reset routes on the X3 front controls. Prompts
+  // must open on No, so a bare Confirm never renames or erases anything.
+  void tickPokemon() {
+    if (scriptIndex < inputScript.size()) {
+      runReaderInputScript();
+      return;
+    }
+    inputScript.clear();
+    scriptIndex = 0;
+    switch (pokemonPhase++) {
+      case 0: {
+        if (std::getenv("CROSSINK_SIMULATOR_POKEMON_LANDSCAPE")) {
+          RenderLock lock;
+          SETTINGS.orientation = CrossPointSettings::LANDSCAPE_CCW;
+          renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
+        }
+        auto activity = makeUniqueNoThrow<PokemonActivity>(renderer, mappedInputManager);
+        if (!activity) fail("Could not allocate Pokemon simulator activity");
+        activityManager.replaceActivity(std::move(activity));
+        queueStep("Pokemon Starter", SmokeStep::Start, 4);
+        break;
+      }
+      case 1:
+        // The front rocker navigates on its press edge.
+        inputScript.push_back(press(MappedInputManager::Button::Right));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Gender", 4));
+        inputScript.push_back(assertActivity("Pokemon"));
+        inputScript.push_back(release(MappedInputManager::Button::Right));
+        addTap(MappedInputManager::Button::Down);
+        inputScript.push_back(render("Pokemon Gender Female", 3));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Nickname Question", 4));
+        // No is listed first: Confirm skips the keyboard and saves the starter.
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Menu after default No", 4));
+        inputScript.push_back(assertActivity("Pokemon"));
+        break;
+      case 2:
+        verifyPokemonSmokeState("onboarding");
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Party", 4));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Actions", 4));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Summary", 4));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Actions Restored", 4));
+        addTap(MappedInputManager::Button::Back);
+        inputScript.push_back(render("Pokemon Party Restored", 4));
+        addTap(MappedInputManager::Button::Back);
+        inputScript.push_back(render("Pokemon Menu Restored", 4));
+        inputScript.push_back(assertActivity("Pokemon"));
+        addTap(MappedInputManager::Button::Down);
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Pokedex", 4));
+        for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Pokedex Detail", 4));
+        addTap(MappedInputManager::Button::Back);
+        for (int i = 0; i < 3; ++i) addTap(MappedInputManager::Button::Down);
+        inputScript.push_back(render("Pokemon Pokedex Second Page", 4));
+        addTap(MappedInputManager::Button::Back);
+        for (int i = 0; i < 2; ++i) addTap(MappedInputManager::Button::Down);
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Empty PC", 4));
+        // An empty box has no row to act on, so Confirm must stay on the box.
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Empty PC Confirm", 4));
+        inputScript.push_back(assertActivity("Pokemon"));
+        break;
+      case 3:
+        addTap(MappedInputManager::Button::Back);
+        inputScript.push_back(render("Pokemon Menu before Reset", 4));
+        // Reset is the seventh Menu row; its first prompt opens on No.
+        for (int i = 0; i < 6; ++i) addTap(MappedInputManager::Button::Down);
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Reset Question", 4));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Menu after Reset No", 4));
+        // Accept the first prompt; the final confirmation also opens on No.
+        for (int i = 0; i < 6; ++i) addTap(MappedInputManager::Button::Down);
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Reset Question Again", 4));
+        addTap(MappedInputManager::Button::Down);
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Reset Confirmation", 4));
+        addTap(MappedInputManager::Button::Confirm);
+        inputScript.push_back(render("Pokemon Menu after Reset Confirmation No", 4));
+        inputScript.push_back(assertActivity("Pokemon"));
+        break;
+      case 4:
+        verifyPokemonSmokeState("declined reset");
+        // Home loads the lead Pokemon for its accessory band.
+        activityManager.goHome();
+        queueStep("Home with Pokemon accessory", SmokeStep::Start, 8);
+        break;
+      default:
+        if (!activityManager.isCurrentActivityNamed("Home")) fail("Expected Home after the Pokemon route");
+        LOG_INF("SMOKE",
+                "Simulator smoke test passed: pokemon onboarding, collection, No-first prompts, empty PC and Home");
+        std::_Exit(0);
+    }
+  }
+
+  static void verifyPokemonSmokeState(const char* stage) {
+    pokemon::PokemonSnapshot snapshot{};
+    if (pokemon::devicePokemonService().loadSnapshot(snapshot) != pokemon::ServiceStatus::Ok)
+      fail("Pokemon save could not be loaded after %s", stage);
+    if (snapshot.ownedCount != 1 || snapshot.partyCount != 1 || snapshot.party[0].speciesId != 4 ||
+        snapshot.party[0].gender != pokemon::Gender::Female || snapshot.party[0].nickname[0] != '\0')
+      fail("Pokemon save did not match the expected starter after %s", stage);
+    LOG_INF("SMOKE", "Pokemon state verified after %s", stage);
+  }
+#endif
+
   void tickAbout() {
     if (scriptIndex < inputScript.size()) {
       runReaderInputScript();
@@ -9336,6 +9459,12 @@ class SimulatorSmokeTest {
       tickAbout();
       return;
     }
+#if defined(CROSSINK_ENABLE_POKEMON)
+    if (std::getenv("CROSSINK_SIMULATOR_START_POKEMON")) {
+      tickPokemon();
+      return;
+    }
+#endif
     if (std::getenv("CROSSINK_SIMULATOR_SMOKE_RELEASE_NOTES")) {
       tickReleaseNotes();
       return;

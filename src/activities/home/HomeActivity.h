@@ -17,6 +17,9 @@
 #include "components/CoverGridHomeUi.h"
 #include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
+#if defined(CROSSINK_ENABLE_POKEMON)
+#include "pokemon/PokemonService.h"
+#endif
 
 struct RecentBook;
 struct Rect;
@@ -84,6 +87,9 @@ class HomeActivity final : public Activity {
   GlobalReadingStats globalStats;
   GlobalReadingStats allDevicesGlobalStats;
   bool showAllDevicesStats = false;
+#if defined(CROSSINK_ENABLE_POKEMON)
+  pokemon::PokemonDashboardSnapshot pokemonDashboard_{};
+#endif
 
   // Per-book stats and progress cached at onEnter() to avoid SD reads during navigation.
   std::array<BookReadingStats, kMaxCachedBooks> cachedBookStats{};
@@ -114,6 +120,9 @@ class HomeActivity final : public Activity {
   void onPluginsOpen();
   void onReadingStatsOpen();
   void onSavedItemsOpen();
+#if defined(CROSSINK_ENABLE_POKEMON)
+  void onPokemonOpen();
+#endif
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

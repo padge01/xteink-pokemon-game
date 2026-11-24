@@ -24,6 +24,7 @@ FIXTURE = r'''
 #include <limits>
 #include "ReadingSessionStats.h"
 #define LOG_ERR(...) ((void)0)
+#define POKEMON_READER_HOOK(hook, call) ((void)0)  // As in stock builds.
 bool bookFails=false, globalFails=false, dailyFails=false, journalFails=false;
 bool s_blockDestructiveSave=false, lockHeld=false, restartFails=false;
 int bookWrites=0, globalWrites=0, dailyFlushes=0, restarts=0, armed=0, transfers=0;

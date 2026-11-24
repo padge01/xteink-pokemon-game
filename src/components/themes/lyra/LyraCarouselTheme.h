@@ -59,6 +59,8 @@ class LyraCarouselTheme : public LyraTheme {
   // Full touch strip used by the carousel menu, including the label below the icons.
   // Home uses this same geometry to consume swipes that start over the menu.
   static Rect buttonMenuTouchRect(const GfxRenderer& renderer, int buttonCount);
+  // Band of the given height directly above the bottom menu labels, for Home accessories.
+  static Rect homeAccessoryRect(const GfxRenderer& renderer, int height);
   void registerButtonMenuTouchTargets(const GfxRenderer& renderer, int buttonCount) const;
   void drawCarouselBorder(GfxRenderer& renderer, Rect coverRect, const std::vector<RecentBook>& recentBooks,
                           int centerIdx, bool inCarouselRow) const override;
