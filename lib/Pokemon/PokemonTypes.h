@@ -10,11 +10,23 @@ namespace pokemon {
 constexpr size_t POKEMON_RECORD_BYTES = 48;
 constexpr size_t POKEMON_NICKNAME_BYTES = 33;
 constexpr uint16_t KANTO_SPECIES_COUNT = 151;
+// Trainer classes met while reading - see TrainerClass in PokemonTrainers.h.
+constexpr uint8_t TRAINER_CLASS_COUNT = 12;
 constexpr uint32_t MAXIMUM_TOTAL_XP = 8340;
 constexpr size_t POKEDEX_BYTES = 19;
 constexpr size_t PARTY_SIZE = 6;
 constexpr size_t EVOLUTION_ITEM_COUNT = 6;
 constexpr size_t PENDING_EVENT_CAPACITY = 3;
+
+// Sizes of the generated battle data tables. PokemonBattleTypes.h sits above
+// this header, so these are pinned here and checked by a static_assert next to
+// each table (PokemonMoveData.cpp, PokemonItemData.cpp, PokemonGymData.cpp).
+constexpr uint16_t POKEMON_MOVE_ID_MAX = 165;
+constexpr size_t POKEMON_BAG_SLOT_COUNT = 77;
+constexpr uint8_t POKEMON_ITEM_ID_MAX = 95;
+constexpr size_t POKEMON_BATTLE_BOOST_ITEM_COUNT = 6;
+constexpr size_t POKEMON_VITAMIN_ITEM_COUNT = 5;
+constexpr uint16_t POKEMON_GYM_PROGRESS_BITS = 13;  // 8 gyms + 4 Elite Four + the Champion
 
 enum class Gender : uint8_t {
   Unknown = 0,

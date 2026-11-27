@@ -249,6 +249,8 @@ add_test(NAME EegoPanelIdleRegression
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/scripts/test_eego_panel_idle.py)
 
 add_subdirectory(pokemon_types)
+add_subdirectory(pokemon_battle_data)
+add_subdirectory(pokemon_battle)
 add_subdirectory(pokemon_game)
 add_subdirectory(pokemon_store)
 add_subdirectory(pokemon_tracker)
