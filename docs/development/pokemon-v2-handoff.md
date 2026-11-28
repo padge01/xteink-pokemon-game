@@ -34,6 +34,13 @@ written.
   battle is an encounter waiting in its town.
 - **Battles:** take the battle engine and data from the thebitsworld fork, and
   replace or rewrite whatever in it is not worth taking.
+- **XP (27 November):** while reading, every party member gets 1 XP per 2
+  reading minutes, on the condition that progress does not become too fast.
+  Check this against the 3–4 month target with the pace simulation before it
+  is locked. XP from a battle goes to the Pokémon that took part in it, split
+  evenly between them, as in the original games: one that fights alone gets
+  all of it, two get half each. Party members that did not fight get none.
+- **An interrupted battle resumes (27 November):** see "The save".
 - **Content split:** the table of league leaders, their teams and badges, and
   the table of Kanto towns, routes and species per area, come from the project
   owner. The fork's existing data files are copied as they are. The systems,
@@ -41,9 +48,11 @@ written.
 
 ## Proposed, not yet confirmed by the owner
 
-- **Shared XP:** every party member gets 1 XP per 2 reading minutes and battle
-  wins are split across the party. A full team reaches about level 57–60 at
-  100 hours. Without halving, the lead alone reaches about level 84.
+- **Pace of shared reading XP:** at 1 XP per 2 reading minutes each, a full
+  team was estimated to reach about level 57–60 at 100 hours, and the lead
+  alone about level 84 without halving. That estimate assumed battle XP split
+  across the whole party; the owner has since decided it goes only to the
+  Pokémon that fought, so the estimate needs redoing.
 - **Map details:** steps come from credited reading minutes, not raw page
   turns. Each area has its own species list and level range, which replaces the
   book-progress gating. You cannot walk past a gym town until you win, losing
