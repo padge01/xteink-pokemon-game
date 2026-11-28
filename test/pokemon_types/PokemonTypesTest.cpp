@@ -44,8 +44,14 @@ PokemonRecord validRecord() {
 }
 
 void recordEncodingIsExplicitAndRoundTrips() {
-  static_assert(std::tuple_size_v<RecordBytes> == 48);
-  const PokemonRecord source = validRecord();
+  static_assert(std::tuple_size_v<RecordBytes> == 64);
+  PokemonRecord source = validRecord();
+  source.moves = {84, 45, 98, 0};
+  source.ppUsed = {3, 0, 30, 0};
+  source.hpLost = 0x0102;
+  source.status = 5;
+  source.statusTurns = 2;
+  source.ppUps = 0x1B;
   RecordBytes bytes{};
 
   CHECK(pokemon::encodeRecord(source, bytes));
@@ -57,11 +63,68 @@ void recordEncodingIsExplicitAndRoundTrips() {
   CHECK(bytes[12] == static_cast<uint8_t>(Origin::Starter));
   CHECK(bytes[13] == pokemon::recordFlag(RecordFlag::EvolutionPromptsDisabled));
   CHECK(std::memcmp(bytes.data() + 14, "Sparky", 6) == 0);
-  CHECK(bytes[20] == 0 && bytes[47] == 0);
+  CHECK(bytes[20] == 0);
+  CHECK(bytes[47] == 5);
+  CHECK(bytes[48] == 84 && bytes[49] == 45 && bytes[50] == 98 && bytes[51] == 0);
+  CHECK(bytes[52] == 3 && bytes[53] == 0 && bytes[54] == 30 && bytes[55] == 0);
+  CHECK(bytes[56] == 0x02 && bytes[57] == 0x01);
+  CHECK(bytes[58] == 0x1B);
+  CHECK(bytes[59] == 2);
+  CHECK(bytes[60] == 0 && bytes[61] == 0 && bytes[62] == 0 && bytes[63] == 0);
 
   PokemonRecord decoded{};
   CHECK(pokemon::decodeRecord(bytes, decoded));
   CHECK(decoded == source);
+
+  // The spare bytes must stay empty.
+  bytes[63] = 1;
+  CHECK(!pokemon::decodeRecord(bytes, decoded));
+}
+
+void legacyRecordsDecodeWithAnEmptyBattleCondition() {
+  static_assert(std::tuple_size_v<pokemon::LegacyRecordBytes> == 48);
+  const PokemonRecord source = validRecord();
+  RecordBytes current{};
+  CHECK(pokemon::encodeRecord(source, current));
+  // A legacy record is the first 48 bytes of the current one, ending in a zero byte.
+  pokemon::LegacyRecordBytes legacy{};
+  std::copy_n(current.begin(), legacy.size(), legacy.begin());
+
+  PokemonRecord decoded{};
+  CHECK(pokemon::decodeLegacyRecord(legacy, decoded));
+  CHECK(decoded == source);
+  CHECK(decoded.moves == (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{}));
+  CHECK(decoded.hpLost == 0);
+
+  legacy[47] = 1;
+  const PokemonRecord before = decoded;
+  CHECK(!pokemon::decodeLegacyRecord(legacy, decoded));
+  CHECK(decoded == before);
+}
+
+void battleConditionValidationRejectsImpossibleMovesAndStatus() {
+  PokemonRecord record = validRecord();
+  record.moves = {84, 45, 0, 0};
+  record.ppUsed = {5, 0, 0, 0};
+  CHECK(pokemon::validateRecord(record));
+
+  // A Pokemon may have lost any amount of health or PP: what that means depends on its stats.
+  record.hpLost = 999;
+  record.ppUsed = {64, 64, 0, 0};
+  CHECK(pokemon::validateRecord(record));
+
+  PokemonRecord invalid = record;
+  invalid.moves[2] = pokemon::POKEMON_MOVE_ID_MAX;  // Struggle is never learned
+  CHECK(!pokemon::validateRecord(invalid));
+  invalid = record;
+  invalid.moves[2] = 84;  // the same move twice
+  CHECK(!pokemon::validateRecord(invalid));
+  invalid = record;
+  invalid.ppUsed[3] = 1;  // PP spent on an empty slot
+  CHECK(!pokemon::validateRecord(invalid));
+  invalid = record;
+  invalid.status = pokemon::POKEMON_STATUS_MAX + 1U;
+  CHECK(!pokemon::validateRecord(invalid));
 }
 
 void nicknameValidationEnforcesTheStoredBoundary() {
@@ -112,7 +175,7 @@ void invalidRecordsDoNotMutateOutputs() {
   CHECK(decoded == decodedBefore);
 
   CHECK(pokemon::encodeRecord(sentinel, corrupt));
-  corrupt[47] = 1;
+  corrupt[47] = pokemon::POKEMON_STATUS_MAX + 1U;  // not a status
   CHECK(!pokemon::decodeRecord(corrupt, decoded));
   CHECK(decoded == decodedBefore);
 
@@ -220,6 +283,112 @@ PokemonState validState() {
   return state;
 }
 
+void bagHoldsEveryItemExceptEvolutionItems() {
+  static_assert(pokemon::POKEMON_FIRST_BAG_ITEM_ID == 7);
+  static_assert(pokemon::POKEMON_BAG_ITEM_COUNT == 89);
+  PokemonState state = validState();
+  CHECK(pokemon::bagCount(state, pokemon::POKEMON_ITEM_POKE_BALL) == 0);
+  CHECK(pokemon::addBagItem(state, pokemon::POKEMON_ITEM_POKE_BALL, 3));
+  CHECK(pokemon::addBagItem(state, pokemon::POKEMON_ITEM_ID_MAX, 1));
+  CHECK(pokemon::bagCount(state, pokemon::POKEMON_ITEM_POKE_BALL) == 3);
+  CHECK(pokemon::bagCount(state, pokemon::POKEMON_ITEM_ID_MAX) == 1);
+  CHECK(state.bagCounts.front() == 3 && state.bagCounts.back() == 1);
+
+  // A stack stops at its limit instead of wrapping.
+  CHECK(pokemon::addBagItem(state, pokemon::POKEMON_ITEM_POKE_BALL, 250));
+  CHECK(pokemon::bagCount(state, pokemon::POKEMON_ITEM_POKE_BALL) == pokemon::POKEMON_BAG_STACK_MAX);
+  CHECK(pokemon::validateState(state));
+
+  // Evolution items and unknown ids are not in the bag.
+  const PokemonState before = state;
+  CHECK(!pokemon::addBagItem(state, pokemon::POKEMON_FIRST_BAG_ITEM_ID - 1U, 1));
+  CHECK(!pokemon::addBagItem(state, pokemon::POKEMON_ITEM_ID_MAX + 1U, 1));
+  CHECK(state == before);
+  CHECK(pokemon::bagCount(state, 1) == 0);
+
+  state.bagCounts[4] = pokemon::POKEMON_BAG_STACK_MAX + 1U;
+  CHECK(!pokemon::validateState(state));
+
+  PokemonState fresh = validState();
+  pokemon::grantStartingItems(fresh);
+  CHECK(pokemon::bagCount(fresh, pokemon::POKEMON_ITEM_POKE_BALL) == pokemon::POKEMON_STARTING_POKE_BALLS);
+  CHECK(pokemon::bagCount(fresh, pokemon::POKEMON_ITEM_POTION) == pokemon::POKEMON_STARTING_POTIONS);
+}
+
+void leagueProgressAndHallOfFameAreValidated() {
+  PokemonState state = validState();
+  state.battleProgress = (1U << pokemon::POKEMON_GYM_PROGRESS_BITS) - 1U;
+  CHECK(pokemon::validateState(state));
+  state.battleProgress = 1U << pokemon::POKEMON_GYM_PROGRESS_BITS;
+  CHECK(!pokemon::validateState(state));
+
+  state = validState();
+  state.hallOfFame.team[0] = {6, 62};
+  state.hallOfFame.team[1] = {25, 58};
+  state.hallOfFame.lifetimeMinutes = 6000;
+  CHECK(pokemon::validateState(state));
+
+  PokemonState invalid = state;
+  invalid.hallOfFame.team[3] = {9, 60};  // a gap in the team
+  CHECK(!pokemon::validateState(invalid));
+  invalid = state;
+  invalid.hallOfFame.team[1].level = 101;
+  CHECK(!pokemon::validateState(invalid));
+  invalid = state;
+  invalid.hallOfFame.team[1].speciesId = pokemon::KANTO_SPECIES_COUNT + 1U;
+  CHECK(!pokemon::validateState(invalid));
+  invalid = validState();
+  invalid.hallOfFame.lifetimeMinutes = 6000;  // a time without a team
+  CHECK(!pokemon::validateState(invalid));
+}
+
+void savedBattleMustMatchThePartyAndTheWaitingList() {
+  const PendingEvent encounter{0, 16, 4, Gender::Male, pokemon::EvolutionItem::None, PendingEventKind::Encounter};
+  PokemonState state = validState();
+  state.pendingEvents[0] = encounter;
+  state.savedBattle.kind = pokemon::SavedBattleKind::Wild;
+  state.savedBattle.playerSlot = 1;
+  state.savedBattle.foes[0] = {7, 5};
+  CHECK(pokemon::validateState(state));
+
+  PokemonState invalid = state;
+  invalid.pendingEvents[0] = {};  // nothing left to fight
+  CHECK(!pokemon::validateState(invalid));
+  invalid = state;
+  invalid.savedBattle.playerSlot = 2;  // an empty party slot
+  CHECK(!pokemon::validateState(invalid));
+  invalid = state;
+  invalid.savedBattle.foes[1].hpLost = 1;  // a wild Pokemon is alone
+  CHECK(!pokemon::validateState(invalid));
+  invalid = state;
+  invalid.savedBattle.leagueIndex = 1;
+  CHECK(!pokemon::validateState(invalid));
+  invalid = state;
+  invalid.savedBattle.foes[0].status = pokemon::POKEMON_STATUS_MAX + 1U;
+  CHECK(!pokemon::validateState(invalid));
+
+  PokemonState league = validState();
+  league.savedBattle.kind = pokemon::SavedBattleKind::League;
+  league.savedBattle.leagueIndex = pokemon::POKEMON_GYM_PROGRESS_BITS;
+  league.savedBattle.foeSlot = 5;
+  league.savedBattle.foes[4] = {300, 0};
+  CHECK(pokemon::validateState(league));
+  invalid = league;
+  invalid.savedBattle.leagueIndex = 0;
+  CHECK(!pokemon::validateState(invalid));
+  invalid = league;
+  invalid.savedBattle.leagueIndex = pokemon::POKEMON_GYM_PROGRESS_BITS + 1U;
+  CHECK(!pokemon::validateState(invalid));
+  invalid = league;
+  invalid.savedBattle.foeSlot = 6;
+  CHECK(!pokemon::validateState(invalid));
+
+  // With no battle saved, nothing else may be left behind.
+  invalid = validState();
+  invalid.savedBattle.foes[0].hpLost = 1;
+  CHECK(!pokemon::validateState(invalid));
+}
+
 void stateValidationRejectsPartyAndPokedexCorruption() {
   const PokemonState valid = validState();
   CHECK(pokemon::validateState(valid));
@@ -306,10 +475,16 @@ void pendingEventQueueIsFixedFifoAndCompacted() {
   CHECK(pokemon::enqueuePendingEvent(state, encounter));
   CHECK(pokemon::enqueuePendingEvent(state, item));
   CHECK(pokemon::enqueuePendingEvent(state, evolution));
-  const PokemonState full = state;
-  CHECK(!pokemon::enqueuePendingEvent(state, fourth));
-  CHECK(state == full);
-  CHECK(pokemon::pendingEventCount(state) == pokemon::PENDING_EVENT_CAPACITY);
+  CHECK(pokemon::pendingEventCount(state) == 3);
+
+  // Once every slot is taken the queue refuses another event and is left as it was.
+  PokemonState full = state;
+  while (pokemon::pendingEventCount(full) < pokemon::PENDING_EVENT_CAPACITY) {
+    CHECK(pokemon::enqueuePendingEvent(full, item));
+  }
+  const PokemonState fullBefore = full;
+  CHECK(!pokemon::enqueuePendingEvent(full, fourth));
+  CHECK(full == fullBefore);
   CHECK(pokemon::pendingEventFront(state) != nullptr);
   CHECK(*pokemon::pendingEventFront(state) == encounter);
 
@@ -501,12 +676,17 @@ void everyKantoEvolutionMatchesTheCanonicalList() {
 
 int main() {
   recordEncodingIsExplicitAndRoundTrips();
+  legacyRecordsDecodeWithAnEmptyBattleCondition();
+  battleConditionValidationRejectsImpossibleMovesAndStatus();
   nicknameValidationEnforcesTheStoredBoundary();
   nicknamePromptContextTracksThePokemonBeingNamed();
   invalidRecordsDoNotMutateOutputs();
   recordValidationRejectsImpossibleLevelAndGender();
   xpBoundariesStartAtZeroAndClampAtLevelOneHundred();
   levelProgressIsRelativeToTheCurrentLevel();
+  bagHoldsEveryItemExceptEvolutionItems();
+  leagueProgressAndHallOfFameAreValidated();
+  savedBattleMustMatchThePartyAndTheWaitingList();
   stateValidationRejectsPartyAndPokedexCorruption();
   pendingEventValidationFollowsItsTag();
   pendingEventQueueIsFixedFifoAndCompacted();

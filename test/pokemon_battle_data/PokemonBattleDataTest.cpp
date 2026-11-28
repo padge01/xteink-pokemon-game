@@ -136,6 +136,12 @@ void itemsPinTheFirstSixIdsToTheExistingEvolutionItemOrder() {
     CHECK(pokeBall->effectValue == 10);
   }
 
+  // The starting items are named by id in PokemonTypes.h, which cannot see this table.
+  const pokemon::ItemData* startingBall = pokemon::itemData(pokemon::POKEMON_ITEM_POKE_BALL);
+  const pokemon::ItemData* startingPotion = pokemon::itemData(pokemon::POKEMON_ITEM_POTION);
+  CHECK(startingBall != nullptr && std::string_view(startingBall->name) == "Poke Ball");
+  CHECK(startingPotion != nullptr && std::string_view(startingPotion->name) == "Potion");
+
   const pokemon::ItemData* masterBall = pokemon::itemData(10);
   CHECK(masterBall != nullptr);
   if (masterBall != nullptr) CHECK(masterBall->effectValue == 255);

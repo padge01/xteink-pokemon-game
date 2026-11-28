@@ -5,10 +5,15 @@
 #include <array>
 #include <cstdint>
 
+#include "PokemonBattle.h"
 #include "PokemonSpecies.h"
 
 namespace pokemon {
 namespace {
+
+// PokemonTypes.h sits below the battle headers and pins its own copies of these.
+static_assert(POKEMON_MOVE_SLOTS == BATTLE_MOVE_SLOTS);
+static_assert(POKEMON_STATUS_MAX == static_cast<uint8_t>(Ailment::Confusion));
 
 constexpr uint8_t OWNED_NEEDS_MASK = 0x3FU;
 constexpr uint8_t ENCOUNTER_CHECK_MINUTES = 15;
@@ -425,6 +430,7 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, const En
     caught.caughtLevel = pending.level;
     caught.gender = pending.gender;
     caught.origin = Origin::Caught;
+    assignLevelUpMoves(caught);
     if (!setNickname(caught, nickname == nullptr ? "" : nickname) || !validateRecord(caught) ||
         !markSpecies(stateCandidate.seenSpecies, caught.speciesId) ||
         !markSpecies(stateCandidate.caughtSpecies, caught.speciesId)) {
@@ -516,6 +522,15 @@ CollectionActionSet collectionActions(const bool party, const uint8_t partyCount
   append(CollectionAction::Rename);
   append(CollectionAction::EvolutionPrompts);
   return actions;
+}
+
+void assignLevelUpMoves(PokemonRecord& record) {
+  // The same choice the battle engine makes for a wild Pokemon, so one that is caught keeps
+  // the moves it fought with.
+  std::array<uint8_t, BATTLE_MOVE_SLOTS> fullPp{};
+  defaultMovesetForLevel(record.speciesId, levelForXp(record.totalXp), record.moves, fullPp);
+  record.ppUsed = {};
+  record.ppUps = 0;
 }
 
 }  // namespace pokemon

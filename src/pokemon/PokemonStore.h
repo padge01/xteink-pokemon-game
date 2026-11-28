@@ -22,8 +22,16 @@ enum class PcOrder : uint8_t {
   Alphabetical,
 };
 
+// Fills in what a record gains when a save from before battles is upgraded: the moves a Pokemon
+// of its species and level knows. Everything else a record gained starts out empty.
+using RecordUpgradeFn = void (*)(PokemonRecord& record);
+
 class PokemonStore {
  public:
+  explicit PokemonStore(const RecordUpgradeFn upgradeRecord = nullptr) : upgradeRecord_(upgradeRecord) {}
+
+  // Finds the newest valid snapshot. A snapshot from an older version is rewritten in the
+  // current one before this returns, and the old file is kept as a backup.
   StoreBeginResult begin();
   bool isReady() const { return ready_; }
   uint32_t recordCount() const { return ready_ ? activeHeader_.recordCount : 0; }
@@ -32,10 +40,19 @@ class PokemonStore {
   bool loadOwnedEvolutionNeeds(OwnedEvolutionNeeds& output) const;
   bool readPcPage(PcOrder order, size_t offset, std::span<PokemonRecord> output, size_t& count) const;
   bool commit(const PokemonState& state, const RecordMutation& mutation = {});
+  // Saves the state and every record change in `mutations` as one snapshot: all of it is saved
+  // or none of it. Takes up to RECORD_MUTATION_CAPACITY entries, at most one of them an Append,
+  // and no record twice. Entries of kind None are skipped.
+  bool commit(const PokemonState& state, std::span<const RecordMutation> mutations);
   bool reset();
 
  private:
-  bool writeSnapshot(const PokemonState& state, const RecordMutation& mutation, bool discardRecords);
+  bool writeSnapshot(const PokemonState& state, std::span<const RecordMutation> mutations, bool discardRecords);
+  bool writeInactiveSnapshot(const PokemonState& state, std::span<const RecordMutation> mutations, bool discardRecords,
+                             SnapshotHeader& header);
+  bool upgradeActiveSnapshot();
+
+  RecordUpgradeFn upgradeRecord_ = nullptr;
 
   SnapshotHeader activeHeader_{};
   // Set by begin() when a single corrupt slot has no fallback (an interrupted

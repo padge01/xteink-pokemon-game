@@ -4,6 +4,11 @@
 
 - The Xteink Pokémon companion (`pokemon-x3` firmware) now runs on CrossInk 2.0. Reading EPUB, TXT and XTC books trains your party, and Home shows the lead Pokémon on supported themes.
 
+### Changed
+
+- A Pokémon save from v0.1.x is upgraded the first time it is opened. Every Pokémon, level and Pokédex entry carries over, each Pokémon gets the moves for its level, and 10 Poké Balls and a Potion are added, ready for battles. The old save is kept on the SD card as `/.crosspoint/pokemon-before-upgrade.bin`.
+- Up to 8 encounters, items and evolutions can now wait for you, up from 3.
+
 ### Fixed
 
 - Pokémon training now credits only manual page turns that finish rendering, using the progress of the page shown, and saves pending training before sleep and before the reader restarts for low memory or font downloads.

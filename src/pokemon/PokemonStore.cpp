@@ -17,6 +17,9 @@ constexpr const char* STORE_PATH_A = "/.crosspoint/pokemon-a.bin";
 constexpr const char* STORE_PATH_B = "/.crosspoint/pokemon-b.bin";
 constexpr const char* LEGACY_STORE_PATH_A = "/.crosspoint/pokemon-v2-a.bin";
 constexpr const char* LEGACY_STORE_PATH_B = "/.crosspoint/pokemon-v2-b.bin";
+// The last snapshot an older version wrote, set aside when the save is upgraded so the player
+// can still go back to that version.
+constexpr const char* UPGRADE_BACKUP_PATH = "/.crosspoint/pokemon-before-upgrade.bin";
 
 enum class InspectionResult : uint8_t {
   Missing,
@@ -45,6 +48,29 @@ void write32(uint8_t* bytes, const uint32_t value) {
 
 size_t recordsOffset(const SnapshotHeader& header) {
   return POKEMON_SNAPSHOT_HEADER_BYTES + snapshotStateBytes(header.version);
+}
+
+bool isOlderVersion(const SnapshotHeader& header) { return header.version != POKEMON_SNAPSHOT_VERSION; }
+
+// Decodes the `size` bytes of a record as `version` wrote them.
+bool decodeStoredRecord(const RecordBytes& bytes, const uint16_t version, PokemonRecord& output) {
+  if (version == POKEMON_SNAPSHOT_VERSION) return decodeRecord(bytes, output);
+  LegacyRecordBytes legacy{};
+  std::memcpy(legacy.data(), bytes.data(), legacy.size());
+  return decodeLegacyRecord(legacy, output);
+}
+
+// Moves the snapshot an older version wrote out of its slot, replacing any earlier backup.
+void setAsideOlderSnapshot(const char* path) {
+  if (Storage.exists(UPGRADE_BACKUP_PATH) && !Storage.remove(UPGRADE_BACKUP_PATH)) {
+    LOG_ERR("PokemonStore", "Failed to remove the previous upgrade backup");
+    return;
+  }
+  if (!Storage.rename(path, UPGRADE_BACKUP_PATH)) {
+    LOG_ERR("PokemonStore", "Failed to keep %s as the upgrade backup", path);
+    return;
+  }
+  LOG_INF("PokemonStore", "Kept the pre-upgrade save as %s", UPGRADE_BACKUP_PATH);
 }
 
 InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader) {
@@ -97,16 +123,17 @@ InspectionResult inspectSnapshot(const char* path, SnapshotHeader& outputHeader)
       requiredPendingRecords |= static_cast<uint8_t>(1U << eventIndex);
     }
   }
+  const size_t recordSize = snapshotRecordBytes(header.version);
   for (uint32_t index = 0; index < header.recordCount; ++index) {
     RecordBytes recordBytes{};
     PokemonRecord record{};
-    if (!readExact(file, recordBytes.data(), recordBytes.size()) || !decodeRecord(recordBytes, record) ||
+    if (!readExact(file, recordBytes.data(), recordSize) || !decodeStoredRecord(recordBytes, header.version, record) ||
         record.recordId <= previousRecordId || !isSpeciesMarked(state.caughtSpecies, record.speciesId)) {
       LOG_ERR("PokemonStore", "Invalid record in %s", path);
       file.close();
       return InspectionResult::Corrupt;
     }
-    crc = updateSnapshotCrc32(crc, recordBytes.data(), recordBytes.size());
+    crc = updateSnapshotCrc32(crc, recordBytes.data(), recordSize);
     previousRecordId = record.recordId;
     for (size_t slot = 0; slot < PARTY_SIZE; ++slot) {
       if (state.partyRecordIds[slot] == record.recordId) foundPartySlots |= static_cast<uint8_t>(1U << slot);
@@ -146,6 +173,44 @@ bool sequenceIsNewer(const uint32_t candidate, const uint32_t current) {
 bool recordIsInParty(const PokemonState& state, const uint32_t recordId) {
   return std::any_of(state.partyRecordIds.begin(), state.partyRecordIds.end(),
                      [recordId](const uint32_t partyRecordId) { return partyRecordId == recordId; });
+}
+
+// Checks a batch of record changes before anything is written, and reports the one record it
+// adds (if any) and how many it replaces. Entries of kind None are skipped.
+bool planMutations(const std::span<const RecordMutation> mutations, const RecordMutation*& append,
+                   size_t& replacementCount) {
+  append = nullptr;
+  replacementCount = 0;
+  if (mutations.size() > RECORD_MUTATION_CAPACITY) return false;
+  for (size_t index = 0; index < mutations.size(); ++index) {
+    const RecordMutation& mutation = mutations[index];
+    if (mutation.kind == RecordMutationKind::None) continue;
+    if ((mutation.kind != RecordMutationKind::Append && mutation.kind != RecordMutationKind::Replace) ||
+        mutation.requestedRecordId != mutation.record.recordId || !validateRecord(mutation.record)) {
+      return false;
+    }
+    for (size_t prior = 0; prior < index; ++prior) {
+      if (mutations[prior].kind != RecordMutationKind::None &&
+          mutations[prior].record.recordId == mutation.record.recordId) {
+        return false;
+      }
+    }
+    if (mutation.kind == RecordMutationKind::Replace) {
+      ++replacementCount;
+    } else if (append == nullptr) {
+      append = &mutation;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
+const RecordMutation* findReplacement(const std::span<const RecordMutation> mutations, const uint32_t recordId) {
+  for (const RecordMutation& mutation : mutations) {
+    if (mutation.kind == RecordMutationKind::Replace && mutation.record.recordId == recordId) return &mutation;
+  }
+  return nullptr;
 }
 
 }  // namespace
@@ -209,6 +274,19 @@ StoreBeginResult PokemonStore::begin() {
     activeHeader_ = activeIsA_ ? headerA : headerB;
     ready_ = true;
     writable_ = true;
+    const bool otherIsReady = (activeIsA_ ? resultB : resultA) == InspectionResult::Ready;
+    const SnapshotHeader& otherHeader = activeIsA_ ? headerB : headerA;
+    if (isOlderVersion(activeHeader_)) {
+      if (!upgradeActiveSnapshot()) {
+        ready_ = false;
+        writable_ = false;
+        return StoreBeginResult::Corrupt;
+      }
+    } else if (otherIsReady && isOlderVersion(otherHeader)) {
+      // An upgrade that was cut off after the new snapshot was written but before the old one
+      // was set aside. Finish it, or the next save would overwrite the old snapshot.
+      setAsideOlderSnapshot(activeIsA_ ? STORE_PATH_B : STORE_PATH_A);
+    }
     return StoreBeginResult::Ready;
   }
   if (resultA == InspectionResult::Missing && resultB == InspectionResult::Missing) {
@@ -243,37 +321,72 @@ bool PokemonStore::loadState(PokemonState& output) const {
     LOG_ERR("PokemonStore", "Failed to decode active state");
     return false;
   }
+  upgradeState(output, activeHeader_.version);
+  return true;
+}
+
+bool PokemonStore::upgradeActiveSnapshot() {
+  const char* olderPath = activeIsA_ ? STORE_PATH_A : STORE_PATH_B;
+  PokemonState state{};
+  // writeSnapshot() converts each record as it copies it across.
+  if (!loadState(state) || !writeSnapshot(state, {}, false)) {
+    LOG_ERR("PokemonStore", "Failed to upgrade the save in %s", olderPath);
+    return false;
+  }
+  LOG_INF("PokemonStore", "Upgraded the save to version %u", static_cast<unsigned>(POKEMON_SNAPSHOT_VERSION));
+  setAsideOlderSnapshot(olderPath);
   return true;
 }
 
 bool PokemonStore::commit(const PokemonState& state, const RecordMutation& mutation) {
-  return writeSnapshot(state, mutation, false);
+  return writeSnapshot(state, std::span<const RecordMutation>(&mutation, 1), false);
 }
 
-bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation& mutation, const bool discardRecords) {
-  const bool appending = mutation.kind == RecordMutationKind::Append;
-  const bool replacing = mutation.kind == RecordMutationKind::Replace;
-  if (!writable_ || !validateState(state) || (discardRecords && mutation.kind != RecordMutationKind::None) ||
-      ((appending || replacing) &&
-       (mutation.requestedRecordId != mutation.record.recordId || !validateRecord(mutation.record))) ||
-      (replacing && (!ready_ || discardRecords)) ||
-      (!appending && !replacing && mutation.kind != RecordMutationKind::None)) {
+bool PokemonStore::commit(const PokemonState& state, const std::span<const RecordMutation> mutations) {
+  return writeSnapshot(state, mutations, false);
+}
+
+bool PokemonStore::writeSnapshot(const PokemonState& state, const std::span<const RecordMutation> mutations,
+                                 const bool discardRecords) {
+  SnapshotHeader header{};
+  if (!writeInactiveSnapshot(state, mutations, discardRecords, header)) return false;
+
+  const bool destinationIsA = !ready_ || !activeIsA_;
+  SnapshotHeader verified{};
+  if (inspectSnapshot(destinationIsA ? STORE_PATH_A : STORE_PATH_B, verified) != InspectionResult::Ready ||
+      verified != header) {
+    LOG_ERR("PokemonStore", "Inactive snapshot verification failed");
+    return false;
+  }
+  activeHeader_ = verified;
+  activeIsA_ = destinationIsA;
+  ready_ = true;
+  return true;
+}
+
+// Kept out of line so its buffers are off the stack again before the snapshot is read back and
+// checked: the two steps each hold a full copy of the state.
+[[gnu::noinline]] bool PokemonStore::writeInactiveSnapshot(const PokemonState& state,
+                                                           const std::span<const RecordMutation> mutations,
+                                                           const bool discardRecords, SnapshotHeader& header) {
+  const RecordMutation* append = nullptr;
+  size_t replacementCount = 0;
+  if (!writable_ || !validateState(state) || !planMutations(mutations, append, replacementCount) ||
+      (discardRecords && (append != nullptr || replacementCount != 0)) || (replacementCount != 0 && !ready_)) {
     return false;
   }
 
   const bool preserveRecords = ready_ && !discardRecords;
   const uint32_t currentRecordCount = preserveRecords ? activeHeader_.recordCount : 0;
-  if (appending && currentRecordCount == UINT32_MAX) return false;
+  if (append != nullptr && currentRecordCount == UINT32_MAX) return false;
 
   const uint32_t nextSequence =
       !ready_ ? 1U : (activeHeader_.sequence == UINT32_MAX ? 1U : activeHeader_.sequence + 1U);
   StateBytes stateBytes{};
-  const SnapshotHeader header{nextSequence, currentRecordCount + (appending ? 1U : 0U)};
+  header = SnapshotHeader{nextSequence, currentRecordCount + (append != nullptr ? 1U : 0U)};
   HeaderBytes headerBytes{};
   if (!encodeState(state, stateBytes) || !encodeSnapshotHeader(header, headerBytes)) return false;
-  write32(stateBytes.data() + 108, nextSequence);
-  RecordBytes mutationRecordBytes{};
-  if ((appending || replacing) && !encodeRecord(mutation.record, mutationRecordBytes)) return false;
+  write32(stateBytes.data() + POKEMON_STATE_SEQUENCE_OFFSET, nextSequence);
 
   const bool destinationIsA = !ready_ || !activeIsA_;
   const char* destinationPath = destinationIsA ? STORE_PATH_A : STORE_PATH_B;
@@ -299,27 +412,39 @@ bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation
   bool writeOk = writeExact(destination, headerBytes.data(), headerBytes.size()) &&
                  writeExact(destination, stateBytes.data(), stateBytes.size());
   uint32_t lastRecordId = 0;
-  bool replacementFound = !replacing;
+  size_t replacementsWritten = 0;
+  const uint16_t sourceVersion = activeHeader_.version;
+  const size_t sourceRecordSize = preserveRecords ? snapshotRecordBytes(sourceVersion) : 0;
   for (uint32_t index = 0; writeOk && index < currentRecordCount; ++index) {
     RecordBytes recordBytes{};
-    writeOk = readExact(source, recordBytes.data(), recordBytes.size());
+    writeOk = readExact(source, recordBytes.data(), sourceRecordSize);
+    if (writeOk && sourceVersion != POKEMON_SNAPSHOT_VERSION) {
+      // The source is a snapshot from an older version: bring each record forward.
+      PokemonRecord upgraded{};
+      writeOk = decodeStoredRecord(recordBytes, sourceVersion, upgraded);
+      if (writeOk && upgradeRecord_ != nullptr) upgradeRecord_(upgraded);
+      writeOk = writeOk && encodeRecord(upgraded, recordBytes);
+    }
     if (writeOk) {
       const uint32_t recordId = read32(recordBytes.data());
       writeOk = recordId > lastRecordId;
       lastRecordId = recordId;
-      const bool useReplacement = replacing && recordId == mutation.requestedRecordId;
-      const RecordBytes& outputBytes = useReplacement ? mutationRecordBytes : recordBytes;
-      writeOk = writeOk && writeExact(destination, outputBytes.data(), outputBytes.size());
-      if (writeOk) crc = updateSnapshotCrc32(crc, outputBytes.data(), outputBytes.size());
-      if (writeOk && useReplacement) replacementFound = true;
+      if (const RecordMutation* replacement = findReplacement(mutations, recordId); replacement != nullptr) {
+        writeOk = writeOk && encodeRecord(replacement->record, recordBytes);
+        if (writeOk) ++replacementsWritten;
+      }
+      writeOk = writeOk && writeExact(destination, recordBytes.data(), recordBytes.size());
+      if (writeOk) crc = updateSnapshotCrc32(crc, recordBytes.data(), recordBytes.size());
     }
   }
-  if (appending) {
-    writeOk = writeOk && mutation.record.recordId > lastRecordId &&
-              writeExact(destination, mutationRecordBytes.data(), mutationRecordBytes.size());
-    if (writeOk) crc = updateSnapshotCrc32(crc, mutationRecordBytes.data(), mutationRecordBytes.size());
+  if (append != nullptr) {
+    RecordBytes appendBytes{};
+    writeOk = writeOk && append->record.recordId > lastRecordId && encodeRecord(append->record, appendBytes) &&
+              writeExact(destination, appendBytes.data(), appendBytes.size());
+    if (writeOk) crc = updateSnapshotCrc32(crc, appendBytes.data(), appendBytes.size());
   }
-  writeOk = writeOk && replacementFound;
+  // A replacement whose record is not in the save would otherwise be dropped silently.
+  writeOk = writeOk && replacementsWritten == replacementCount;
   const bool sourceCloseOk = !preserveRecords || source.close();
   uint8_t crcBytes[POKEMON_SNAPSHOT_CRC_BYTES]{};
   write32(crcBytes, finishSnapshotCrc32(crc));
@@ -329,15 +454,6 @@ bool PokemonStore::writeSnapshot(const PokemonState& state, const RecordMutation
     LOG_ERR("PokemonStore", "Failed to write inactive snapshot");
     return false;
   }
-
-  SnapshotHeader verified{};
-  if (inspectSnapshot(destinationPath, verified) != InspectionResult::Ready || verified != header) {
-    LOG_ERR("PokemonStore", "Inactive snapshot verification failed");
-    return false;
-  }
-  activeHeader_ = verified;
-  activeIsA_ = destinationIsA;
-  ready_ = true;
   return true;
 }
 

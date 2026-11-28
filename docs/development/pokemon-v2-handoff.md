@@ -54,7 +54,8 @@ written.
   stat boosts. The fork's engine uses IVs and EVs, so cutting them means
   feeding it fixed values.
 - **Release:** ship the port as v0.2.0 labelled beta until CrossInk tags 2.0.0.
-- **Save migrations:** small chained steps, not one large frozen format.
+- **Save migrations:** small chained steps, not one large frozen format. The
+  save built on 27 November works this way (see "The save").
 
 ## What is on `feat/battle-engine`
 
@@ -95,6 +96,55 @@ Not adapted yet: `scripts/dev/simulate_pokemon_pace.py` still looks for
 
 Before a release, credit the thebitsworld fork and PokeAPI (the source of the
 battle data CSVs) in `RIGHTS_AND_ATTRIBUTION.md`.
+
+## The save
+
+Approved by the owner on 27 November 2026 and built that day. It is not
+committed yet.
+
+- **Files:** the same two alternating files as v0.1.1, `pokemon-a.bin` and
+  `pokemon-b.bin`. Every save writes a complete snapshot to the idle file and
+  checks it before switching, so a save lands whole or not at all. There are no
+  side files for battle data.
+- **Version 3.** Versions 1 and 2 are still read. `decodeState()` reads each
+  version with its own decoder, and `upgradeState()` applies what newer rules
+  add, one version at a time. Version 3 can keep changing until it ships in a
+  release; after that a change is a new version with its own small step.
+- **Each Pokémon's record is 64 bytes** (48 before). It adds four moves, PP
+  used per move, HP lost, status, status turns and PP Ups, with four spare
+  bytes. Health and PP are stored as what has been lost, so zero means full and
+  a record is valid without any stat table. Pokémon in the PC box keep all of
+  this.
+- **The game section is 320 bytes** (116 before). It adds the bag (one count
+  per item id 7 to 95, up to 99 each), league progress (13 bits), the map
+  position (area, destination, steps), the Hall of Fame team and time, and an
+  unfinished battle. The waiting list holds 8 events instead of 3. Fifteen
+  bytes are spare.
+- **One save can change seven records:** `PokemonStore::commit()` takes a list
+  of up to six replacements and one new record. This is what a battle's end,
+  shared XP and healing in a town need.
+- **An unfinished battle** (`SavedBattle`) is written when the reader sleeps or
+  the player leaves the game, not every turn. It holds who is on the field and
+  each opponent's HP lost and status. The player's side is in the party
+  records, saved in the same commit. Effects that last one battle start over
+  on resume. A crash puts the player back at the start of that battle.
+- **Upgrading an older save** happens in `PokemonStore::begin()`. The newer old
+  snapshot is rewritten as version 3 into the idle file, each Pokémon gets the
+  moves for its level (`assignLevelUpMoves()`), the bag gets 10 Poké Balls and
+  a Potion, and the old snapshot is renamed to
+  `pokemon-before-upgrade.bin`. If the upgrade is cut off, the old snapshot is
+  still in its slot and the next start upgrades it again.
+- **A new game** gets the same moves and starting items.
+- **Tests:** a real v0.1.1 save is upgraded in `PokemonServiceTest`, and
+  `PokemonStoreTest` cuts the upgrade and a seven-record save at every byte.
+
+Not in the save yet, and added with the feature that needs them: a road
+trainer as a waiting event and as a saved battle, the road-trainer and item
+drop counters, and bounds on the map position. Hidden stats are not stored;
+IVs would fit in the spare record bytes, EVs would need a larger record.
+
+Book memories are not built. The plan keeps them in their own file so damage
+there cannot hurt the save.
 
 ## Audit of the fork
 
@@ -146,9 +196,7 @@ icon, `features::pokemonGame()` and 153 extra `STR_POKEMON_*` strings.
 
 ## Next steps
 
-1. Design one save file that holds moves, HP, PP and battle state per Pokémon,
-   map position and gym progress, with an update that can change all six party
-   members in one commit. Grant starting balls when an older save is upgraded.
+1. Done on 27 November: the save (see "The save").
 2. Merge `PokemonGame`, `PokemonTypes` and `PokemonService` by hand.
 3. Write a battle controller in `lib/Pokemon/` that owns turn order, trainer
    decisions and XP and gym sequencing, with tests.

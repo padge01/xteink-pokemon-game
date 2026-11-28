@@ -1,3 +1,4 @@
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -60,6 +61,46 @@ pokemon::PokemonState stateWithLeader(const pokemon::PokemonRecord& leader) {
   pokemon::PokemonState state{};
   state.partyRecordIds[0] = leader.recordId;
   return state;
+}
+
+void everySpeciesGetsValidMovesAtEveryLevel() {
+  for (uint16_t speciesId = 1; speciesId <= pokemon::KANTO_SPECIES_COUNT; ++speciesId) {
+    const pokemon::SpeciesData* species = pokemon::speciesData(speciesId);
+    CHECK(species != nullptr);
+    if (species == nullptr) continue;
+    pokemon::PokemonRecord record{};
+    record.recordId = 1;
+    record.speciesId = speciesId;
+    record.origin = pokemon::Origin::Caught;
+    record.gender = species->genderRate == 255
+                        ? pokemon::Gender::Genderless
+                        : (species->genderRate == 0 ? pokemon::Gender::Male : pokemon::Gender::Female);
+    for (uint8_t level = 1; level <= 100; ++level) {
+      record.caughtLevel = level;
+      record.totalXp = pokemon::xpRequired(level);
+      // Whatever the record held before is replaced.
+      record.moves = {1, 2, 3, 4};
+      record.ppUsed = {9, 9, 9, 9};
+      record.ppUps = 0xFF;
+      pokemon::assignLevelUpMoves(record);
+      CHECK(record.moves[0] != 0);
+      CHECK(record.ppUsed == (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{}));
+      CHECK(record.ppUps == 0);
+      CHECK(pokemon::validateRecord(record));
+    }
+  }
+}
+
+void levelUpMovesAreTheFourMostRecent() {
+  pokemon::PokemonRecord bulbasaur = leaderAtLevelFive();
+  bulbasaur.speciesId = 1;
+  pokemon::assignLevelUpMoves(bulbasaur);
+  CHECK(bulbasaur.moves == (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{45, 33, 0, 0}));  // Growl, Tackle
+
+  // At level 27 it has learned six moves and keeps the last four, newest first.
+  bulbasaur.totalXp = pokemon::xpRequired(27);
+  pokemon::assignLevelUpMoves(bulbasaur);
+  CHECK(bulbasaur.moves == (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{75, 77, 22, 73}));
 }
 
 void collectionActionsExcludeOperationsThatCannotSucceed() {
@@ -222,6 +263,8 @@ void fullQueueCreditsReadingAndPrimesGuaranteesWithoutRolling() {
                             pokemon::Gender::Unknown,
                             pokemon::EvolutionItem::None,
                             pokemon::PendingEventKind::Evolution};
+  for (size_t index = 3; index < state.pendingEvents.size(); ++index)
+    state.pendingEvents[index] = state.pendingEvents[0];
   state.readingMinuteRemainder = 59;
   const auto pendingBefore = state.pendingEvents;
   const uint32_t xpBefore = leader.totalXp;
@@ -944,6 +987,8 @@ void rejectedInputsAndCancelledEvolutionDoNotPartiallyMutate() {
 }  // namespace
 
 int main() {
+  everySpeciesGetsValidMovesAtEveryLevel();
+  levelUpMovesAreTheFourMostRecent();
   collectionActionsExcludeOperationsThatCannotSucceed();
   creditedMinutesAdvanceLeaderAndReadingCounters();
   creditClampsAndRejectsInvalidCallsWithoutMutation();

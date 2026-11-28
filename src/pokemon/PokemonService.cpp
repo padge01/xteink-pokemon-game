@@ -82,9 +82,11 @@ ServiceStatus PokemonService::createStarter(const uint16_t speciesId, const Gend
   starter.caughtLevel = 5;
   starter.gender = gender;
   starter.origin = Origin::Starter;
+  assignLevelUpMoves(starter);
   if (!setNickname(starter, nickname) || !validateRecord(starter)) return ServiceStatus::Invalid;
 
   PokemonState state{};
+  grantStartingItems(state);
   state.partyRecordIds[0] = starter.recordId;
   if (!markSpecies(state.seenSpecies, speciesId) || !markSpecies(state.caughtSpecies, speciesId)) {
     return ServiceStatus::Invalid;
@@ -392,7 +394,7 @@ bool PokemonService::creditMinutes(const uint16_t minutes, const uint8_t bookPro
 
 #if !defined(POKEMON_SERVICE_HOST_TEST)
 PokemonService& devicePokemonService() {
-  static PokemonStore store;
+  static PokemonStore store(assignLevelUpMoves);
   static PokemonService service(store, {nullptr, deviceRandomBelow});
   return service;
 }

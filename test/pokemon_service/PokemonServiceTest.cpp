@@ -1,6 +1,9 @@
 #include <HalStorage.h>
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstring>
+
 #include "pokemon/PokemonService.h"
 
 namespace {
@@ -156,6 +159,102 @@ TEST(PokemonService, CreatesOneDurableStarterWithChosenIdentity) {
   pokemon::PokemonRecord durable{};
   ASSERT_TRUE(reopened.readRecord(1, durable));
   EXPECT_EQ(durable, snapshot.party[0]);
+}
+
+TEST(PokemonService, NewGameStartsWithMovesAndItems) {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  pokemon::PokemonService service(store, {nullptr, zeroRandom});
+  ASSERT_EQ(service.createStarter(1, pokemon::Gender::Male, ""), pokemon::ServiceStatus::Ok);
+
+  pokemon::PokemonSnapshot snapshot{};
+  ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
+  // A level 5 Bulbasaur knows Growl and Tackle; Leech Seed comes at level 7.
+  EXPECT_EQ(snapshot.party[0].moves, (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{45, 33, 0, 0}));
+  EXPECT_EQ(snapshot.party[0].hpLost, 0U);
+  EXPECT_EQ(pokemon::bagCount(snapshot.state, pokemon::POKEMON_ITEM_POKE_BALL), pokemon::POKEMON_STARTING_POKE_BALLS);
+  EXPECT_EQ(pokemon::bagCount(snapshot.state, pokemon::POKEMON_ITEM_POTION), pokemon::POKEMON_STARTING_POTIONS);
+}
+
+TEST(PokemonService, CaughtPokemonKnowsTheMovesForItsLevel) {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  seedStarter(store);
+  pokemon::PokemonState state{};
+  ASSERT_TRUE(store.loadState(state));
+  // A level 12 Pidgey: Gust, Sand Attack at 5 and Quick Attack at 12.
+  ASSERT_TRUE(pokemon::markSpecies(state.seenSpecies, 16));
+  ASSERT_TRUE(pokemon::enqueuePendingEvent(
+      state, {0, 16, 12, pokemon::Gender::Male, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter}));
+  ASSERT_TRUE(store.commit(state));
+  pokemon::PokemonService service(store, {nullptr, zeroRandom});
+
+  uint32_t caughtRecordId = 0;
+  ASSERT_EQ(service.resolveEncounter(pokemon::EncounterChoice::Catch, caughtRecordId), pokemon::ServiceStatus::Ok);
+  pokemon::PokemonRecord caught{};
+  ASSERT_EQ(service.readRecord(caughtRecordId, caught), pokemon::ServiceStatus::Ok);
+  EXPECT_EQ(caught.moves, (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{98, 28, 16, 0}));
+}
+
+// The save a real v0.1.1 build wrote right after a new game: one level 5 female Squirtle.
+constexpr uint8_t RELEASED_V011_SAVE[] = {
+    0x50, 0x4B, 0x56, 0x32, 0x02, 0x00, 0x18, 0x00, 0x01, 0x00, 0x00, 0x00, 0x74, 0x00, 0x30, 0x00, 0x01, 0x00,
+    0x00, 0x00, 0xA4, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x34, 0x00, 0x00, 0x00, 0x07, 0x00, 0x05, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xD5, 0xEC, 0xDA, 0x01,
+};
+
+TEST(PokemonService, SaveFromTheReleasedVersionUpgradesWithMovesAndItems) {
+  Storage.clear();
+  {
+    FsFile file = Storage.open("/.crosspoint/pokemon-a.bin", O_WRONLY | O_CREAT | O_TRUNC);
+    ASSERT_TRUE(file);
+    ASSERT_EQ(file.write(RELEASED_V011_SAVE, sizeof(RELEASED_V011_SAVE)), sizeof(RELEASED_V011_SAVE));
+    ASSERT_TRUE(file.close());
+  }
+  // The store the device uses: upgraded records get their moves from the game rules.
+  pokemon::PokemonStore store(pokemon::assignLevelUpMoves);
+  pokemon::PokemonService service(store, {nullptr, zeroRandom});
+
+  pokemon::PokemonSnapshot snapshot{};
+  ASSERT_EQ(service.loadSnapshot(snapshot), pokemon::ServiceStatus::Ok);
+  ASSERT_EQ(snapshot.partyCount, 1U);
+  ASSERT_EQ(snapshot.ownedCount, 1U);
+  const pokemon::PokemonRecord& squirtle = snapshot.party[0];
+  EXPECT_EQ(squirtle.speciesId, 7U);
+  EXPECT_EQ(squirtle.gender, pokemon::Gender::Female);
+  EXPECT_EQ(squirtle.origin, pokemon::Origin::Starter);
+  EXPECT_EQ(pokemon::levelForXp(squirtle.totalXp), 5U);
+  // Tail Whip and Tackle; Bubble comes at level 8.
+  EXPECT_EQ(squirtle.moves, (std::array<uint8_t, pokemon::POKEMON_MOVE_SLOTS>{39, 33, 0, 0}));
+  EXPECT_EQ(squirtle.hpLost, 0U);
+  EXPECT_EQ(pokemon::bagCount(snapshot.state, pokemon::POKEMON_ITEM_POKE_BALL), pokemon::POKEMON_STARTING_POKE_BALLS);
+  EXPECT_EQ(pokemon::bagCount(snapshot.state, pokemon::POKEMON_ITEM_POTION), pokemon::POKEMON_STARTING_POTIONS);
+  EXPECT_TRUE(pokemon::isSpeciesMarked(snapshot.state.caughtSpecies, 7));
+  // The released save itself is set aside, byte for byte.
+  FsFile backup = Storage.open("/.crosspoint/pokemon-before-upgrade.bin", O_RDONLY);
+  ASSERT_TRUE(backup);
+  uint8_t kept[sizeof(RELEASED_V011_SAVE)]{};
+  EXPECT_EQ(backup.fileSize64(), sizeof(RELEASED_V011_SAVE));
+  EXPECT_EQ(backup.read(kept, sizeof(kept)), static_cast<int>(sizeof(kept)));
+  EXPECT_TRUE(backup.close());
+  EXPECT_EQ(std::memcmp(kept, RELEASED_V011_SAVE, sizeof(kept)), 0);
+
+  // Reading carries on against the upgraded save.
+  EXPECT_TRUE(service.creditMinutes(2, 10));
+  pokemon::PokemonStore reopened(pokemon::assignLevelUpMoves);
+  ASSERT_EQ(reopened.begin(), pokemon::StoreBeginResult::Ready);
+  pokemon::PokemonState state{};
+  ASSERT_TRUE(reopened.loadState(state));
+  EXPECT_EQ(state.lifetimeMinutes, 2U);
+  EXPECT_EQ(pokemon::bagCount(state, pokemon::POKEMON_ITEM_POKE_BALL), pokemon::POKEMON_STARTING_POKE_BALLS);
 }
 
 TEST(PokemonService, RejectsSecondStarterWithoutChangingTheSave) {

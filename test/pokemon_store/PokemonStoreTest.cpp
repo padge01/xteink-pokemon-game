@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <span>
 
 #include "pokemon/PokemonStore.h"
 
@@ -31,58 +32,81 @@ void write32(uint8_t* bytes, const size_t offset, const uint32_t value) {
   bytes[offset + 3] = static_cast<uint8_t>(value >> 24U);
 }
 
-bool encodeLegacyState(const pokemon::PokemonState& state,
-                       std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES>& output) {
-  if (!pokemon::validateState(state) || pokemon::pendingEventCount(state) > 1) return false;
+constexpr const char* PATH_A = "/.crosspoint/pokemon-a.bin";
+constexpr const char* PATH_B = "/.crosspoint/pokemon-b.bin";
+constexpr const char* BACKUP_PATH = "/.crosspoint/pokemon-before-upgrade.bin";
+// A snapshot version newer than this build knows.
+constexpr uint8_t UNKNOWN_VERSION = pokemon::POKEMON_SNAPSHOT_VERSION + 1U;
+
+// Encodes a state the way snapshot version 1 or 2 stored it: one or three waiting events, and
+// none of what version 3 added.
+bool encodeOlderState(const uint16_t version, const pokemon::PokemonState& state,
+                      std::array<uint8_t, pokemon::POKEMON_STATE_V2_BYTES>& output, size_t& size) {
+  const size_t eventCount = version == pokemon::POKEMON_SNAPSHOT_VERSION_V1 ? 1U : 3U;
+  if (!pokemon::validateState(state) || pokemon::pendingEventCount(state) > eventCount) return false;
   output = {};
   for (size_t slot = 0; slot < pokemon::PARTY_SIZE; ++slot)
     write32(output.data(), slot * 4U, state.partyRecordIds[slot]);
-  const pokemon::PendingEvent* pending = pokemon::pendingEventFront(state);
-  if (pending != nullptr) {
-    write32(output.data(), 24, pending->recordId);
-    write16(output.data(), 28, pending->speciesId);
-    output[30] = pending->level;
-    output[31] = static_cast<uint8_t>(pending->gender);
-    output[32] = static_cast<uint8_t>(pending->item);
-    output[33] = static_cast<uint8_t>(pending->kind);
+  for (size_t index = 0; index < eventCount; ++index) {
+    const pokemon::PendingEvent& pending = state.pendingEvents[index];
+    uint8_t* bytes = output.data() + 24U + index * 10U;
+    write32(bytes, 0, pending.recordId);
+    write16(bytes, 4, pending.speciesId);
+    bytes[6] = pending.level;
+    bytes[7] = static_cast<uint8_t>(pending.gender);
+    bytes[8] = static_cast<uint8_t>(pending.item);
+    bytes[9] = static_cast<uint8_t>(pending.kind);
   }
+  uint8_t* rest = output.data() + 24U + eventCount * 10U;
   for (size_t index = 0; index < pokemon::EVOLUTION_ITEM_COUNT; ++index) {
-    write16(output.data(), 34U + index * 2U, state.itemCounts[index]);
+    write16(rest, index * 2U, state.itemCounts[index]);
   }
-  std::memcpy(output.data() + 46, state.seenSpecies.data(), state.seenSpecies.size());
-  std::memcpy(output.data() + 65, state.caughtSpecies.data(), state.caughtSpecies.size());
-  write32(output.data(), 84, state.lifetimeMinutes);
-  write32(output.data(), 88, state.sequence);
-  output[92] = state.readingMinuteRemainder;
-  output[93] = state.encounterMisses;
-  output[94] = state.itemMisses;
-  output[95] = static_cast<uint8_t>(state.dashboardNotice);
+  std::memcpy(rest + 12, state.seenSpecies.data(), state.seenSpecies.size());
+  std::memcpy(rest + 31, state.caughtSpecies.data(), state.caughtSpecies.size());
+  write32(rest, 50, state.lifetimeMinutes);
+  write32(rest, 54, state.sequence);
+  rest[58] = state.readingMinuteRemainder;
+  rest[59] = state.encounterMisses;
+  rest[60] = state.itemMisses;
+  rest[61] = static_cast<uint8_t>(state.dashboardNotice);
+  size = pokemon::snapshotStateBytes(version);
   return true;
 }
 
-bool writeLegacySnapshot(const char* path, const pokemon::PokemonState& state, const pokemon::PokemonRecord& record) {
+// Writes a complete snapshot as version 1 or 2 did, with its 48-byte records.
+bool writeOlderSnapshot(const char* path, const uint16_t version, const pokemon::PokemonState& state,
+                        const std::span<const pokemon::PokemonRecord> records) {
   pokemon::HeaderBytes headerBytes{};
-  const pokemon::SnapshotHeader header{pokemon::POKEMON_SNAPSHOT_VERSION_V1, state.sequence, 1};
-  std::array<uint8_t, pokemon::POKEMON_STATE_V1_BYTES> stateBytes{};
-  pokemon::RecordBytes recordBytes{};
-  if (!pokemon::encodeSnapshotHeader(header, headerBytes) || !encodeLegacyState(state, stateBytes) ||
-      !pokemon::encodeRecord(record, recordBytes)) {
+  const pokemon::SnapshotHeader header{version, state.sequence, static_cast<uint32_t>(records.size())};
+  std::array<uint8_t, pokemon::POKEMON_STATE_V2_BYTES> stateBytes{};
+  size_t stateSize = 0;
+  if (!pokemon::encodeSnapshotHeader(header, headerBytes) || !encodeOlderState(version, state, stateBytes, stateSize)) {
     return false;
   }
-  uint32_t crc =
-      pokemon::updateSnapshotCrc32(pokemon::POKEMON_SNAPSHOT_CRC32_INITIAL, headerBytes.data(), headerBytes.size());
-  crc = pokemon::updateSnapshotCrc32(crc, stateBytes.data(), stateBytes.size());
-  crc = pokemon::updateSnapshotCrc32(crc, recordBytes.data(), recordBytes.size());
-  uint8_t crcBytes[pokemon::POKEMON_SNAPSHOT_CRC_BYTES]{};
-  write32(crcBytes, 0, pokemon::finishSnapshotCrc32(crc));
-
   FsFile file = Storage.open(path, O_WRONLY | O_CREAT | O_TRUNC);
   if (!file) return false;
-  const bool written = file.write(headerBytes.data(), headerBytes.size()) == headerBytes.size() &&
-                       file.write(stateBytes.data(), stateBytes.size()) == stateBytes.size() &&
-                       file.write(recordBytes.data(), recordBytes.size()) == recordBytes.size() &&
-                       file.write(crcBytes, sizeof(crcBytes)) == sizeof(crcBytes);
-  return written && file.close();
+  uint32_t crc =
+      pokemon::updateSnapshotCrc32(pokemon::POKEMON_SNAPSHOT_CRC32_INITIAL, headerBytes.data(), headerBytes.size());
+  crc = pokemon::updateSnapshotCrc32(crc, stateBytes.data(), stateSize);
+  bool written = file.write(headerBytes.data(), headerBytes.size()) == headerBytes.size() &&
+                 file.write(stateBytes.data(), stateSize) == stateSize;
+  for (const pokemon::PokemonRecord& record : records) {
+    // An older record is the first 48 bytes of the current one.
+    pokemon::RecordBytes recordBytes{};
+    written =
+        written && pokemon::encodeRecord(record, recordBytes) &&
+        file.write(recordBytes.data(), pokemon::POKEMON_LEGACY_RECORD_BYTES) == pokemon::POKEMON_LEGACY_RECORD_BYTES;
+    crc = pokemon::updateSnapshotCrc32(crc, recordBytes.data(), pokemon::POKEMON_LEGACY_RECORD_BYTES);
+  }
+  uint8_t crcBytes[pokemon::POKEMON_SNAPSHOT_CRC_BYTES]{};
+  write32(crcBytes, 0, pokemon::finishSnapshotCrc32(crc));
+  written = written && file.write(crcBytes, sizeof(crcBytes)) == sizeof(crcBytes);
+  return file.close() && written;
+}
+
+bool writeLegacySnapshot(const char* path, const pokemon::PokemonState& state, const pokemon::PokemonRecord& record) {
+  return writeOlderSnapshot(path, pokemon::POKEMON_SNAPSHOT_VERSION_V1, state,
+                            std::span<const pokemon::PokemonRecord>(&record, 1));
 }
 
 bool readStoredHeader(const char* path, pokemon::SnapshotHeader& output) {
@@ -256,6 +280,162 @@ void replacementChangesOnlyTheRequestedRecord() {
   CHECK(reopened.loadState(loadedState));
   CHECK(loadedState.sequence == 3);
   CHECK(loadedState.lifetimeMinutes == 15);
+}
+
+// A full party: record ids 1-6, all of them in the party. Returns the state that goes with it.
+pokemon::PokemonState commitFullParty(pokemon::PokemonStore& store,
+                                      std::array<pokemon::PokemonRecord, pokemon::PARTY_SIZE>& party) {
+  pokemon::PokemonState state{};
+  for (size_t slot = 0; slot < party.size(); ++slot) {
+    const uint32_t recordId = static_cast<uint32_t>(slot + 1U);
+    party[slot] = slot == 0 ? starterPikachu() : (slot % 2U == 1U ? caughtBulbasaur(recordId) : caughtAbra(recordId));
+    state.partyRecordIds[slot] = recordId;
+    CHECK(pokemon::markSpecies(state.seenSpecies, party[slot].speciesId));
+    CHECK(pokemon::markSpecies(state.caughtSpecies, party[slot].speciesId));
+    const pokemon::RecordMutation append{recordId, party[slot], pokemon::RecordMutationKind::Append};
+    CHECK(store.commit(state, append));
+  }
+  return state;
+}
+
+void oneCommitReplacesEveryPartyMemberAndAppendsACatch() {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+  std::array<pokemon::PokemonRecord, pokemon::PARTY_SIZE> party{};
+  pokemon::PokemonState state = commitFullParty(store, party);
+
+  std::array<pokemon::RecordMutation, pokemon::RECORD_MUTATION_CAPACITY> batch{};
+  for (size_t slot = 0; slot < party.size(); ++slot) {
+    party[slot].totalXp += static_cast<uint32_t>(slot + 1U);
+    batch[slot] = {party[slot].recordId, party[slot], pokemon::RecordMutationKind::Replace};
+  }
+  const pokemon::PokemonRecord caught = caughtAbra(7);
+  batch[pokemon::PARTY_SIZE] = {caught.recordId, caught, pokemon::RecordMutationKind::Append};
+  state.lifetimeMinutes = 30;
+  CHECK(store.commit(state, batch));
+
+  pokemon::PokemonStore reopened;
+  CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(reopened.recordCount() == 7);
+  pokemon::PokemonRecord loaded{};
+  for (const pokemon::PokemonRecord& member : party) {
+    CHECK(reopened.readRecord(member.recordId, loaded));
+    CHECK(loaded == member);
+  }
+  CHECK(reopened.readRecord(caught.recordId, loaded));
+  CHECK(loaded == caught);
+  pokemon::PokemonState loadedState{};
+  CHECK(reopened.loadState(loadedState));
+  // Six appends, then one save for the whole batch.
+  CHECK(loadedState.sequence == 7);
+  CHECK(loadedState.lifetimeMinutes == 30);
+}
+
+void batchSkipsUnusedEntries() {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+  std::array<pokemon::PokemonRecord, pokemon::PARTY_SIZE> party{};
+  const pokemon::PokemonState state = commitFullParty(store, party);
+
+  std::array<pokemon::RecordMutation, pokemon::RECORD_MUTATION_CAPACITY> batch{};
+  party[3].totalXp += 9;
+  batch[4] = {party[3].recordId, party[3], pokemon::RecordMutationKind::Replace};
+  CHECK(store.commit(state, batch));
+
+  pokemon::PokemonRecord loaded{};
+  for (const pokemon::PokemonRecord& member : party) {
+    CHECK(store.readRecord(member.recordId, loaded));
+    CHECK(loaded == member);
+  }
+}
+
+void rejectedBatchSavesNothing() {
+  Storage.clear();
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+  std::array<pokemon::PokemonRecord, pokemon::PARTY_SIZE> party{};
+  pokemon::PokemonState state = commitFullParty(store, party);
+  state.lifetimeMinutes = 45;
+
+  pokemon::PokemonRecord changed = party[0];
+  changed.totalXp += 5;
+  const pokemon::RecordMutation replaceFirst{changed.recordId, changed, pokemon::RecordMutationKind::Replace};
+
+  // A record that is not in the save.
+  const pokemon::PokemonRecord stranger = caughtAbra(40);
+  std::array<pokemon::RecordMutation, 2> unknownRecord{
+      replaceFirst, pokemon::RecordMutation{stranger.recordId, stranger, pokemon::RecordMutationKind::Replace}};
+  CHECK(!store.commit(state, unknownRecord));
+
+  // The same record twice.
+  std::array<pokemon::RecordMutation, 2> sameRecordTwice{replaceFirst, replaceFirst};
+  CHECK(!store.commit(state, sameRecordTwice));
+
+  // Two new records.
+  const pokemon::PokemonRecord seventh = caughtAbra(7);
+  const pokemon::PokemonRecord eighth = caughtAbra(8);
+  std::array<pokemon::RecordMutation, 2> twoAppends{
+      pokemon::RecordMutation{seventh.recordId, seventh, pokemon::RecordMutationKind::Append},
+      pokemon::RecordMutation{eighth.recordId, eighth, pokemon::RecordMutationKind::Append}};
+  CHECK(!store.commit(state, twoAppends));
+
+  // More entries than one save takes.
+  std::array<pokemon::RecordMutation, pokemon::RECORD_MUTATION_CAPACITY + 1U> tooMany{};
+  tooMany[0] = replaceFirst;
+  CHECK(!store.commit(state, tooMany));
+
+  pokemon::PokemonStore reopened;
+  CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(reopened.recordCount() == pokemon::PARTY_SIZE);
+  pokemon::PokemonRecord loaded{};
+  CHECK(reopened.readRecord(party[0].recordId, loaded));
+  CHECK(loaded == party[0]);
+  pokemon::PokemonState loadedState{};
+  CHECK(reopened.loadState(loadedState));
+  CHECK(loadedState.sequence == pokemon::PARTY_SIZE);
+  CHECK(loadedState.lifetimeMinutes == 0);
+}
+
+void everyInterruptedBatchByteLeavesThePreviousSnapshotBootable() {
+  constexpr size_t batchSnapshotBytes = pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + pokemon::POKEMON_STATE_BYTES +
+                                        (pokemon::PARTY_SIZE + 1U) * pokemon::POKEMON_RECORD_BYTES +
+                                        pokemon::POKEMON_SNAPSHOT_CRC_BYTES;
+  for (size_t cut = 0; cut < batchSnapshotBytes; ++cut) {
+    Storage.clear();
+    pokemon::PokemonStore store;
+    CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
+    std::array<pokemon::PokemonRecord, pokemon::PARTY_SIZE> party{};
+    pokemon::PokemonState state = commitFullParty(store, party);
+
+    std::array<pokemon::RecordMutation, pokemon::RECORD_MUTATION_CAPACITY> batch{};
+    for (size_t slot = 0; slot < party.size(); ++slot) {
+      pokemon::PokemonRecord changed = party[slot];
+      changed.totalXp += 10;
+      batch[slot] = {changed.recordId, changed, pokemon::RecordMutationKind::Replace};
+    }
+    const pokemon::PokemonRecord caught = caughtAbra(7);
+    batch[pokemon::PARTY_SIZE] = {caught.recordId, caught, pokemon::RecordMutationKind::Append};
+    state.lifetimeMinutes = 30;
+    Storage.setWriteLimit(cut);
+    CHECK(!store.commit(state, batch));
+    Storage.clearWriteLimit();
+
+    // None of the batch is visible: not the new record, not one changed party member.
+    pokemon::PokemonStore reopened;
+    CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+    CHECK(reopened.recordCount() == pokemon::PARTY_SIZE);
+    pokemon::PokemonState loadedState{};
+    CHECK(reopened.loadState(loadedState));
+    CHECK(loadedState.lifetimeMinutes == 0);
+    pokemon::PokemonRecord loaded{};
+    for (const pokemon::PokemonRecord& member : party) {
+      CHECK(reopened.readRecord(member.recordId, loaded));
+      CHECK(loaded == member);
+    }
+    CHECK(!reopened.readRecord(caught.recordId, loaded));
+  }
 }
 
 void pcPagesExcludeThePartyAndSupportAllThreeOrders() {
@@ -520,7 +700,55 @@ void failedSyncKeepsTheLiveStoreOldButAllowsACompleteSnapshotAfterRestart() {
   CHECK(loaded.lifetimeMinutes == 20);
 }
 
-void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
+bool writeGarbage(const char* path) {
+  FsFile file = Storage.open(path, O_WRONLY | O_CREAT | O_TRUNC);
+  if (!file) return false;
+  constexpr uint8_t garbage[] = {'P', 'K', 'M', 0x00, 0x13, 0x37};
+  const bool written = file.write(garbage, sizeof(garbage)) == sizeof(garbage);
+  return file.close() && written;
+}
+
+// What a state from an older version looks like once it has been upgraded and saved.
+pokemon::PokemonState upgraded(pokemon::PokemonState older) {
+  pokemon::grantStartingItems(older);
+  ++older.sequence;
+  return older;
+}
+
+// A version 2 save as v0.1.1 leaves it: the newer snapshot in slot A, the one before it in slot B.
+struct VersionTwoSave {
+  std::array<pokemon::PokemonRecord, 3> records{starterPikachu(), caughtBulbasaur(2), caughtAbra(3)};
+  pokemon::PokemonState state{};
+};
+
+VersionTwoSave writeVersionTwoSave() {
+  VersionTwoSave save{};
+  save.state.partyRecordIds = {1, 2, 0, 0, 0, 0};
+  for (const pokemon::PokemonRecord& record : save.records) {
+    CHECK(pokemon::markSpecies(save.state.seenSpecies, record.speciesId));
+    CHECK(pokemon::markSpecies(save.state.caughtSpecies, record.speciesId));
+  }
+  CHECK(pokemon::markSpecies(save.state.seenSpecies, 16));
+  save.state.pendingEvents[0] = {
+      0, 16, 4, pokemon::Gender::Male, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Encounter};
+  save.state.pendingEvents[1] = {
+      0, 0, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::MoonStone, pokemon::PendingEventKind::Item};
+  save.state.pendingEvents[2] = {
+      1, 26, 0, pokemon::Gender::Unknown, pokemon::EvolutionItem::None, pokemon::PendingEventKind::Evolution};
+  save.state.itemCounts[0] = 1;
+  save.state.dashboardNotice = pokemon::DashboardNotice::NewPokemon;
+  save.state.lifetimeMinutes = 480;
+  save.state.readingMinuteRemainder = 12;
+  pokemon::PokemonState previous = save.state;
+  previous.sequence = 20;
+  previous.lifetimeMinutes = 475;
+  save.state.sequence = 21;
+  CHECK(writeOlderSnapshot(PATH_B, pokemon::POKEMON_SNAPSHOT_VERSION_V2, previous, save.records));
+  CHECK(writeOlderSnapshot(PATH_A, pokemon::POKEMON_SNAPSHOT_VERSION_V2, save.state, save.records));
+  return save;
+}
+
+void firstVersionSaveIsUpgradedOnStartupAndKeptAsABackup() {
   Storage.clear();
   const pokemon::PokemonRecord pikachu = starterPikachu();
   pokemon::PokemonState legacy{};
@@ -533,39 +761,162 @@ void legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback() {
   CHECK(pokemon::markSpecies(legacy.seenSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(legacy.caughtSpecies, pikachu.speciesId));
   CHECK(pokemon::markSpecies(legacy.seenSpecies, 1));
-  CHECK(writeLegacySnapshot("/.crosspoint/pokemon-a.bin", legacy, pikachu));
+  CHECK(writeLegacySnapshot(PATH_A, legacy, pikachu));
 
   pokemon::PokemonStore store;
   CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
   pokemon::PokemonState loaded{};
   CHECK(store.loadState(loaded));
-  CHECK(loaded == legacy);
+  CHECK(loaded == upgraded(legacy));
   pokemon::PokemonRecord loadedRecord{};
   CHECK(store.readRecord(pikachu.recordId, loadedRecord));
   CHECK(loadedRecord == pikachu);
 
-  CHECK(store.commit(loaded));
-  pokemon::SnapshotHeader migratedHeader{};
-  CHECK(readStoredHeader("/.crosspoint/pokemon-b.bin", migratedHeader));
-  CHECK(migratedHeader.version == pokemon::POKEMON_SNAPSHOT_VERSION);
-  CHECK(migratedHeader.sequence == 8);
+  // The upgraded snapshot went to the free slot; the old one moved out of the way, untouched.
+  pokemon::SnapshotHeader header{};
+  CHECK(readStoredHeader(PATH_B, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION);
+  CHECK(header.sequence == 8);
+  CHECK(!Storage.exists(PATH_A));
+  CHECK(readStoredHeader(BACKUP_PATH, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION_V1);
+  CHECK(header.sequence == 7);
 
-  pokemon::PokemonStore migrated;
-  CHECK(migrated.begin() == pokemon::StoreBeginResult::Ready);
-  CHECK(migrated.loadState(loaded));
-  CHECK(loaded.sequence == 8);
-  CHECK(loaded.lifetimeMinutes == legacy.lifetimeMinutes);
-  CHECK(loaded.pendingEvents == legacy.pendingEvents);
-  CHECK(migrated.readRecord(pikachu.recordId, loadedRecord));
-  CHECK(loadedRecord == pikachu);
+  // Starting again finds the upgraded save and does not upgrade it a second time.
+  pokemon::PokemonStore reopened;
+  CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(reopened.loadState(loaded));
+  CHECK(loaded == upgraded(legacy));
 
-  Storage.setByte("/.crosspoint/pokemon-b.bin", pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + 104, 0xFF);
-  pokemon::PokemonStore fallback;
-  CHECK(fallback.begin() == pokemon::StoreBeginResult::Ready);
-  CHECK(fallback.loadState(loaded));
-  CHECK(loaded == legacy);
-  CHECK(fallback.readRecord(pikachu.recordId, loadedRecord));
-  CHECK(loadedRecord == pikachu);
+  // Saving carries on from there.
+  loaded.lifetimeMinutes = 124;
+  CHECK(reopened.commit(loaded));
+  CHECK(readStoredHeader(PATH_A, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION);
+  CHECK(header.sequence == 9);
+}
+
+void versionTwoSaveKeepsEveryPokemonAndWaitingEvent() {
+  Storage.clear();
+  const VersionTwoSave save = writeVersionTwoSave();
+
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(store.recordCount() == save.records.size());
+  pokemon::PokemonState loaded{};
+  CHECK(store.loadState(loaded));
+  CHECK(loaded == upgraded(save.state));
+  CHECK(pokemon::bagCount(loaded, pokemon::POKEMON_ITEM_POKE_BALL) == pokemon::POKEMON_STARTING_POKE_BALLS);
+  CHECK(pokemon::bagCount(loaded, pokemon::POKEMON_ITEM_POTION) == pokemon::POKEMON_STARTING_POTIONS);
+  for (const pokemon::PokemonRecord& record : save.records) {
+    pokemon::PokemonRecord loadedRecord{};
+    CHECK(store.readRecord(record.recordId, loadedRecord));
+    CHECK(loadedRecord == record);
+  }
+
+  // The newer of the two old snapshots is the one kept.
+  pokemon::SnapshotHeader header{};
+  CHECK(readStoredHeader(BACKUP_PATH, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION_V2);
+  CHECK(header.sequence == 21);
+  CHECK(!Storage.exists(PATH_A));
+  CHECK(readStoredHeader(PATH_B, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION);
+  CHECK(header.sequence == 22);
+}
+
+void upgradeGivesEveryPokemonItsMoves() {
+  Storage.clear();
+  const VersionTwoSave save = writeVersionTwoSave();
+
+  // Stands in for the game's rule: here, the species id is the first move.
+  pokemon::PokemonStore store(
+      +[](pokemon::PokemonRecord& record) { record.moves = {static_cast<uint8_t>(record.speciesId), 33, 0, 0}; });
+  CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
+  for (const pokemon::PokemonRecord& record : save.records) {
+    pokemon::PokemonRecord expected = record;
+    expected.moves = {static_cast<uint8_t>(record.speciesId), 33, 0, 0};
+    pokemon::PokemonRecord loadedRecord{};
+    CHECK(store.readRecord(record.recordId, loadedRecord));
+    CHECK(loadedRecord == expected);
+    CHECK(loadedRecord.hpLost == 0 && loadedRecord.status == 0);
+  }
+
+  // A record the upgrade leaves invalid stops the upgrade; the old save stays where it was.
+  Storage.clear();
+  writeVersionTwoSave();
+  pokemon::PokemonStore broken(+[](pokemon::PokemonRecord& record) { record.moves = {33, 33, 0, 0}; });
+  CHECK(broken.begin() == pokemon::StoreBeginResult::Corrupt);
+  CHECK(!broken.commit(save.state));
+  pokemon::SnapshotHeader header{};
+  CHECK(readStoredHeader(PATH_A, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION_V2);
+  CHECK(!Storage.exists(BACKUP_PATH));
+}
+
+void everyInterruptedUpgradeByteLeavesTheOlderSaveBootable() {
+  constexpr size_t upgradedSnapshotBytes = pokemon::POKEMON_SNAPSHOT_HEADER_BYTES + pokemon::POKEMON_STATE_BYTES +
+                                           3U * pokemon::POKEMON_RECORD_BYTES + pokemon::POKEMON_SNAPSHOT_CRC_BYTES;
+  for (size_t cut = 0; cut < upgradedSnapshotBytes; ++cut) {
+    Storage.clear();
+    const VersionTwoSave save = writeVersionTwoSave();
+
+    Storage.setWriteLimit(cut);
+    pokemon::PokemonStore interrupted;
+    CHECK(interrupted.begin() == pokemon::StoreBeginResult::Corrupt);
+    CHECK(!interrupted.commit(save.state));
+    Storage.clearWriteLimit();
+
+    // The old snapshot is still in its slot, and the next start upgrades it in full.
+    pokemon::SnapshotHeader header{};
+    CHECK(readStoredHeader(PATH_A, header));
+    CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION_V2);
+    CHECK(!Storage.exists(BACKUP_PATH));
+    pokemon::PokemonStore retried;
+    CHECK(retried.begin() == pokemon::StoreBeginResult::Ready);
+    pokemon::PokemonState loaded{};
+    CHECK(retried.loadState(loaded));
+    CHECK(loaded == upgraded(save.state));
+    CHECK(retried.recordCount() == save.records.size());
+    CHECK(Storage.exists(BACKUP_PATH));
+  }
+}
+
+void backupLeftUnfinishedIsCompletedOnTheNextStartup() {
+  Storage.clear();
+  const VersionTwoSave save = writeVersionTwoSave();
+
+  // The upgrade itself succeeds, but the old snapshot cannot be moved aside.
+  Storage.setFailRename(true);
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
+  Storage.setFailRename(false);
+  CHECK(!Storage.exists(BACKUP_PATH));
+  pokemon::SnapshotHeader header{};
+  CHECK(readStoredHeader(PATH_A, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION_V2);
+
+  pokemon::PokemonStore reopened;
+  CHECK(reopened.begin() == pokemon::StoreBeginResult::Ready);
+  CHECK(!Storage.exists(PATH_A));
+  CHECK(readStoredHeader(BACKUP_PATH, header));
+  CHECK(header.version == pokemon::POKEMON_SNAPSHOT_VERSION_V2);
+  CHECK(header.sequence == 21);
+  pokemon::PokemonState loaded{};
+  CHECK(reopened.loadState(loaded));
+  CHECK(loaded == upgraded(save.state));
+}
+
+void upgradeReplacesAnEarlierBackup() {
+  Storage.clear();
+  writeVersionTwoSave();
+  CHECK(writeGarbage(BACKUP_PATH));
+
+  pokemon::PokemonStore store;
+  CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
+  pokemon::SnapshotHeader header{};
+  CHECK(readStoredHeader(BACKUP_PATH, header));
+  CHECK(header.sequence == 21);
 }
 
 void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData() {
@@ -582,7 +933,7 @@ void startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData
   Storage.clear();
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, UNKNOWN_VERSION);
   pokemon::PokemonStore unsupported;
   CHECK(unsupported.begin() == pokemon::StoreBeginResult::Unsupported);
 
@@ -609,7 +960,7 @@ void startupBlocksDowngradesAndMixedUnsupportedCorruption() {
   CHECK(store.commit(state));
   state.lifetimeMinutes = 20;
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-b.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-b.bin", 4, UNKNOWN_VERSION);
 
   pokemon::PokemonStore downgraded;
   CHECK(downgraded.begin() == pokemon::StoreBeginResult::Unsupported);
@@ -627,7 +978,7 @@ void failedResetDoesNotBypassProtectedStoreGating() {
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   pokemon::PokemonState state{};
   CHECK(store.commit(state));
-  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, UNKNOWN_VERSION);
 
   pokemon::PokemonStore protectedStore;
   CHECK(protectedStore.begin() == pokemon::StoreBeginResult::Unsupported);
@@ -657,8 +1008,13 @@ void legacyFilenamesMigrateTheNewestValidSnapshot() {
   CHECK(store.begin() == pokemon::StoreBeginResult::Ready);
   pokemon::PokemonState loaded{};
   CHECK(store.loadState(loaded));
-  CHECK(loaded == newer);
-  CHECK(Storage.exists("/.crosspoint/pokemon-a.bin"));
+  CHECK(loaded == upgraded(newer));
+  // The newer file took slot A under its new name, was upgraded into slot B, and is now the backup.
+  CHECK(Storage.exists(PATH_B));
+  CHECK(!Storage.exists(PATH_A));
+  pokemon::SnapshotHeader header{};
+  CHECK(readStoredHeader(BACKUP_PATH, header));
+  CHECK(header.sequence == 8);
   CHECK(!Storage.exists("/.crosspoint/pokemon-v2-b.bin"));
   CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
 }
@@ -678,14 +1034,6 @@ void failedLegacyFilenameMigrationKeepsTheOriginalSave() {
   CHECK(store.begin() == pokemon::StoreBeginResult::Corrupt);
   CHECK(Storage.exists("/.crosspoint/pokemon-v2-a.bin"));
   CHECK(!Storage.exists("/.crosspoint/pokemon-a.bin"));
-}
-
-bool writeGarbage(const char* path) {
-  FsFile file = Storage.open(path, O_WRONLY | O_CREAT | O_TRUNC);
-  if (!file) return false;
-  constexpr uint8_t garbage[] = {'P', 'K', 'M', 0x00, 0x13, 0x37};
-  const bool written = file.write(garbage, sizeof(garbage)) == sizeof(garbage);
-  return file.close() && written;
 }
 
 void corruptFirstSaveWithoutFallbackCanBeReset() {
@@ -745,7 +1093,7 @@ void corruptSlotBesideOtherDamageIsNotResettable() {
   pokemon::PokemonStore store;
   CHECK(store.begin() == pokemon::StoreBeginResult::Empty);
   CHECK(store.commit(pokemon::PokemonState{}));
-  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, 3);
+  Storage.setByte("/.crosspoint/pokemon-a.bin", 4, UNKNOWN_VERSION);
   CHECK(writeGarbage("/.crosspoint/pokemon-b.bin"));
   pokemon::PokemonStore mixed;
   CHECK(mixed.begin() == pokemon::StoreBeginResult::Corrupt);
@@ -761,6 +1109,10 @@ int main() {
   initialAppendPersistsAReadableRecord();
   laterAppendStreamsExistingRecordsIntoTheInactiveSlot();
   replacementChangesOnlyTheRequestedRecord();
+  oneCommitReplacesEveryPartyMemberAndAppendsACatch();
+  batchSkipsUnusedEntries();
+  rejectedBatchSavesNothing();
+  everyInterruptedBatchByteLeavesThePreviousSnapshotBootable();
   pcPagesExcludeThePartyAndSupportAllThreeOrders();
   pcReadFailureIsDistinctFromAValidEmptyPage();
   resetCommitsANewerEmptySnapshot();
@@ -769,7 +1121,12 @@ int main() {
   unwritableAppendPreservesThePendingEncounterAndRoster();
   interruptedAppendPreservesThePendingEncounterAndRoster();
   failedSyncKeepsTheLiveStoreOldButAllowsACompleteSnapshotAfterRestart();
-  legacySnapshotMigratesToV2AndRemainsTheCorruptionFallback();
+  firstVersionSaveIsUpgradedOnStartupAndKeptAsABackup();
+  versionTwoSaveKeepsEveryPokemonAndWaitingEvent();
+  upgradeGivesEveryPokemonItsMoves();
+  everyInterruptedUpgradeByteLeavesTheOlderSaveBootable();
+  backupLeftUnfinishedIsCompletedOnTheNextStartup();
+  upgradeReplacesAnEarlierBackup();
   startupClassifiesCorruptAndUnsupportedSnapshotsAndFallsBackToValidOlderData();
   startupBlocksDowngradesAndMixedUnsupportedCorruption();
   failedResetDoesNotBypassProtectedStoreGating();

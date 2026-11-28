@@ -68,6 +68,9 @@ struct RecordMutation {
   RecordMutationKind kind = RecordMutationKind::None;
 };
 
+// One save can change every party member and add one newly caught Pokemon.
+constexpr size_t RECORD_MUTATION_CAPACITY = PARTY_SIZE + 1;
+
 CreditResult applyCreditedMinutes(PokemonState& state, PokemonRecord& leader, uint16_t minutes,
                                   uint8_t bookProgressPercent, OwnedEvolutionNeeds ownedEvolutionNeeds,
                                   const RandomSource& random);
@@ -78,5 +81,8 @@ bool resolveEncounter(PokemonState& state, const PokemonRecord& leader, Encounte
 bool resolveEvolution(PokemonState& state, PokemonRecord& record, EvolutionChoice choice, RecordMutation& mutation);
 bool useEvolutionItem(PokemonState& state, PokemonRecord& record, EvolutionItem item, RecordMutation& mutation);
 CollectionActionSet collectionActions(bool party, uint8_t partyCount);
+// Gives a Pokemon the moves one of its species and level knows - the four it learned most
+// recently - at full PP. For a new Pokemon, and for one from a save made before battles.
+void assignLevelUpMoves(PokemonRecord& record);
 
 }  // namespace pokemon

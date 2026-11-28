@@ -17,12 +17,66 @@ add_custom_command(
   VERBATIM
 )
 
+# The game rules pick a Pokemon's moves from the battle data.
+set(POKEMON_MOVES_GENERATED_HEADER "${POKEMON_SPECIES_GENERATED_DIR}/PokemonMoves.generated.h")
+set(POKEMON_STATS_GENERATED_HEADER "${POKEMON_SPECIES_GENERATED_DIR}/PokemonStats.generated.h")
+set(POKEMON_LEARNSETS_GENERATED_HEADER "${POKEMON_SPECIES_GENERATED_DIR}/PokemonLearnsets.generated.h")
+
+add_custom_command(
+  OUTPUT "${POKEMON_MOVES_GENERATED_HEADER}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${POKEMON_SPECIES_GENERATED_DIR}"
+  COMMAND ${Python3_EXECUTABLE}
+          "${REPO_ROOT}/scripts/generate_pokemon_moves.py"
+          --input "${REPO_ROOT}/scripts/data/pokemon-moves.csv"
+          --output "${POKEMON_MOVES_GENERATED_HEADER}"
+  DEPENDS
+    "${REPO_ROOT}/scripts/generate_pokemon_moves.py"
+    "${REPO_ROOT}/scripts/data/pokemon-moves.csv"
+  VERBATIM
+)
+
+add_custom_command(
+  OUTPUT "${POKEMON_STATS_GENERATED_HEADER}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${POKEMON_SPECIES_GENERATED_DIR}"
+  COMMAND ${Python3_EXECUTABLE}
+          "${REPO_ROOT}/scripts/generate_pokemon_stats.py"
+          --input "${REPO_ROOT}/scripts/data/pokemon-stats.csv"
+          --output "${POKEMON_STATS_GENERATED_HEADER}"
+  DEPENDS
+    "${REPO_ROOT}/scripts/generate_pokemon_stats.py"
+    "${REPO_ROOT}/scripts/data/pokemon-stats.csv"
+  VERBATIM
+)
+
+add_custom_command(
+  OUTPUT "${POKEMON_LEARNSETS_GENERATED_HEADER}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${POKEMON_SPECIES_GENERATED_DIR}"
+  COMMAND ${Python3_EXECUTABLE}
+          "${REPO_ROOT}/scripts/generate_pokemon_learnsets.py"
+          --learnsets-input "${REPO_ROOT}/scripts/data/pokemon-learnsets.csv"
+          --tmhm-input "${REPO_ROOT}/scripts/data/pokemon-tmhm.csv"
+          --output "${POKEMON_LEARNSETS_GENERATED_HEADER}"
+  DEPENDS
+    "${REPO_ROOT}/scripts/generate_pokemon_learnsets.py"
+    "${REPO_ROOT}/scripts/data/pokemon-learnsets.csv"
+    "${REPO_ROOT}/scripts/data/pokemon-tmhm.csv"
+  VERBATIM
+)
+
 add_executable(PokemonGameTest
   PokemonGameTest.cpp
   "${POKEMON_SPECIES_GENERATED_HEADER}"
+  "${POKEMON_MOVES_GENERATED_HEADER}"
+  "${POKEMON_STATS_GENERATED_HEADER}"
+  "${POKEMON_LEARNSETS_GENERATED_HEADER}"
   ${REPO_ROOT}/lib/Pokemon/PokemonTypes.cpp
   ${REPO_ROOT}/lib/Pokemon/PokemonSpecies.cpp
   ${REPO_ROOT}/lib/Pokemon/PokemonGame.cpp
+  ${REPO_ROOT}/lib/Pokemon/PokemonMoveData.cpp
+  ${REPO_ROOT}/lib/Pokemon/PokemonBaseStats.cpp
+  ${REPO_ROOT}/lib/Pokemon/PokemonLearnsets.cpp
+  ${REPO_ROOT}/lib/Pokemon/PokemonTypeChart.cpp
+  ${REPO_ROOT}/lib/Pokemon/PokemonBattle.cpp
 )
 
 target_include_directories(PokemonGameTest PRIVATE
